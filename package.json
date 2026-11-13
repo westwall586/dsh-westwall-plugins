@@ -1,0 +1,39 @@
+{
+  "name": "@westwall/dsh-plugins",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "westwall 的 DSH 插件库（pnpm monorepo）：packages/* 每个都是可独立安装、独立上架的 bundle，根包是全家桶聚合 bundle。",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "engines": {
+      "dsh": ">=0.2.2-rc.2"
+    }
+  },
+  "scripts": {
+    "aggregate": "node scripts/aggregate.mjs",
+    "aggregate:check": "node scripts/aggregate.mjs --check",
+    "create-plugin": "node scripts/create-plugin.mjs",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r --if-present test"
+  },
+  "engines": {
+    "node": ">=22.19.0",
+    "pnpm": ">=10"
+  },
+  "packageManager": "pnpm@11.3.0",
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

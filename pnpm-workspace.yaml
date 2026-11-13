@@ -1,0 +1,10 @@
+packages:
+  - "packages/*"
+
+# pnpm 11 起，非认证类设置放这里（.npmrc 只留给 registry/auth）。
+# 本地 workspace 包按版本匹配时走 link：改 packages/x 立即生效。
+linkWorkspacePackages: true
+# engines 不满足时直接失败，而不是只打 WARN。
+engineStrict: true
+# 宿主服务由 DSH 提供，不从 registry 拉取（否则会装上整个 @deepseek-ai/dsh 依赖树）。
+autoInstallPeers: false

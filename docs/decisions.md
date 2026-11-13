@@ -40,7 +40,7 @@
 
 ## registry
 
-- **安装**沿用本机配置的 registry（可以使用镜像）。
+- **安装**与发布都使用 npm 官方 registry（`registry.npmjs.org`）。
 - **发布**固定到 `https://registry.npmjs.org/`：各包 `publishConfig.registry` 已声明。
 
 ## 版本管理

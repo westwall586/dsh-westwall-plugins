@@ -20,7 +20,7 @@
 - DSH Cordis bundle：`package.json#dsh.bundle.patch` + `cordis.patch.yml`
 - 测试：`node:test`，Node 原生类型剥离，直接运行 `.ts`
 - CI：GitHub Actions；发布：tag 触发 `.github/workflows/release.yml`（trusted publishing，发布开关未开启时只校验）
-- registry：发布固定 `registry.npmjs.org`；安装使用本机配置的 registry（可为镜像）
+- registry：安装与发布都使用 npm 官方 registry（`registry.npmjs.org`）
 
 ## 项目级约束
 

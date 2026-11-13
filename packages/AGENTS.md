@@ -26,7 +26,7 @@
 
 - **包必须自包含**：插件之间不互相 import，不依赖兄弟包，依赖里不出现 `workspace:`。
 - 运行期只依赖宿主提供的 `@deepseek-ai/*`：声明进 `peerDependencies`，需要本地类型/测试时再进
-  `devDependencies`（版本从 npmjs 装；npmmirror 常缺 0.2.x 的平台包）。
+  `devDependencies`（从 npm 官方 registry 安装；部分平台包只在官方 registry 有）。
 - 第三方运行依赖保持最少，并在包 README 里说明理由。
 
 ### 产物

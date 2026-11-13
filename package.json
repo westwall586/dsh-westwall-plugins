@@ -22,8 +22,8 @@
     "aggregate": "node scripts/aggregate.mjs",
     "aggregate:check": "node scripts/aggregate.mjs --check",
     "create-plugin": "node scripts/create-plugin.mjs",
-    "build": "pnpm -r build",
-    "typecheck": "pnpm -r typecheck",
+    "build": "pnpm -r --if-present build",
+    "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test"
   },
   "engines": {

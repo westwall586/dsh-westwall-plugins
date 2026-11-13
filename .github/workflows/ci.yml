@@ -27,7 +27,7 @@ jobs:
         run: pnpm aggregate:check
 
       - name: 构建
-        run: pnpm -r build
+        run: pnpm -r --if-present build
 
       - name: 构建产物必须与源码一致（lib 入库）
         run: git diff --exit-code -- packages

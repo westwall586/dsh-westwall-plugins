@@ -15,6 +15,27 @@
 2. 发布凭据可用：优先 **trusted publishing（OIDC）**；未配置时用人工 2FA（`pnpm publish` 会提示验证码）。
 3. 目标 DSH 版本满足该包声明的 `engines.dsh` / `peerDependencies`。
 
+## 一次性配置（开启自动发布）
+
+只在第一次配置或更换仓库时做一次。
+
+1. **npm 上给每个要发布的包配 trusted publisher**：
+   - 打开 `https://www.npmjs.com/package/@westwall/dsh-<name>/access`
+   - Trusted publisher → GitHub Actions
+   - Repository：`JohnXi029/dsh-westwall-plugins`
+   - Workflow：`release.yml`
+   - Environment：留空（除非使用了 GitHub Environment）
+2. **仓库里打开发布开关**：
+   - Settings → Secrets and variables → Actions → Variables → New variable
+   - Name `PUBLISH_ENABLED`，Value `true`
+   - 不设或设成其他值：release workflow 只校验、不发布。
+3. 之后发布 = 打 tag 并推送（见下）。
+
+> 首次发布一个尚不存在的包时，也可以先手动
+> `pnpm --filter @westwall/dsh-<name> publish --access public`（会提示 2FA 验证码），
+> 发布成功后在 npm 包页面配上 trusted publisher，后续再走自动发布。
+> npm 正在收紧 bypass-2FA token 的直接发布权限，优先用 trusted publishing。
+
 ## 步骤
 
 ```sh

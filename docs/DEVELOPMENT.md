@@ -2,6 +2,15 @@
 
 面向维护者。用户安装说明见 [README](../README.md)。
 
+## 只需要记住三件事
+
+1. **新增插件**：`pnpm create-plugin <name>`，然后 `pnpm install && pnpm -r build`。
+2. **怎么用**：自己用 `link:` 装；分享/换机用 GitHub 固定 commit。这两种都**不需要发布**。
+3. **要发 npm**：按 [RELEASING.md](RELEASING.md) 走一遍，最后打 `dsh-<name>@<version>` tag。
+
+其余细节（结构、产物、版本语义、CI 检查什么）本文与 [decisions.md](decisions.md) 有完整说明；
+CI 会自动拦住常见错误（聚合清单过期、产物没入库、类型或测试失败）。
+
 ## 环境要求
 
 - Node.js >= 22.19

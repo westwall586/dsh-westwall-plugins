@@ -8,6 +8,7 @@
 | 目录 | 说明 | 状态 |
 |---|---|---|
 | [jira-worklogs](jira-worklogs/README.md) | Jira 工时记录：月历缺口、日详情、Git 素材，就地起草并确认后写入 Jira | 草稿 · 推荐本地安装 |
+| [feed-ultra](feed-ultra/README.md) | 资讯工作台：RSS、GitHub 榜单、每日早报与 X 书签按天阅读，渠道定时与 AI 翻译 | 草稿 · 推荐本地安装 |
 
 新增插件后把这一行补上。
 

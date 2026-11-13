@@ -55,6 +55,7 @@ dsh plugin --profile <profile> add \
 | 插件 | 简介 | 状态 |
 |---|---|---|
 | [Jira 工时记录](packages/jira-worklogs/README.md) | 月历查看工时缺口、日详情与 Git 素材，就地起草、确认后写入 Jira | **草稿** · 推荐本地安装 |
+| [资讯工作台](packages/feed-ultra/README.md) | RSS、GitHub 榜单、每日早报与 X 书签收进一个工作区，按天阅读并做 AI 翻译 | **草稿** · 推荐本地安装 |
 
 ## 兼容性
 

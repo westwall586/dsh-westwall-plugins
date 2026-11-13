@@ -1,16 +1,31 @@
-# @westwall/dsh-hello
+# Hello
 
-最小插件模板，`pnpm create-plugin <name>` 以它为蓝本。
+示例插件：用来验证「构建 → 打包 → 安装 → 挂载」整条链路。它没有界面，只在宿主启动时
+输出一行日志。正式插件以它为模板（见 [开发指南](../../docs/DEVELOPMENT.md)）。
 
-- `cordis.patch.yml`：把 `hello` 这一行插进 profile 阵容
-- `src/index.ts`：宿主半体，导出 `name` / `inject` / `apply`
-- `locale/*.json`：插件页显示用的标题与描述
-- `icon.svg`：插件页图标
+## 安装
 
-本地调试：
+从 npm：
 
 ```sh
-pnpm --filter @westwall/dsh-hello build
-dsh plugin --profile web add link:$(pwd)/packages/hello
-dsh web
+dsh plugin --profile <profile> add @westwall/dsh-hello
+```
+
+从 GitHub 固定提交：
+
+```sh
+dsh plugin --profile <profile> add \
+  "git+https://github.com/JohnXi029/dsh-westwall-plugins.git#<commit>&path:/packages/hello"
+```
+
+本地开发：
+
+```sh
+dsh plugin --profile <profile> add link:/绝对路径/packages/hello
+```
+
+## 卸载
+
+```sh
+dsh plugin --profile <profile> remove @westwall/dsh-hello
 ```

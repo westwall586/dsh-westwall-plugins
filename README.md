@@ -1,51 +1,80 @@
-# westwall DSH 插件库
+# DSH 插件库
 
-[DeepSeek Harness](https://www.deepseek.com/harness/)（DSH）的插件 monorepo。
-每个 `packages/*` 都是一个**完整、可独立安装、可独立上架 npm** 的 bundle；
-仓库根包是**全家桶聚合 bundle**，一条命令挂载全部插件。
+为 [DeepSeek Harness](https://www.deepseek.com/harness/)（DSH）提供的插件集合。
+每个插件独立安装、独立升级；也可以一次装齐全部。
 
-## 结构
+## 安装插件
 
-```
-.
-├── package.json          # @westwall/dsh-plugins：根聚合 bundle（dsh.bundle.patch）
-├── cordis.patch.yml      # 生成物：根行 + 各插件行（pnpm aggregate）
-├── packages/<name>/      # 一个插件包 = 一个 bundle，独立版本、独立发布
-├── templates/hello/      # 新插件蓝本（pnpm create-plugin 复制它）
-├── scripts/              # aggregate（生成聚合清单）/ create-plugin（脚手架）
-└── docs/decisions.md     # 命名、版本、产物、发布等已经拍板的约定
-```
+按你的场景选一种方式。桌面版对应左侧栏 → **插件** → **Add plugin**，Web 版对应 `dsh plugin --profile <profile> add <spec>`。
 
-单包解剖：
+### 从 npm 安装
 
-| 文件 | 作用 |
-|---|---|
-| `package.json` | `dsh.bundle.patch` 指向补丁；`peerDependencies.@deepseek-ai/dsh` 写兼容区间；`files` 决定 npm 产物 |
-| `cordis.patch.yml` | 一条 `insert` 行，把插件挂进 profile 阵容 |
-| `src/index.ts` | 宿主半体：`name` / `inject` / `apply(ctx, config)` |
-| `lib/` | tsc 产物（入库，发布前不需要现场构建） |
-| `locale/*.json` | 插件页的标题与描述（`meta.title` / `meta.description`） |
-| `icon.svg` | 插件页图标（`exports["./icon"]`） |
-
-## 常用命令
+适用于已经发布的插件：
 
 ```sh
-pnpm install                       # 一次装齐所有 workspace 包的依赖
-pnpm create-plugin <name> [id]     # 生成 packages/<name>（@westwall/dsh-<name>）
-pnpm -r build                      # 构建全部插件
-pnpm aggregate                     # 改了包集合/版本后重新生成聚合清单
-pnpm aggregate:check               # CI 用：聚合清单是否与包集合一致
-
-# 本地挂载全家桶（先把本仓库 link 进 profile）
-dsh plugin --profile web add link:$(pwd)
-dsh web                            # 重启后生效
-
-# 只挂一个子包
-dsh plugin --profile web add link:$(pwd)/packages/<name>
+dsh plugin --profile <profile> add @westwall/dsh-hello
 ```
 
-> 根包与子包**不要同时安装**，否则同一行会被挂两次，启动时报 `duplicate loader entry id`。
+### 从 GitHub 安装
 
-## 当前状态
+适用于尚未发布、或想固定某个提交的插件：
 
-骨架阶段：`packages/` 为空，尚未迁入任何插件。下一个动作见 [docs/decisions.md](docs/decisions.md)。
+```sh
+dsh plugin --profile <profile> add \
+  "git+https://github.com/JohnXi029/dsh-westwall-plugins.git#<commit>&path:/packages/<插件目录>"
+```
+
+- `<commit>` 是 40 位提交 SHA，`<插件目录>` 是包所在的目录名（如 `hello`）。
+- 固定提交意味着内容可复现；升级时换成新的 SHA 重新安装。
+- 仓库是公开的，安装不需要登录 GitHub。
+
+### 从本地目录安装
+
+适用于开发调试：
+
+```sh
+dsh plugin --profile <profile> add link:/绝对路径/packages/<插件目录>
+```
+
+本地目录是符号链接，改动代码后重启宿主即可生效，不需要重新安装（除非改了依赖）。
+
+### 一次性安装全部
+
+仓库根目录本身是一个聚合 bundle：
+
+```sh
+dsh plugin --profile <profile> add \
+  "git+https://github.com/JohnXi029/dsh-westwall-plugins.git#<commit>"
+```
+
+> 前提：聚合里列出的插件都已发布到 npm。根 bundle 的依赖按 npm 版本解析；
+> 有未发布的插件时，请用上面的「从 GitHub 安装」逐个装子目录。
+
+## 插件
+
+| 插件 | 说明 | 安装 |
+|---|---|---|
+| Hello（`@westwall/dsh-hello`） | 示例插件：只验证安装与挂载链路，没有界面 | `@westwall/dsh-hello` |
+
+## 兼容性
+
+- 需要 DSH **0.2.2-rc.2** 或更新版本；每个插件在 `dsh.engines.dsh` 与
+  `peerDependencies` 中声明自己的兼容范围。
+- 宿主在安装前与启动时都会校验版本，不满足会拒绝安装或加载。
+
+## 卸载
+
+```sh
+dsh plugin --profile <profile> remove @westwall/dsh-hello
+```
+
+桌面版与 Web 版也可以在 **插件** 页里直接移除。
+
+## 文档
+
+- [开发指南](docs/DEVELOPMENT.md)：目录结构、构建、测试、新增插件
+- [设计决定](docs/decisions.md)：命名、产物、分发与兼容性约定
+
+## 许可证
+
+[Apache-2.0](LICENSE)

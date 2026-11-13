@@ -5,3 +5,8 @@
 - insert:
     - id: dsh-plugins
       name: '@westwall/dsh-plugins'
+
+# from packages/hello
+- insert:
+    - id: hello
+      name: '@westwall/dsh-hello'

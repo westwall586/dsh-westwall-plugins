@@ -1,15 +1,5 @@
-// dsh-jira-worklogs client half — 面板化入口（侧栏「Jira 日志」菜单行 + 主栏页面：
-// 月历五区 + 组件内生成 + 直接提交）。
-// 20261015 Wave：暂存提示条（overview.outbox）、手动素材区（dayDetail.notes +
-// candidates，防抖自动保存）、暂存回显（openOutbox 复用草稿表单）。
-// Shape: official decoration template (window.__ModuleLoader__.load factory;
-// React from the loader's frozen module table). Service access via the
-// platform Remote: this package hand-writes its TypertRemoteContribution
-// (wire format matches the generated artifacts; Node/browser side is pure
-// data) and mounts it with ctx.remote.$mount, then calls
-// ctx.remote.jiraWorklogs.{overview,dayDetail,generate,submit,openOutbox,dismissOutbox,saveNotes}.
 window.__ModuleLoader__.load({
-  id: 'dsh-jira-worklogs',
+  id: '@westwall/dsh-jira-worklogs',
   factory(require) {
     const React = require('react')
     const { useState, useRef, useEffect, useCallback } = React
@@ -681,7 +671,7 @@ window.__ModuleLoader__.load({
           if (!aliveRef.current) return
           if (next && next.error === 'jira-credentials') {
             setMonth(null)
-            setFailure({ title: '缺少连接配置', message: next.message || 'Jira 地址、账号与密码尚未配置，请到 插件页 → dsh-jira-worklogs 详情页补齐，保存后回本窗口刷新即可。' })
+            setFailure({ title: '缺少连接配置', message: next.message || 'Jira 地址、账号与密码尚未配置，请到 插件页 → Jira 工时记录 详情页补齐，保存后回本窗口刷新即可。' })
             return
           }
           setMonth(next)
@@ -1302,7 +1292,7 @@ window.__ModuleLoader__.load({
             h('div', { className: 'jw-c-section-title' }, '仓库过滤名单'),
             h('textarea', {
               className: 'jw-c-textarea', rows: 3, value: draft?.filterText ?? '',
-              placeholder: '每行一个子串，命中即排除；默认 context-repo',
+              placeholder: '每行一个子串，命中即排除',
               onChange: e => patch({ filterText: e.target.value }),
             })),
           h('div', { className: 'jw-c-footer' },
@@ -1554,14 +1544,9 @@ textarea.jw-in { height: auto; padding: 6px 8px; }
     return {
       inject: ['slots', 'remote'],
       async apply(ctx) {
-        // 设置入口：官方产品方向把插件配置收进插件页（ui-plugin-manager），系统设置只留
-        // 只读列表——注册进 plugins.bundle.config 包级槽（键＝包名），表单直接内嵌组合包
-        // 详情页的描述与组件列表之间（仓规范：包级内嵌为默认，行级仅例外场景）。
-        // 卡片数据层走 ctx.remote.settings（describe/mutate 均在 rc.1 在位），
-        // 注入声明之内访问以保留 remote 服务的属性追踪语义。
         ctx.inject(['remote.settings'], sctx => {
           sctx.slots.inject('plugins.bundle.config', () => sctx.slots.register(
-            { name: 'plugins.bundle.config', key: 'dsh-jira-worklogs' },
+            { name: 'plugins.bundle.config', key: '@westwall/dsh-jira-worklogs' },
             () => h(SettingsCard, { ctx: sctx }),
           ))
         })

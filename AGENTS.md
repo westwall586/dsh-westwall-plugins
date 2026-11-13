@@ -55,4 +55,5 @@ node scripts/smoke-install.mjs <spec>   # 装 → 启动 → 校验 → 摘除�
 - [packages/AGENTS.md](packages/AGENTS.md)：插件包通用规则与插件目录。改动任何包前（进入包目录时也会被自动加载）
 - [RELEASING.md](docs/RELEASING.md)：发版步骤、验证与回滚，以及自动发布的一次性配置。发布前
 - [decisions.md](docs/decisions.md)：命名、分发方式、版本管理、兼容性。做设计取舍时
+- [PLUGIN-GUIDE.md](docs/PLUGIN-GUIDE.md)：插件标题、描述、README、图标与互推规则。写用户可见文案前
 - [README.md](README.md)：面向用户的安装与卸载说明。改用户可见行为时

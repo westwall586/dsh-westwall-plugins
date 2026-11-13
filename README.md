@@ -72,6 +72,7 @@ dsh plugin --profile <profile> remove <包名>
 ## 文档
 
 - [开发指南](docs/DEVELOPMENT.md)：目录结构、构建、测试、新增插件
+- [插件文案与图标规范](docs/PLUGIN-GUIDE.md)：标题、描述、README 与图标写法
 - [设计决定](docs/decisions.md)：命名、产物、分发与兼容性约定
 
 ## 许可证

@@ -52,6 +52,7 @@ pnpm -r build
 ```
 
 模板会生成 `packages/<name>`（`@westwall/dsh-<name>`，插件 id `<id>`），并自动重跑聚合。
+新插件的标题、描述、README 与图标按 [PLUGIN-GUIDE.md](PLUGIN-GUIDE.md) 完成。
 之后的开发循环：
 
 ```sh

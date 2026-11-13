@@ -69,4 +69,5 @@ if (agg.status !== 0) {
 }
 
 console.log(`[create-plugin] packages/${name} 已生成（@westwall/dsh-${name}，插件 id ${id}）`)
-console.log('[create-plugin] 下一步：pnpm install && pnpm -r build')
+console.log('[create-plugin] 下一步：按 docs/PLUGIN-GUIDE.md 补齐 locale 标题与描述、README 和图标')
+console.log('[create-plugin] 然后运行 pnpm install && pnpm -r build')

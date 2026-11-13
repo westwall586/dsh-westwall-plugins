@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Hello",
-    "description": "Minimal westwall DSH plugin template with a bundle patch, a host half and localized display metadata."
+    "title": "Replace this title",
+    "description": "Replace this description with two sentences. State the user goal and searchable nouns, then the location, key action and safety boundary. Rules are in docs/PLUGIN-GUIDE.md."
   }
 }

@@ -1,16 +1,63 @@
-# @westwall/dsh-hello
+# <标题> 使用手册
 
-最小插件模板。`pnpm create-plugin <name>` 以它为蓝本生成新的插件包。
+> **状态：草稿。** 发布前保留这一行。发布后改成正式状态与安装方式。
 
-- `cordis.patch.yml`：把 `hello` 这一行插进 profile 阵容
-- `src/index.ts`：宿主半体，导出 `name` / `inject` / `apply`
-- `locale/*.json`：插件页显示用的标题与描述
-- `icon.svg`：插件页图标
+<一句话承诺。写清用户完成什么，不要写功能清单。>
 
-结构与约定见 [开发指南](../../docs/DEVELOPMENT.md)。
+## 快速开始
 
-## 安装
+1. 安装 `@westwall/dsh-hello`。
+2. 重启 DSH。
+3. 在「插件」页完成配置。
+4. 打开侧栏「<入口标签>」，预期看到 <首屏>。
 
 ```sh
-dsh plugin --profile <profile> add @westwall/dsh-hello
+dsh plugin --profile <profile> add link:/绝对路径/packages/hello
 ```
+
+## 配置
+
+| 项 | 说明 |
+|---|---|
+| <配置项> | <含义、默认值与前置条件> |
+
+## 日常使用
+
+### <主流程>
+
+<用真实 UI 标签写步骤与预期结果。>
+
+## 故障排查
+
+| 现象 | 先查 |
+|---|---|
+| <现象> | <原因与动作> |
+
+## 卸载与清理
+
+<移除方式、可选的数据清理、需要撤销的凭据。>
+
+## 相关链接
+
+- 作者主页 [github.com/westwall586](https://github.com/westwall586)
+- 插件仓库 [dsh-westwall-plugins](https://github.com/westwall586/dsh-westwall-plugins)
+
+### 更多插件
+
+更多插件见 [dsh-westwall-plugins](https://github.com/westwall586/dsh-westwall-plugins)。固定提交安装。
+
+```sh
+dsh plugin --profile <profile> add \
+  "git+https://github.com/westwall586/dsh-westwall-plugins.git#<commit>&path:/packages/hello"
+```
+
+### 维护者文档
+
+- <架构说明，例如 docs/ARCHITECTURE.md>
+- <本地调试与命令，例如 docs/TOOLS.md>
+
+### 许可
+
+<许可证，例如 Apache-2.0，指向仓库 LICENSE。>
+
+模板说明。复制后替换标题、承诺、各节内容、链接与图标，并删除本行。完整规则见 [插件文案与图标规范](../../docs/PLUGIN-GUIDE.md)。

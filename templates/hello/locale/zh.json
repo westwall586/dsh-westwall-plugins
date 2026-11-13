@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "待替换标题",
-    "description": "把这段描述替换为两句话。先写用户目标与可搜索名词，再写入口、关键动作与安全边界。规则见 docs/PLUGIN-GUIDE.md。"
+    "description": "把这段描述替换为两句话。先写用户问题与可搜索名词，再写亮点、入口、关键动作与安全边界。规则见 docs/PLUGIN-GUIDE.md。"
   }
 }

@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Jira worklogs",
-    "description": "Fill in and review Jira worklogs in DSH. Open the sidebar item 「Jira 日志」 to see gaps and the day's Git commits, draft entries in place, then confirm to write with a duplicate check; coworker worklogs are read-only."
+    "description": "Manual Jira worklogs are easy to forget. Open 「Jira 日志」 to see gaps and the day's Git commits, auto-draft entries, then confirm a deduplicated write; coworker worklogs are read-only."
   }
 }

@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Jira worklogs",
-    "description": "Sidebar worklog panel with a monthly calendar of work-hour gaps and the day's Git commits. Draft entries in place with the host model, then write to Jira only after explicit confirmation; each write checks for duplicates and reads back the result."
+    "description": "Fill in and review Jira worklogs in DSH. Open the sidebar item 「Jira 日志」 to see gaps and the day's Git commits, draft entries in place, then confirm to write with a duplicate check; coworker worklogs are read-only."
   }
 }

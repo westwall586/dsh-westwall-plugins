@@ -1,0 +1,86 @@
+{
+  "name": "@westwall/dsh-feed-ultra",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "资讯工作台（草稿）：RSS、GitHub Trending、每日早报与 X 书签按天阅读，AI 翻译，数据落在绑定工作区。",
+  "icon": "./icon.svg",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "src",
+    "client",
+    "client.js",
+    "tools",
+    "cordis.patch.yml",
+    "locale",
+    "icon.svg",
+    "README.md"
+  ],
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "engines": {
+      "dsh": ">=0.2.2-rc.2"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-sidebar-right"
+      ]
+    }
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "test": "node --test 'tests/**/*.test.{ts,mjs}'",
+    "typecheck": "tsc --noEmit",
+    "dev:fetch": "node src/dev/fetch.ts"
+  },
+  "dependencies": {
+    "feedsmith": "3.0.1",
+    "node-html-parser": "^7.0.1",
+    "undici": "7.30.2",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.1.0",
+    "@deepseek-ai/cordis-plugin-loader": "^1.1.0",
+    "@deepseek-ai/cordis-plugin-timer": "^1.2.0",
+    "@deepseek-ai/dsh-settings": "0.2.2-rc.2",
+    "@deepseek-ai/dsh-typert-protocol": "0.2.2-rc.2",
+    "@deepseek-ai/schemastery": "^3.19.0",
+    "@types/node": "^24.10.1",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.3"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.1.0",
+    "@deepseek-ai/cordis-plugin-loader": "^1.1.0",
+    "@deepseek-ai/cordis-plugin-timer": "^1.2.0",
+    "@deepseek-ai/dsh": "^0.2.2-rc.2",
+    "@deepseek-ai/dsh-settings": ">=0.1.0-rc <0.3.0",
+    "@deepseek-ai/dsh-typert-protocol": ">=0.1.0-rc <0.3.0",
+    "@deepseek-ai/schemastery": "^3.19.0"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh": {
+      "optional": true
+    }
+  },
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"
+     xmlns:content="http://purl.org/rss/1.0/modules/content/"
+     xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Example Engineering</title>
+    <link>https://blog.example.com/</link>
+    <description>Engineering notes</description>
+    <item>
+      <title>Choosing QuePaxa</title>
+      <link>https://blog.example.com/quepaxa</link>
+      <guid isPermaLink="false">01M742VWRK37TPYYPMXERSCWKN</guid>
+      <description>&lt;p&gt;Cloudflare is building &amp;amp; testing a new consensus algorithm.&lt;/p&gt;</description>
+      <content:encoded><![CDATA[<p>Full <strong>text</strong> for the article.</p>]]></content:encoded>
+      <pubDate>Wed, 11 Nov 2026 14:24:46 GMT</pubDate>
+      <category>Engineering</category>
+      <category>Consensus</category>
+      <enclosure url="https://blog.example.com/quepaxa.mp3" length="12345" type="audio/mpeg"/>
+      <dc:creator>João Pedro Leite</dc:creator>
+    </item>
+    <item>
+      <title>Permalink item with &amp; entities</title>
+      <link>https://blog.example.com/permalink</link>
+      <guid isPermaLink="true">https://blog.example.com/permalink</guid>
+      <description><![CDATA[<p>Second item<br/>with a break.</p>]]></description>
+      <pubDate>Thu, 12 Nov 2026 08:22:09 +0800</pubDate>
+    </item>
+  </channel>
+</rss>

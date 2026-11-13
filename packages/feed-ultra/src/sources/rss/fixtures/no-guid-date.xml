@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>No GUID</title>
+    <link>https://sspai.example.com/</link>
+    <description>Real-world shapes without identifiers</description>
+    <item>
+      <title>Plain local time</title>
+      <link>https://sspai.example.com/posts/local</link>
+      <description>A date without a timezone marker.</description>
+      <pubDate>2026-11-11 07:30:00</pubDate>
+    </item>
+    <item>
+      <title>Future post</title>
+      <link>https://sspai.example.com/posts/future</link>
+      <guid isPermaLink="false">future-post</guid>
+      <description>Accepted, sorted to the top.</description>
+      <pubDate>2027-01-01T00:00:00Z</pubDate>
+    </item>
+    <item>
+      <link>https://sspai.example.com/posts/untitled</link>
+      <guid isPermaLink="false">untitled-post</guid>
+      <description>No title in the document.</description>
+      <pubDate>Thu, 12 Nov 2026 08:22:09 +0800</pubDate>
+    </item>
+    <item>
+      <title>Garbage date</title>
+      <link>https://sspai.example.com/posts/garbage</link>
+      <guid isPermaLink="false">garbage-date</guid>
+      <description>Falls back to the fetch instant.</description>
+      <pubDate>not a date</pubDate>
+    </item>
+    <item>
+      <title>No link and no guid</title>
+      <description>Dropped.</description>
+    </item>
+  </channel>
+</rss>

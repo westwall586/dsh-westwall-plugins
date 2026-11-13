@@ -1,0 +1,90 @@
+[
+  {
+    "entryId": "tweet-2120050574448025797",
+    "content": {
+      "itemContent": {
+        "tweet_results": {
+          "result": {
+            "__typename": "Tweet",
+            "rest_id": "2120050574448025797",
+            "core": {
+              "user_results": {
+                "result": {
+                  "core": {
+                    "name": "星川 ✨ StarFlow",
+                    "screen_name": "star_flow_ai"
+                  }
+                }
+              }
+            },
+            "legacy": {
+              "id_str": "2120050574448025797",
+              "created_at": "Tue Nov 10 07:07:00 +0000 2026",
+              "full_text": "最近在 GitHub 上翻了不少 DeepSeek Harness（DSH）的社区插件， 挑出 7 个我觉得比较值得装的。\n\n主要就两个目的：让 Agent 更好地干活，顺便少烧点 Token。\n\ndsh-context：查看 Token 都花在哪了，还能监控子 Agent 的运行情况。",
+              "lang": "zh",
+              "favorite_count": 216,
+              "retweet_count": 24,
+              "reply_count": 19,
+              "quote_count": 0
+            },
+            "note_tweet": {
+              "note_tweet_results": {
+                "result": {
+                  "text": "最近在 GitHub 上翻了不少 DeepSeek Harness（DSH）的社区插件， 挑出 7 个我觉得比较值得装的。\n\n主要就两个目的：让 Agent 更好地干活，顺便少烧点 Token。\n\ndsh-context：查看 Token 都花在哪了，还能监控子 Agent 的运行情况。\n\ndsh-live-compact：自动压缩上下文，不需要额外调用模型，长会话应该挺实用。\n\ndsh-multitask：这个我最感兴趣。主 Agent 只负责理解需求、分配任务和汇报，具体操作全部交给子 Agent，避免主会话被一堆日志塞满。\n\ndsh-auto-review：让第二个模型帮忙审批高风险操作，不用每次都自己点确认。\n\ndsh-mnemon：给 Agent 加分层记忆，需要什么再检索，不用每次把历史资料全塞进去。\n\ndsh-plugin-tool-management：按场景切换 MCP、Skills 和子 Agent，不用的工具直接隐藏，省下工具描述占用的 Token。\n\ndsh-cost-meter：统计 Token 消耗和费用，方便控制预算。\n\n这几个里面，我个人比较看好 multitask + live-compact 的思路。"
+                }
+              }
+            },
+            "views": {
+              "count": "18158",
+              "state": "EnabledWithCount"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "entryId": "tweet-2120348886426603825",
+    "content": {
+      "itemContent": {
+        "tweet_results": {
+          "result": {
+            "__typename": "Tweet",
+            "rest_id": "2120348886426603825",
+            "core": {
+              "user_results": {
+                "result": {
+                  "core": {
+                    "name": "李不凯@libuk.ai",
+                    "screen_name": "libukai"
+                  }
+                }
+              }
+            },
+            "legacy": {
+              "id_str": "2120348886426603825",
+              "created_at": "Wed Nov 11 02:52:23 +0000 2026",
+              "full_text": "DS-Bot 这个项目的成熟程度比我之前预想的要好很多啊！\n\n毕竟是站在 Dots/Grok-Bot 的肩膀上，博采众家之长又开源便于定制，用起来感觉就特别的舒服。\n\n我已经把各种自动化任务全部迁移了过来，测试跑了两天聪明又稳定（可能主要归功于默认模型用的 GPT-6.1-Sol）。 https://t.co/8zMjf4Kq7r",
+              "lang": "zh",
+              "favorite_count": 41,
+              "retweet_count": 1,
+              "reply_count": 10,
+              "quote_count": 0
+            },
+            "note_tweet": {
+              "note_tweet_results": {
+                "result": {
+                  "text": "DS-Bot 这个项目的成熟程度比我之前预想的要好很多啊！\n\n毕竟是站在 Dots/Grok-Bot 的肩膀上，博采众家之长又开源便于定制，用起来感觉就特别的舒服。\n\n我已经把各种自动化任务全部迁移了过来，测试跑了两天聪明又稳定（可能主要归功于默认模型用的 GPT-6.1-Sol）。\n\n就个人使用习惯而言，我不大喜欢依赖云端电脑，还是像 DS-Bot 这样全部跑在本地设备上最便捷和最安心。\n\n综合考虑之后，我放弃了独立的客户端版本，而是选择了使用嵌入 DeepSeek Harness 客户端的插件版本。\n\n然后自己动手在 Bot 界面上加了一个快捷切换按钮，这样就能在 Agent 模式和 Bot 模式之间快速切换。\n\n不同类型的工作能使用不同的应用模式，实在是太对我这样龟毛的强迫症用户的胃口了。\n\n配合 dsh-Go 客户端，在移动端也可以便捷使用，出门在外调用家里电脑让它继续干活。\n\n至于具体用法上，就不多加介绍了，毕竟功能点上现在各家都差不多。\n\n而如何用好 Personal Agent 这个问题又实在是太个性化了，我唯一的建议就是作者在 Readme 里说的那句话：“强烈建议直接通过和 bot 对话来配置其他 bot 和群聊。”\n\n换成我更惯用的表达方式就是：你得真心把它当个人看，这样你就能和它相处的更好。\n\n以上就是 DeepSeek Harness 插件推荐第五弹，项目地址依然在评论第一条，有兴趣的朋友可以自己研究。"
+                }
+              }
+            },
+            "views": {
+              "count": "4613",
+              "state": "EnabledWithCount"
+            }
+          }
+        }
+      }
+    }
+  }
+]

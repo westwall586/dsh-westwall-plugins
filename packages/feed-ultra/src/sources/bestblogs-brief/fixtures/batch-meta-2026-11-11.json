@@ -1,0 +1,71 @@
+{
+  "success": true,
+  "data": [
+    {
+      "id": "RAW_39abcb5f7e",
+      "title": "Gemini 4 Carbon 现已推出",
+      "oneSentenceSummary": "Google DeepMind 发布 Gemini 4 Carbon，这款前沿 AI 模型擅长网络安全、长程智能体工作流和科学推理，可通过 API 和 Google 平台使用，定价与 Argon 相同。",
+      "url": "https://deepmind.google/blog/gemini-4-carbon-is-now-available/",
+      "readUrl": "https://www.bestblogs.dev/article/39abcb5f7e",
+      "cover": "https://media.bestblogs.dev/20261110224730_gemini_4_carbon_key_art_16-9_lockup.width-1300.jpg",
+      "sourceName": "Google DeepMind News",
+      "resourceType": "ARTICLE",
+      "language": "en_US",
+      "tags": [
+        "AI 与智能应用",
+        "模型发布",
+        "大语言模型 (LLM)",
+        "AI Agent",
+        "AI 安全与对齐"
+      ],
+      "wordCount": 1873,
+      "readTime": 8,
+      "publishTimeStamp": 1794326498670,
+      "score": 92
+    },
+    {
+      "id": "RAW_b8ba16a568",
+      "title": "MiniMax H3-Image 开源：让 4K 图像生成进入 10 秒时代",
+      "oneSentenceSummary": "MiniMax 发布 H3-Image 开源模型，支持 4K 图像生成，10 秒出图，速度提升 5 倍，价格低于同档位 50%-70%，并首周提供五折优惠。",
+      "url": "https://mp.weixin.qq.com/s?__biz=MzE5MTA3NzcxMQ==&mid=2247489228&idx=1&sn=7611a433102ca91044ef5e71f19ee291",
+      "readUrl": "https://www.bestblogs.dev/article/b8ba16a568",
+      "cover": "https://image.jido.dev/20260527050757_5c72e77.jpeg",
+      "sourceName": "MiniMax 稀宇科技",
+      "resourceType": "ARTICLE",
+      "language": "zh_CN",
+      "tags": [
+        "AI 与智能应用",
+        "图像生成",
+        "开放权重模型",
+        "大语言模型 (LLM)",
+        "AI 产品与应用"
+      ],
+      "wordCount": 925,
+      "readTime": 4,
+      "publishTimeStamp": 1794322800000,
+      "score": 88
+    },
+    {
+      "id": "RAW_fa387eaa0",
+      "title": "LinkedIn 如何让智能体从错误中改进，并验证改动有效",
+      "oneSentenceSummary": "LinkedIn 用递归改进流程生成了首个上线的提示词更新。为了让改动靠谱，团队先修正了评估标准和归因方式。",
+      "url": "https://www.youtube.com/watch?v=yH7_SIIgI-Y",
+      "readUrl": "https://www.bestblogs.dev/video/fa387eaa0",
+      "cover": "https://i2.ytimg.com/vi/yH7_SIIgI-Y/hqdefault.jpg",
+      "sourceName": "AI Engineer",
+      "resourceType": "VIDEO",
+      "language": "en_US",
+      "tags": [
+        "AI 与智能应用",
+        "递归自我改进",
+        "科技评论",
+        "视频",
+        "智能体评估"
+      ],
+      "wordCount": 1233,
+      "readTime": 5,
+      "publishTimeStamp": 1794268813000,
+      "score": 90
+    }
+  ]
+}

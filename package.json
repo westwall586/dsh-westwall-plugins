@@ -37,6 +37,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "dependencies": {
+    "@westwall/dsh-feed-ultra": "0.1.0",
     "@westwall/dsh-jira-worklogs": "0.1.0"
   }
 }

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Atom Example</title>
+  <id>tag:example.com,2026:feed</id>
+  <updated>2026-11-12T09:00:00Z</updated>
+  <entry>
+    <title type="html">&lt;b&gt;Rust 1.90&lt;/b&gt;</title>
+    <id>tag:example.com,2026:entry-1</id>
+    <published>2026-11-11T07:30:00+08:00</published>
+    <updated>2026-11-12T08:00:00Z</updated>
+    <summary>Summary with <em>entities</em>.</summary>
+    <content type="html">&lt;p&gt;Full content.&lt;/p&gt;</content>
+    <link rel="alternate" type="text/html" href="https://example.com/posts/one"/>
+    <link rel="shorturl" href="https://ex.co/1"/>
+    <author><name>Ann Author</name></author>
+    <category term="ai"/>
+    <category term="rust"/>
+  </entry>
+  <entry>
+    <title>Updated only</title>
+    <id>tag:example.com,2026:entry-2</id>
+    <updated>2026-11-12T10:00:00Z</updated>
+    <summary>No published date.</summary>
+    <link rel="alternate" href="/posts/two"/>
+  </entry>
+  <entry>
+    <title>No links</title>
+    <id>tag:example.com,2026:entry-3</id>
+    <updated>2026-11-12T11:00:00Z</updated>
+    <content type="html">&lt;p&gt;Body.&lt;/p&gt;</content>
+  </entry>
+</feed>

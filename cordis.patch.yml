@@ -6,6 +6,11 @@
     - id: dsh-plugins
       name: '@westwall/dsh-plugins'
 
+# from packages/feed-ultra
+- insert:
+    - id: dsh-feed-ultra
+      name: '@westwall/dsh-feed-ultra'
+
 # from packages/jira-worklogs
 - insert:
     - id: dsh-jira-worklogs

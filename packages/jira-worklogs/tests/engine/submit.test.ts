@@ -17,7 +17,7 @@ function confirmedPlan(overrides: Record<string, unknown> = {}) {
     today_existing_hours: 0,
     entries: [{
       issue_key: 'DEMO-745',
-      task_name: '需求交付agent优化',
+      task_name: '示例任务甲',
       time_spent: '8h',
       hours: 8,
       started: '2026-09-21T09:00:00.000+0800',
@@ -63,7 +63,7 @@ test('确认后写入并回读，adjustEstimate 走 query 参数', async () => {
 test('结果条目保留任务字段（任务名与时间段）', async () => {
   const { report } = await submitPlan(confirmedPlan())
   const item = report.results[0]!
-  assert.equal(item.task_name, '需求交付agent优化')
+  assert.equal(item.task_name, '示例任务甲')
   assert.equal(item.time_range, '09:00-17:00')
 })
 
@@ -122,7 +122,7 @@ test('占位说明阻塞；超长说明放行（20261028 用户裁决——长�
 test('旧格式双副本确认收敛后正常写入', async () => {
   const confirmed = {
     issue_key: 'DEMO-745',
-    task_name: '需求交付agent优化',
+    task_name: '示例任务甲',
     time_spent: '8h',
     hours: 8,
     started: '2026-09-21T09:00:00.000+0800',
@@ -172,7 +172,7 @@ test('多日提交：某日校验失败按日隔离，整体 partial', async () 
   ;(bad.entries as Record<string, unknown>[])[0]!.comment = '待用户补充真实工作说明'
   const other = confirmedPlan({ target_date: '2026-09-18', entries: [{
     issue_key: 'DEMO-745',
-    task_name: '需求交付agent优化',
+    task_name: '示例任务甲',
     time_spent: '8h',
     hours: 8,
     started: '2026-09-18T09:00:00.000+0800',
@@ -202,7 +202,7 @@ test('多日提交：次 myself 网络事故不吞掉已写日的回报（review
   const client = new engine.JiraClient('https://jira', 'u', 'p', transport)
   const day2 = confirmedPlan({ target_date: '2026-09-18', entries: [{
     issue_key: 'DEMO-745',
-    task_name: '需求交付agent优化',
+    task_name: '示例任务甲',
     time_spent: '8h',
     hours: 8,
     started: '2026-09-18T09:00:00.000+0800',

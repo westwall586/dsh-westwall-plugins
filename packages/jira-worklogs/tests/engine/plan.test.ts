@@ -50,13 +50,13 @@ test('scheduleEntries 从 09:00 连续排班；已有工时从最晚结束时刻
 test('userProposal 隐藏 issue key，任务名取 summary', () => {
   const proposal = engine.userProposal([{
     issue_key: 'DEMO-745',
-    task_name: '需求交付agent优化',
+    task_name: '示例任务甲',
     date: '2026-09-21',
     time_range: '09:00-11:00',
     time_spent: '2h',
     comment: '待用户确认：整理需求',
   }])
-  assert.equal(proposal[0]!.task_name, '需求交付agent优化')
+  assert.equal(proposal[0]!.task_name, '示例任务甲')
   assert.ok(!('issue_key' in proposal[0]!))
 })
 
@@ -67,7 +67,7 @@ test('plan 输出单副本与总量（冷启动集中单问题 8h）', async () 
   assert.ok(!('submission_entries' in result))
   assert.ok(Array.isArray(result.user_proposal))
 
-  const two = fakeJira({ issues: [issueData('需求交付agent优化', 'DEMO-745'), issueData('云端Agent方案与落地', 'DEMO-772')] })
+  const two = fakeJira({ issues: [issueData('示例任务甲', 'DEMO-745'), issueData('示例任务乙', 'DEMO-772')] })
   const result2 = ( await engine.plan(new engine.JiraClient('https://jira', 'u', 'p', two), MONDAY, { includeGit: false })) as any
   assert.equal(result2.suggested_entries.reduce((sum: number, item: { hours: number }) => sum + item.hours, 0), 8)
   assert.equal(result2.planned_total_hours, 8)
@@ -75,7 +75,7 @@ test('plan 输出单副本与总量（冷启动集中单问题 8h）', async () 
 
 test('plan 报告逐日缺口与历史归属建议', async () => {
   const fake = fakeJira({
-    issues: [issueData('云端Agent方案与落地', 'DEMO-772')],
+    issues: [issueData('示例任务乙', 'DEMO-772')],
     logs: {
       'DEMO-772': [
         log('2026-09-14', 8, '满'),
@@ -119,10 +119,10 @@ test('目标日已填计数含非关注问题，other_logged_issues 记录', asy
 
 test('当日已满且历史有记录时返回空建议不报错（remaining=0）', async () => {
   const fake = fakeJira({
-    issues: [issueData('云端Agent方案与落地', 'DEMO-772')],
+    issues: [issueData('示例任务乙', 'DEMO-772')],
     logs: {
       'DEMO-772': [
-        log('2026-09-18', 8, '云端Agent推进'),
+        log('2026-09-18', 8, '示例任务乙推进'),
         log('2026-09-21', 8, '今日已满'),
       ],
     },
@@ -134,8 +134,8 @@ test('当日已满且历史有记录时返回空建议不报错（remaining=0）
 
 test('目标日集中于单一活跃问题（延续历史）', async () => {
   const fake = fakeJira({
-    issues: [issueData('云端Agent方案与落地', 'DEMO-772'), issueData('需求交付agent优化', 'DEMO-745')],
-    logs: { 'DEMO-772': Array.from({ length: 5 }, (_, i) => log(`2026-09-${14 + i}`, 8, '云端Agent推进')) },
+    issues: [issueData('示例任务乙', 'DEMO-772'), issueData('示例任务甲', 'DEMO-745')],
+    logs: { 'DEMO-772': Array.from({ length: 5 }, (_, i) => log(`2026-09-${14 + i}`, 8, '示例任务乙推进')) },
   })
   const result = ( await engine.plan(new engine.JiraClient('https://jira', 'u', 'p', fake), MONDAY, { includeGit: false })) as any
   const suggested = result.suggested_entries
@@ -162,7 +162,7 @@ test('顺延草案集中最近工作日的问题，不回头均摊', async () =>
 
 test('同日多问题按该日小时比例顺延（2h/6h → 6h/2h）', async () => {
   const fake = fakeJira({
-    issues: [issueData('需求交付agent优化', 'DEMO-745'), issueData('云端Agent方案与落地', 'DEMO-772')],
+    issues: [issueData('示例任务甲', 'DEMO-745'), issueData('示例任务乙', 'DEMO-772')],
     logs: {
       'DEMO-772': [log('2026-09-18', 2, '联调', 'DEMO-772')],
       'DEMO-745': [log('2026-09-18', 6, '部署', 'DEMO-745')],
@@ -177,7 +177,7 @@ test('同日多问题按该日小时比例顺延（2h/6h → 6h/2h）', async ()
 })
 
 test('冷启动默认单一关注问题并显式标记待确认', async () => {
-  const fake = fakeJira({ issues: [issueData('需求交付agent优化', 'DEMO-745'), issueData('云端Agent方案与落地', 'DEMO-772')] })
+  const fake = fakeJira({ issues: [issueData('示例任务甲', 'DEMO-745'), issueData('示例任务乙', 'DEMO-772')] })
   const result = ( await engine.plan(new engine.JiraClient('https://jira', 'u', 'p', fake), MONDAY, { includeGit: false })) as any
   const suggested = result.suggested_entries
   assert.deepEqual(suggested.map((item: { issue_key: string }) => item.issue_key), ['DEMO-745'])
@@ -187,7 +187,7 @@ test('冷启动默认单一关注问题并显式标记待确认', async () => {
 })
 
 test('缺口建议携带历史说明草案', async () => {
-  const fake = fakeJira({ issues: [issueData('云端Agent方案与落地', 'DEMO-772')], logs: { 'DEMO-772': [log('2026-09-17', 2, '部分推进')] } })
+  const fake = fakeJira({ issues: [issueData('示例任务乙', 'DEMO-772')], logs: { 'DEMO-772': [log('2026-09-17', 2, '部分推进')] } })
   const result = ( await engine.plan(new engine.JiraClient('https://jira', 'u', 'p', fake), MONDAY, { includeGit: false })) as any
   const byDate = Object.fromEntries(result.gap_suggestions.map((item: { date: string }) => [item.date, item]))
   assert.equal(byDate['2026-09-17']!.comment, '待用户确认：延续「部分推进」')
@@ -207,7 +207,7 @@ test('调休上班日进入窗口并要求 8h', async () => {
 })
 
 test('调休日作为目标日生成建议', async () => {
-  const fake = fakeJira({ issues: [issueData('云端Agent方案与落地', 'DEMO-772')], logs: { 'DEMO-772': [log('2026-09-18', 8, '云端Agent推进')] } })
+  const fake = fakeJira({ issues: [issueData('示例任务乙', 'DEMO-772')], logs: { 'DEMO-772': [log('2026-09-18', 8, '示例任务乙推进')] } })
   const result = ( await engine.plan(new engine.JiraClient('https://jira', 'u', 'p', fake), '2026-09-20', { includeGit: false, workdays: ['2026-09-20'] })) as any
   assert.equal(result.minimum_hours, 8)
   const suggested = result.suggested_entries

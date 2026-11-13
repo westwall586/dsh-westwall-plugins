@@ -88,13 +88,12 @@ test('collectGitActivity 按日分组、窗口过滤、未推送不计', async (
     { 10: { path_with_namespace: 'grp/one' }, 20: { path_with_namespace: 'grp/two' } },
     {
       10: [
-        { short_id: 'aaa111', title: 'feat: 完成 FSD', author_name: 'jumproot', committed_date: '2026-09-15T01:00:00Z' },
-        { short_id: 'bbb222', title: '窗口外提交', author_name: 'jumproot', committed_date: '2026-09-17T01:00:00Z' },
+        { short_id: 'aaa111', title: 'feat: 完成 FSD', author_name: 'alice', committed_date: '2026-09-15T01:00:00Z' },
+        { short_id: 'bbb222', title: '窗口外提交', author_name: 'alice', committed_date: '2026-09-17T01:00:00Z' },
       ],
       20: [
         { short_id: 'ccc333', title: 'chore: 同步', author_name: 'alice', committed_date: '2026-09-16T02:00:00Z' },
-        // 09-15 本人未推送过 proj 20，他人合入 main 的提交不进素材
-        { short_id: 'oth444', title: '他人合入 main', author_name: '邓磊', committed_date: '2026-09-15T23:00:00Z' },
+        { short_id: 'oth444', title: '他人合入 main', author_name: 'bob', committed_date: '2026-09-15T23:00:00Z' },
       ],
     },
   )
@@ -136,10 +135,10 @@ test('collectGitActivity 过滤 context-repo 状态库并记入名单', async ()
       { project_id: 10, created_at: '2026-09-15T03:00:00Z', push_data: {} },
       { project_id: 30, created_at: '2026-09-15T04:00:00Z', push_data: {} },
     ],
-    { 10: { path_with_namespace: 'grp/one' }, 30: { path_with_namespace: 'zhenyoutms/zhqy-context-repo' } },
+    { 10: { path_with_namespace: 'grp/one' }, 30: { path_with_namespace: 'grp/context-repo' } },
     {
       10: [{ short_id: 'a1', title: 'feat: 开发', author_name: 'alice', committed_date: '2026-09-15T01:00:00Z' }],
-      30: [{ short_id: 'b1', title: 'chore: 状态库同步', author_name: 'jumproot', committed_date: '2026-09-15T01:00:00Z' }],
+      30: [{ short_id: 'b1', title: 'chore: 状态库同步', author_name: 'alice', committed_date: '2026-09-15T01:00:00Z' }],
     },
   )
   const activity = await engine.collectGitActivity(
@@ -149,7 +148,7 @@ test('collectGitActivity 过滤 context-repo 状态库并记入名单', async ()
     () => new engine.GitlabClient('http://git', 't', transport),
   )
   assert.deepEqual(activity.by_date['2026-09-15']!.map(item => item.project), ['grp/one'])
-  assert.deepEqual(activity.instances[0]!.filtered_context_repos, ['zhenyoutms/zhqy-context-repo'])
+  assert.deepEqual(activity.instances[0]!.filtered_context_repos, ['grp/context-repo'])
 })
 
 test('collectGitActivity 自定义名单按子串排除并记入（迭代二 repoFilter 参数化）', async () => {
@@ -182,10 +181,10 @@ test('collectGitActivity 空名单不过滤（context-repo 照常收录）', asy
       { project_id: 10, created_at: '2026-09-15T03:00:00Z', push_data: {} },
       { project_id: 30, created_at: '2026-09-15T04:00:00Z', push_data: {} },
     ],
-    { 10: { path_with_namespace: 'grp/one' }, 30: { path_with_namespace: 'zhenyoutms/zhqy-context-repo' } },
+    { 10: { path_with_namespace: 'grp/one' }, 30: { path_with_namespace: 'grp/context-repo' } },
     {
       10: [{ short_id: 'a1', title: 'feat: 开发', author_name: 'alice', committed_date: '2026-09-15T01:00:00Z' }],
-      30: [{ short_id: 'b1', title: 'chore: 状态库同步', author_name: 'jumproot', committed_date: '2026-09-15T01:00:00Z' }],
+      30: [{ short_id: 'b1', title: 'chore: 状态库同步', author_name: 'alice', committed_date: '2026-09-15T01:00:00Z' }],
     },
   )
   const activity = await engine.collectGitActivity(
@@ -194,7 +193,7 @@ test('collectGitActivity 空名单不过滤（context-repo 照常收录）', asy
     [],
     () => new engine.GitlabClient('http://git', 't', transport),
   )
-  assert.deepEqual(activity.by_date['2026-09-15']!.map(item => item.project), ['grp/one', 'zhenyoutms/zhqy-context-repo'])
+  assert.deepEqual(activity.by_date['2026-09-15']!.map(item => item.project), ['grp/one', 'grp/context-repo'])
   assert.equal(activity.instances[0]!.filtered_context_repos, undefined)
 })
 
@@ -295,21 +294,21 @@ test('JiraClient 常驻头不再携带 Content-Type（由 transport 有 body 时
 test('searchUsers 命中 user/search 端点、查询参数编码、三字段映射', async () => {
   const transport = fakeJira({
     userSearch: [
-      { name: 'bob', displayName: '王帅', active: true },
-      { name: 'bob01', displayName: '王帅' },
+      { name: 'bob', displayName: '张三', active: true },
+      { name: 'bob01', displayName: '张三' },
       { name: 'x', displayName: 'Y', active: false },
       null,
     ],
   })
   const client = new engine.JiraClient('https://jira', 'u', 'p', transport)
-  const users = await client.searchUsers('王帅')
+  const users = await client.searchUsers('张三')
   const call = transport.calls.find(c => c.url.includes('/rest/api/2/user/search'))!
   assert.equal(call.method, 'GET')
-  assert.ok(call.url.includes('username=%E7%8E%8B%E5%B8%85'), '中文名经 URLSearchParams 编码')
+  assert.ok(call.url.includes('username=%E5%BC%A0%E4%B8%89'), '中文名经 URLSearchParams 编码')
   assert.ok(call.url.includes('maxResults=20'))
   assert.deepEqual(users, [
-    { name: 'bob', displayName: '王帅', active: true },
-    { name: 'bob01', displayName: '王帅', active: true },
+    { name: 'bob', displayName: '张三', active: true },
+    { name: 'bob01', displayName: '张三', active: true },
     { name: 'x', displayName: 'Y', active: false },
   ])
 })

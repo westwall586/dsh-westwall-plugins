@@ -20,52 +20,52 @@ const jiraWith = (users: unknown[], logs: Record<string, unknown[]> = {}) =>
 
 test('resolveUser 登录 ID 精确命中（同名堆里直选）', async () => {
   const users = [
-    { name: 'bob', displayName: '王帅', active: true },
-    { name: 'bob01', displayName: '王帅', active: true },
-    { name: 'bob_hz', displayName: '王帅', active: true },
+    { name: 'bob', displayName: '张三', active: true },
+    { name: 'bob01', displayName: '张三', active: true },
+    { name: 'bob_hz', displayName: '张三', active: true },
   ]
   const client = new engine.JiraClient('https://jira', 'u', 'p', jiraWith(users))
   assert.deepEqual(await engine.resolveUser(client, 'bob'), {
-    status: 'unique', name: 'bob', displayName: '王帅',
+    status: 'unique', name: 'bob', displayName: '张三',
   })
 })
 
 test('resolveUser 显示名全等池唯一命中', async () => {
   const users = [
-    { name: 'carol', displayName: '何慧敏', active: true },
+    { name: 'carol', displayName: '李四', active: true },
     { name: 'alice', displayName: 'Alice', active: true },
   ]
   const client = new engine.JiraClient('https://jira', 'u', 'p', jiraWith(users))
-  assert.deepEqual(await engine.resolveUser(client, '何慧敏'), {
-    status: 'unique', name: 'carol', displayName: '何慧敏',
+  assert.deepEqual(await engine.resolveUser(client, '李四'), {
+    status: 'unique', name: 'carol', displayName: '李四',
   })
 })
 
 test('resolveUser 显示名全等池多个 → 歧义候选', async () => {
   const users = [
-    { name: 'bob', displayName: '王帅', active: true },
-    { name: 'bob01', displayName: '王帅', active: true },
-    { name: 'bob_hz', displayName: '王帅', active: true },
+    { name: 'bob', displayName: '张三', active: true },
+    { name: 'bob01', displayName: '张三', active: true },
+    { name: 'bob_hz', displayName: '张三', active: true },
   ]
   const client = new engine.JiraClient('https://jira', 'u', 'p', jiraWith(users))
-  const resolved = await engine.resolveUser(client, '王帅')
+  const resolved = await engine.resolveUser(client, '张三')
   assert.equal(resolved.status, 'ambiguous')
   assert.equal(resolved.status === 'ambiguous' ? resolved.candidates.length : 0, 3)
 })
 
 test('resolveUser 全等池为空回落模糊池：唯一即用', async () => {
   const client = new engine.JiraClient('https://jira', 'u', 'p', jiraWith([
-    { name: 'carol', displayName: '何慧敏', active: true },
+    { name: 'carol', displayName: '李四', active: true },
   ]))
-  assert.deepEqual(await engine.resolveUser(client, '何慧'), {
-    status: 'unique', name: 'carol', displayName: '何慧敏',
+  assert.deepEqual(await engine.resolveUser(client, '李'), {
+    status: 'unique', name: 'carol', displayName: '李四',
   })
 })
 
 test('resolveUser 全等池为空回落模糊池：多个即歧义', async () => {
   const client = new engine.JiraClient('https://jira', 'u', 'p', jiraWith([
-    { name: 'a', displayName: '王一', active: true },
-    { name: 'b', displayName: '王二', active: true },
+    { name: 'a', displayName: '王四', active: true },
+    { name: 'b', displayName: '王五', active: true },
   ]))
   assert.equal((await engine.resolveUser(client, '王')).status, 'ambiguous')
 })
@@ -179,8 +179,8 @@ test('aggregateToDays 空集 → 空数组', () => {
 
 test('fallbackNotice 含原窗口（三态）与回溯周', () => {
   const week = { monday: '2026-10-12', sunday: '2026-10-18' }
-  const both = svc.fallbackNotice('王帅', 'bob', '2026-10-17', '2026-10-23', week)
-  assert.ok(both.includes('王帅（bob）'), both)
+  const both = svc.fallbackNotice('张三', 'bob', '2026-10-17', '2026-10-23', week)
+  assert.ok(both.includes('张三（bob）'), both)
   assert.ok(both.includes('2026-10-17 至 2026-10-23'), both)
   assert.ok(both.includes('2026-10-12 至 2026-10-18'), both)
   assert.ok(svc.fallbackNotice('王', 'w', '2026-10-17', undefined, week).includes('2026-10-17 起'))
@@ -189,8 +189,8 @@ test('fallbackNotice 含原窗口（三态）与回溯周', () => {
 })
 
 test('noLogsNotice 含姓名与无任何日志口径', () => {
-  const text = svc.noLogsNotice('王帅', 'bob01')
-  assert.ok(text.includes('王帅（bob01）') && text.includes('无任何'), text)
+  const text = svc.noLogsNotice('张三', 'bob01')
+  assert.ok(text.includes('张三（bob01）') && text.includes('无任何'), text)
 })
 
 test('notFoundNotice 含禁用/离职说明', () => {
@@ -199,12 +199,12 @@ test('notFoundNotice 含禁用/离职说明', () => {
 })
 
 test('ambiguousNotice 列候选与登录 ID 指引；满 20 注明截断', () => {
-  const three = svc.ambiguousNotice('王帅', [
-    { name: 'bob', displayName: '王帅' },
-    { name: 'bob01', displayName: '王帅' },
-    { name: 'bob_hz', displayName: '王帅' },
+  const three = svc.ambiguousNotice('张三', [
+    { name: 'bob', displayName: '张三' },
+    { name: 'bob01', displayName: '张三' },
+    { name: 'bob_hz', displayName: '张三' },
   ])
-  assert.ok(three.includes('bob（王帅）') && three.includes('登录 ID'), three)
+  assert.ok(three.includes('bob（张三）') && three.includes('登录 ID'), three)
   assert.ok(!three.includes('仅显示前 20'))
   const twenty = Array.from({ length: 20 }, (_, i) => ({ name: `u${i}`, displayName: '同' }))
   assert.ok(svc.ambiguousNotice('同', twenty).includes('仅显示前 20'))
@@ -235,21 +235,21 @@ function queryDeps(over: {
   }
 }
 
-const HE_HUIMIN = [{ name: 'carol', displayName: '何慧敏', active: true }]
+const LI_SI = [{ name: 'carol', displayName: '李四', active: true }]
 const WLH = (day: string, seconds: number, comment = '日常') => ({
   id: day + seconds, started: `${day}T09:30:00.000+0800`, timeSpent: 'x', timeSpentSeconds: seconds,
-  comment, author: { name: 'carol', displayName: '何慧敏' },
+  comment, author: { name: 'carol', displayName: '李四' },
 })
 
 test('queryFlow 凭据未配置 → 配置引导（零网络）', async () => {
   const { deps, transport } = queryDeps({ configured: false })
-  await assert.rejects(() => flows.queryFlow(deps, { name: '何慧敏' }), /插件页/)
+  await assert.rejects(() => flows.queryFlow(deps, { name: '李四' }), /插件页/)
   assert.equal(transport.calls.length, 0)
 })
 
 test('queryFlow myself 空体 → 凭据口径（非查无此人）', async () => {
-  const { deps } = queryDeps({ fake: fakeJira({ myself: {}, userSearch: HE_HUIMIN }) })
-  await assert.rejects(() => flows.queryFlow(deps, { name: '何慧敏' }), /未返回当前用户|凭据/)
+  const { deps } = queryDeps({ fake: fakeJira({ myself: {}, userSearch: LI_SI }) })
+  await assert.rejects(() => flows.queryFlow(deps, { name: '李四' }), /未返回当前用户|凭据/)
 })
 
 test('queryFlow myself 401 → 认证失败凭据文案', async () => {
@@ -263,26 +263,26 @@ test('queryFlow myself 401 → 认证失败凭据文案', async () => {
     makeClient: (jira: { server: string; username: string; password: string; verifySsl: boolean }) =>
       new engine.JiraClient(jira.server, jira.username, jira.password, rejectMyself, jira.verifySsl),
   } as never
-  await assert.rejects(() => flows.queryFlow(deps, { name: '何慧敏' }), /Jira 认证失败（401\/403/)
+  await assert.rejects(() => flows.queryFlow(deps, { name: '李四' }), /Jira 认证失败（401\/403/)
 })
 
 test('queryFlow 窗口命中 → ok 视图（days＋permissionNote）', async () => {
-  const { deps } = queryDeps({ fake: fakeJira({ userSearch: HE_HUIMIN, logs: {
+  const { deps } = queryDeps({ fake: fakeJira({ userSearch: LI_SI, logs: {
     'A-1': [WLH('2026-10-22', 3600), WLH('2026-10-23', 7200, '方案')],
   } }) })
-  const view = await flows.queryFlow(deps, { name: '何慧敏', from: '2026-10-17', to: '2026-10-23' }, '2026-10-23')
+  const view = await flows.queryFlow(deps, { name: '李四', from: '2026-10-17', to: '2026-10-23' }, '2026-10-23')
   assert.equal(view.status, 'ok')
-  assert.equal(view.displayName, '何慧敏')
+  assert.equal(view.displayName, '李四')
   assert.deepEqual(view.days!.map(d => d.date), ['2026-10-23', '2026-10-22'])
   assert.equal(view.permissionNote, svc.PERMISSION_NOTE)
   assert.equal(view.notice, undefined)
 })
 
 test('queryFlow 窗口空 → 回溯最后活跃周（notice 含原窗口与周）', async () => {
-  const { deps } = queryDeps({ fake: fakeJira({ userSearch: HE_HUIMIN, logs: {
+  const { deps } = queryDeps({ fake: fakeJira({ userSearch: LI_SI, logs: {
     'A-1': [WLH('2026-10-13', 3600), WLH('2026-10-15', 3600)],
   } }) })
-  const view = await flows.queryFlow(deps, { name: '何慧敏', from: '2026-10-17', to: '2026-10-23' }, '2026-10-23')
+  const view = await flows.queryFlow(deps, { name: '李四', from: '2026-10-17', to: '2026-10-23' }, '2026-10-23')
   assert.equal(view.status, 'ok')
   assert.ok(view.notice!.includes('2026-10-17 至 2026-10-23'), view.notice ?? '')
   assert.ok(view.notice!.includes('2026-10-12 至 2026-10-18'), view.notice ?? '')
@@ -290,26 +290,26 @@ test('queryFlow 窗口空 → 回溯最后活跃周（notice 含原窗口与周�
 })
 
 test('queryFlow 不限窗口且无历史 → no-logs', async () => {
-  const { deps } = queryDeps({ fake: fakeJira({ userSearch: HE_HUIMIN, logs: {} }) })
-  const view = await flows.queryFlow(deps, { name: '何慧敏' }, '2026-10-23')
+  const { deps } = queryDeps({ fake: fakeJira({ userSearch: LI_SI, logs: {} }) })
+  const view = await flows.queryFlow(deps, { name: '李四' }, '2026-10-23')
   assert.equal(view.status, 'no-logs')
   assert.ok(view.notice!.includes('无任何可见日志'))
 })
 
 test('queryFlow 窗口空且历史也无 → no-logs（经回溯扫描）', async () => {
-  const { deps } = queryDeps({ fake: fakeJira({ userSearch: HE_HUIMIN, logs: {} }) })
-  const view = await flows.queryFlow(deps, { name: '何慧敏', from: '2026-10-17', to: '2026-10-23' }, '2026-10-23')
+  const { deps } = queryDeps({ fake: fakeJira({ userSearch: LI_SI, logs: {} }) })
+  const view = await flows.queryFlow(deps, { name: '李四', from: '2026-10-17', to: '2026-10-23' }, '2026-10-23')
   assert.equal(view.status, 'no-logs')
 })
 
 test('queryFlow 同名 → ambiguous（候选剥离 active 字段）', async () => {
   const { deps } = queryDeps({ fake: fakeJira({ userSearch: [
-    { name: 'bob', displayName: '王帅', active: true },
-    { name: 'bob01', displayName: '王帅', active: false },
+    { name: 'bob', displayName: '张三', active: true },
+    { name: 'bob01', displayName: '张三', active: false },
   ] }) })
-  const view = await flows.queryFlow(deps, { name: '王帅' }, '2026-10-23')
+  const view = await flows.queryFlow(deps, { name: '张三' }, '2026-10-23')
   assert.equal(view.status, 'ambiguous')
-  assert.deepEqual(view.candidates, [{ name: 'bob', displayName: '王帅' }, { name: 'bob01', displayName: '王帅' }])
+  assert.deepEqual(view.candidates, [{ name: 'bob', displayName: '张三' }, { name: 'bob01', displayName: '张三' }])
   assert.ok(view.notice!.includes('登录 ID'))
 })
 
@@ -328,12 +328,12 @@ test('queryFlow 网络错误原样传播（不吞消息不伪装）', async () =
     makeClient: (jira: { server: string; username: string; password: string; verifySsl: boolean }) =>
       new engine.JiraClient(jira.server, jira.username, jira.password, boom, jira.verifySsl),
   } as never
-  await assert.rejects(() => flows.queryFlow(deps, { name: '何慧敏' }), /ECONNREFUSED/)
+  await assert.rejects(() => flows.queryFlow(deps, { name: '李四' }), /ECONNREFUSED/)
 })
 
 test('queryFlow 全程仅 GET', async () => {
-  const { deps, transport } = queryDeps({ fake: fakeJira({ userSearch: HE_HUIMIN, logs: { 'A-1': [WLH('2026-10-22', 3600)] } }) })
-  await flows.queryFlow(deps, { name: '何慧敏', from: '2026-10-17', to: '2026-10-23' }, '2026-10-23')
+  const { deps, transport } = queryDeps({ fake: fakeJira({ userSearch: LI_SI, logs: { 'A-1': [WLH('2026-10-22', 3600)] } }) })
+  await flows.queryFlow(deps, { name: '李四', from: '2026-10-17', to: '2026-10-23' }, '2026-10-23')
   assert.ok(transport.calls.length > 0)
   assert.ok(transport.calls.every(call => call.method === 'GET'))
 })
@@ -367,9 +367,9 @@ test('collectWorklogs 畸形/缺失 started 一致丢弃（from 有无两路径�
 
 test('resolveUser 空 name 脏候选不入池', async () => {
   const client = new engine.JiraClient('https://jira', 'u', 'p', jiraWith([
-    { name: '', displayName: '何慧敏', active: true },
+    { name: '', displayName: '李四', active: true },
   ]))
-  assert.deepEqual(await engine.resolveUser(client, '何慧敏'), { status: 'not-found' })
+  assert.deepEqual(await engine.resolveUser(client, '李四'), { status: 'not-found' })
 })
 
 test('lastActiveWeek/weekdayCN 跨月跨年闰日边界', () => {

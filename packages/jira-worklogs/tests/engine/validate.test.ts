@@ -12,7 +12,7 @@ const OK_COMMENT = '需求拆解与方案设计'
 function planEntry(overrides: Record<string, unknown> = {}) {
   return {
     issue_key: 'DEMO-745',
-    task_name: '需求交付agent优化',
+    task_name: '示例任务甲',
     time_spent: '8h',
     hours: 8,
     started: '2026-09-21T09:00:00.000+0800',

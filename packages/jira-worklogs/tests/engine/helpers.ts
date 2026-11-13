@@ -13,7 +13,7 @@ export function myselfData() {
   return { name: 'alice', key: 'alice', emailAddress: 'a@example.com', displayName: 'Alice' }
 }
 
-export function issueData(summary = '需求交付agent优化', key = 'DEMO-745') {
+export function issueData(summary = '示例任务甲', key = 'DEMO-745') {
   return {
     id: '351314',
     key,

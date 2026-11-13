@@ -1,0 +1,4 @@
+# 双面挂载：主行 = host service（jiraWorklogs 远程服务）。
+- insert:
+    - id: dsh-jira-worklogs
+      name: '@westwall/dsh-jira-worklogs'

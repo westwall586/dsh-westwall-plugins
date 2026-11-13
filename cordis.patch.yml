@@ -6,7 +6,7 @@
     - id: dsh-plugins
       name: '@westwall/dsh-plugins'
 
-# from packages/hello
+# from packages/jira-worklogs
 - insert:
-    - id: hello
-      name: '@westwall/dsh-hello'
+    - id: dsh-jira-worklogs
+      name: '@westwall/dsh-jira-worklogs'

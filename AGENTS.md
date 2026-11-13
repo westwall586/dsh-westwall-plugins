@@ -52,6 +52,7 @@ node scripts/smoke-install.mjs <spec>   # 装 → 启动 → 校验 → 摘除�
 ## 项目文件
 
 - [DEVELOPMENT.md](docs/DEVELOPMENT.md)：目录结构、构建与测试、新增插件、包解剖与硬规则。写代码、加插件前
+- [packages/AGENTS.md](packages/AGENTS.md)：插件包通用规则与插件目录。改动任何包前（进入包目录时也会被自动加载）
 - [RELEASING.md](docs/RELEASING.md)：发版步骤、验证与回滚，以及自动发布的一次性配置。发布前
 - [decisions.md](docs/decisions.md)：命名、分发方式、版本管理、兼容性。做设计取舍时
 - [README.md](README.md)：面向用户的安装与卸载说明。改用户可见行为时

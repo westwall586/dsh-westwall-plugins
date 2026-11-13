@@ -12,7 +12,7 @@
 适用于已经发布的插件：
 
 ```sh
-dsh plugin --profile <profile> add @westwall/dsh-hello
+dsh plugin --profile <profile> add @westwall/dsh-<插件名>
 ```
 
 ### 从 GitHub 安装
@@ -24,7 +24,7 @@ dsh plugin --profile <profile> add \
   "git+https://github.com/westwall586/dsh-westwall-plugins.git#<commit>&path:/packages/<插件目录>"
 ```
 
-- `<commit>` 是 40 位提交 SHA，`<插件目录>` 是包所在的目录名（如 `hello`）。
+- `<commit>` 是 40 位提交 SHA，`<插件目录>` 是包所在的目录名。
 - 固定提交意味着内容可复现；升级时换成新的 SHA 重新安装。
 - 仓库是公开的，安装不需要登录 GitHub。
 
@@ -40,32 +40,31 @@ dsh plugin --profile <profile> add link:/绝对路径/packages/<插件目录>
 
 ### 一次性安装全部
 
-仓库根目录本身是一个聚合 bundle：
+仓库根目录本身是一个聚合 bundle，但它的依赖按 npm 版本解析：
 
 ```sh
 dsh plugin --profile <profile> add \
   "git+https://github.com/westwall586/dsh-westwall-plugins.git#<commit>"
 ```
 
-> 前提：聚合里列出的插件都已发布到 npm。根 bundle 的依赖按 npm 版本解析；
-> 有未发布的插件时，请用上面的「从 GitHub 安装」逐个装子目录。
+> 只有在**聚合里列出的插件都已发布**时才能这样装。当前仓库里的插件多为草稿（未发布），
+> 请用上面的「从 GitHub 安装」逐个装子目录。
 
 ## 插件
 
-| 插件 | 说明 | 安装 |
+| 插件 | 简介 | 状态 |
 |---|---|---|
-| Hello（`@westwall/dsh-hello`） | 示例插件：只验证安装与挂载链路，没有界面 | `@westwall/dsh-hello` |
+| [Jira 工时记录](packages/jira-worklogs/README.md) | 月历查看工时缺口、日详情与 Git 素材，就地起草、确认后写入 Jira | **草稿** · 推荐本地安装 |
 
 ## 兼容性
 
-- 需要 DSH **0.2.2-rc.2** 或更新版本；每个插件在 `dsh.engines.dsh` 与
-  `peerDependencies` 中声明自己的兼容范围。
+- 每个插件在 `peerDependencies` 与 `dsh.engines.dsh` 中声明自己需要的 DSH 版本。
 - 宿主在安装前与启动时都会校验版本，不满足会拒绝安装或加载。
 
 ## 卸载
 
 ```sh
-dsh plugin --profile <profile> remove @westwall/dsh-hello
+dsh plugin --profile <profile> remove <包名>
 ```
 
 桌面版与 Web 版也可以在 **插件** 页里直接移除。

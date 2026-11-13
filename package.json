@@ -37,6 +37,6 @@
     "registry": "https://registry.npmjs.org/"
   },
   "dependencies": {
-    "@westwall/dsh-hello": "0.0.1"
+    "@westwall/dsh-jira-worklogs": "0.1.0"
   }
 }

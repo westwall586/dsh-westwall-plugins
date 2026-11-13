@@ -1,0 +1,82 @@
+{
+  "name": "@westwall/dsh-jira-worklogs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Jira 工时记录（草稿）：月历缺口、日详情、Git 素材，生成并提交工时记录。",
+  "icon": "./icon.svg",
+  "meta": {
+    "title": "Jira 日志 · Worklogs",
+    "description": "侧栏「Jira 日志」月历：工时缺口与 Git 提交素材，一键起草、硬确认后写入 Jira。"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./client/client.js",
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "engines": {
+      "dsh": ">=0.2.2-rc.2"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    }
+  },
+  "scripts": {
+    "test": "node --test 'tests/**/*.test.{ts,mjs}'",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "undici": "^8.11.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/cordis-plugin-loader": "~1.0.5",
+    "@deepseek-ai/dsh-llm": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-settings": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-storage": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-storage-domain": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-storage-json": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-tools": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-typert-protocol": "0.2.0-rc.2",
+    "@deepseek-ai/schemastery": "~3.18.4",
+    "@types/node": "^26.6.2",
+    "typescript": "^7.0.2"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/cordis-plugin-loader": "~1.0.5",
+    "@deepseek-ai/dsh": "^0.2.2-rc.2",
+    "@deepseek-ai/dsh-llm": ">=0.1.0-rc <0.3.0",
+    "@deepseek-ai/dsh-settings": ">=0.1.0-rc <0.3.0",
+    "@deepseek-ai/dsh-storage-domain": ">=0.1.0-rc <0.3.0",
+    "@deepseek-ai/dsh-tools": ">=0.1.0-rc <0.3.0",
+    "@deepseek-ai/dsh-typert-protocol": ">=0.1.0-rc <0.3.0",
+    "@deepseek-ai/schemastery": "~3.18.4"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh": {
+      "optional": true
+    }
+  },
+  "files": [
+    "src",
+    "client",
+    "icon.svg",
+    "cordis.patch.yml",
+    "README.md",
+    "docs"
+  ],
+  "license": "Apache-2.0"
+}

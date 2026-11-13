@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "示例插件",
+    "title": "Hello",
     "description": "westwall DSH 插件模板：bundle 补丁、宿主半体与本地化显示信息的最小形态。"
   }
 }

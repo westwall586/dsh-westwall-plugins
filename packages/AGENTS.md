@@ -32,7 +32,7 @@
 ### 产物
 
 - 模板形态是 `tsc → lib/` 且 `lib/` 入库；从 GitHub 安装时 pnpm 不构建，只打包仓库里已有的文件。
-- **TS 直载包**（`exports` 指向 `src/index.ts`，如 `jira-worklogs`）是模板形态的豁免：不需要 `lib/`，
+- **TS 直载包**（`exports` 指向 `src/index.ts`）是模板形态的豁免：不需要 `lib/`，
   但必须在包 README 里说明，并保证只用可擦除的 TS 语法。
 
 ### 聚合与安装

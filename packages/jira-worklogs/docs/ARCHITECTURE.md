@@ -15,6 +15,8 @@
 packages/jira-worklogs/
 ├── cordis.patch.yml        # 单行挂载：host service
 ├── client/client.js        # Client 半（单文件）：侧栏入口 + 面板页 + 配置表单
+├── locale/                 # 插件页标题与描述（en / zh）
+├── lib/                    # tsc 产物（入库）：Host 半运行时入口
 ├── src/
 │   ├── index.ts            # Host 接线：远程方法描述符、存储域与 LLM 注入、提交互斥
 │   ├── flows.ts            # 流程编排（依赖注入，可测）
@@ -25,7 +27,7 @@ packages/jira-worklogs/
 │   ├── gates.ts            # DayMutex 同日互斥
 │   ├── store/domain.ts     # 平台存储域 dsh_jira_worklogs（outbox / notes）
 │   └── engine/             # 确定性引擎：plan / submit / query / validate / jira / gitlab / http / dates
-└── tests/                  # 离线测试（node --test，直接跑 .ts）
+└── tests/                  # 离线测试（node --test，直接跑 src 的 .ts）
 ```
 
 ## 关键路径
@@ -43,7 +45,8 @@ packages/jira-worklogs/
   schemastery）由宿主提供，插件以 `peerDependencies` 声明
 - 设置入口走包级 `plugins.bundle.config`（插件详情页内嵌表单），不用系统设置分区
 - Jira 7.2+（`worklogAuthor` / `worklogDate` JQL）与 GitLab REST API；自签证书可按客户端关闭校验
-- Host 半是 `.ts` 直载（Node 原生类型剥离），因此只用可擦除的 TS 语法
+- Host 半构建到 `lib/`（产物入库，安装即用）；测试仍以 Node 原生类型剥离直接 import `src` 的
+  `.ts`，因此源码只用可擦除的 TS 语法
 
 ## 硬约束
 

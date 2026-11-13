@@ -44,10 +44,8 @@ export interface HostFlowsDeps {
   candidates?: CandidateStore
 }
 
-const CREDENTIALS_GUIDE = 'Jira 地址、账号与密码尚未配置，请到 插件页 → dsh-jira-worklogs 详情页补齐，保存后回本窗口刷新即可。'
+const CREDENTIALS_GUIDE = 'Jira 地址、账号与密码尚未配置，请到 插件页 → Jira 工时记录 详情页补齐，保存后回本窗口刷新即可。'
 
-/** 存储操作统一走此后门检查（JWL_DEBUG_STORE_FAIL=io——验收故障注入，开域形态在
- * store/domain.ts 的 openWorklogsStore）。 */
 async function storeIo<T>(op: () => T | Promise<T>): Promise<T> {
   if (process.env.JWL_DEBUG_STORE_FAIL === 'io') {
     throw new Error('存储域调试故障（JWL_DEBUG_STORE_FAIL=io，验收注入）')
@@ -91,7 +89,7 @@ export async function overviewFlow(deps: HostFlowsDeps, today = todayKeyEast8())
       return withOutbox(deps, {
         ...emptyMonth(today),
         error: 'jira-credentials',
-        message: 'Jira 认证失败（401/403，账号或密码无效），请到 插件页 → dsh-jira-worklogs 详情页修正，保存后回本窗口刷新即可。',
+        message: 'Jira 认证失败（401/403，账号或密码无效），请到 插件页 → Jira 工时记录 详情页修正，保存后回本窗口刷新即可。',
       })
     }
     const issue = credentialsIssue(error as Error)

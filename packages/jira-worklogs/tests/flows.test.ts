@@ -88,7 +88,7 @@ test('overviewFlow：纯配置预检缺失 → 引导态，零网络', async () 
   deps.makeClient = () => { madeClient = true; throw new Error('不应构建客户端') }
   const view = await overviewFlow(deps, '2026-09-24')
   assert.equal(view.error, 'jira-credentials')
-  assert.ok(view.message!.includes('插件页 → dsh-jira-worklogs 详情页'))
+  assert.ok(view.message!.includes('插件页 → Jira 工时记录 详情页'))
   assert.equal(madeClient, false)
 })
 
@@ -613,11 +613,10 @@ test('dayDetailFlow：notes 读取、候选集＝watched∪已登记∪素材任
   const view = await dayDetailFlow(makeDeps({ fake, worklogs, candidates }), '2026-09-21')
   assert.deepEqual(view.notes, [{ id: 'n-1', taskName: '素材任务', text: '评审' }])
   assert.ok(view.candidates!.some(item => item.name === '素材任务'), '素材任务并入候选')
-  // watched 任务经 issueSummary 归一化进候选（round-01 P1 回归：searchAll 原始形态 {key,fields} 裸读 .issue_key 恒空）
-  assert.ok(view.candidates!.some(item => item.name === '需求交付agent优化'), 'watched 任务并入候选')
+  assert.ok(view.candidates!.some(item => item.name === '示例任务甲'), 'watched 任务并入候选')
   const map = candidates.get('2026-09-21')!
   assert.ok([...map.values()].some(ref => ref.key === 'NOTE-1'), '候选映射含素材任务键')
-  assert.ok([...map.values()].some(ref => ref.key === 'DEMO-745' && ref.name === '需求交付agent优化'), '候选映射含 watched 键')
+  assert.ok([...map.values()].some(ref => ref.key === 'DEMO-745' && ref.name === '示例任务甲'), '候选映射含 watched 键')
   assert.ok(!JSON.stringify(view.candidates!).includes('NOTE-1'), '键不进候选视图')
 })
 

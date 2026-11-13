@@ -30,10 +30,8 @@ export const settingsSchema = z.object({
     verifySsl: z.boolean().default(false),
   }).volatile(),
   gitInstances: z.dict(gitInstanceSchema).default({}).volatile(),
-  repoFilter: z.array(z.string()).default(['context-repo']).volatile(),
+  repoFilter: z.array(z.string()).default([]).volatile(),
 })
-
-// ---- 取值映射（模块 1：纯函数，测试直喂值断言）----
 
 /** settings 命名空间的解析值形态（schema 输出；存量 project 键经非严格合并被忽略）。 */
 export interface SettingsValue {
@@ -116,10 +114,9 @@ export function pluginConfigSnapshot(): SettingsValue {
   ))
 }
 
-/** 每调用读取的配置入口（热生效语义，F17）；config 未绑定＝主服务行未装载。 */
 export function requireEngineConfig(): EngineConfig {
   if (boundConfig === undefined) {
-    throw new Error('缺少 Jira 配置：插件设置不可用，请在插件页 dsh-jira-worklogs 详情页完成配置')
+    throw new Error('缺少 Jira 配置：插件设置不可用，请在插件页 Jira 工时记录 详情页完成配置')
   }
   return engineConfigFrom(pluginConfigSnapshot())
 }

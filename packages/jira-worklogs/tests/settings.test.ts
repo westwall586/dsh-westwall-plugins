@@ -17,10 +17,10 @@ const settingsSource = readFileSync(
 
 const DEFAULT = schemaValue(undefined)
 
-test('schema 默认值：jira 空、git 空映射、过滤名单默认 context-repo', () => {
+test('schema 默认值：jira 空、git 空映射、过滤名单默认空', () => {
   assert.equal(DEFAULT.jira.server, '')
   assert.equal(DEFAULT.jira.username, '')
-  assert.deepEqual(DEFAULT.repoFilter, ['context-repo'])
+  assert.deepEqual(DEFAULT.repoFilter, [])
   assert.deepEqual(DEFAULT.gitInstances, {})
 })
 
@@ -121,7 +121,7 @@ test('requireEngineConfig：config 未绑定时报「设置不可用」口径（
 
 test('配置缺失报错文案指向插件页（源断言钉引导口径）', () => {
   assert.ok(
-    settingsSource.includes('请在插件页 dsh-jira-worklogs 详情页完成配置'),
+    settingsSource.includes('请在插件页 Jira 工时记录 详情页完成配置'),
     'requireEngineConfig 未绑定分支的引导文案应指向插件页组合包详情页',
   )
 })

@@ -15,11 +15,14 @@
 
 ## 安装
 
-推荐**本地目录安装**（草稿期改动频繁，改代码后重启即可生效）：
+推荐**本地目录安装**：
 
 ```sh
 dsh plugin --profile <profile> add link:/绝对路径/packages/jira-worklogs
 ```
+
+安装加载的是仓库里入库的 `lib/`（`src/` 与 source map 也随包提供）。本地 `link:` 安装后如果改了
+`src/`，先在包目录跑 `pnpm build` 再重启，改动才会生效。
 
 也可以固定某个提交，从 GitHub 安装：
 
@@ -27,6 +30,8 @@ dsh plugin --profile <profile> add link:/绝对路径/packages/jira-worklogs
 dsh plugin --profile <profile> add \
   "git+https://github.com/westwall586/dsh-westwall-plugins.git#<commit>&path:/packages/jira-worklogs"
 ```
+
+GitHub 安装同样直接加载仓库里入库的 `lib/`，不需要在安装时构建。
 
 尚未发布 npm，也没有市场条目。卸载可以在插件页移除，或用：
 
@@ -38,13 +43,13 @@ dsh plugin --profile <profile> remove <包名>
 
 ## 配置
 
-安装后在插件页的「Jira 日志」详情页填写：
+安装后在插件页的「Jira 工时记录」详情页填写：
 
 | 项 | 说明 |
 |---|---|
 | Jira | 服务器地址、用户名、密码（或 API token）、是否校验 SSL |
 | Git 实例 | 名称 → API 地址 + token，可配置多个；URL 与 token 成对才生效 |
-| 仓库过滤 | 只统计匹配的仓库 |
+| 仓库过滤 | 子串排除名单，命中即排除；默认空 |
 
 调试期也可用环境变量覆盖：`JIRA_SERVER` / `JIRA_USERNAME` / `JIRA_PASSWORD` /
 `JIRA_VERIFY_SSL`（优先级最高）。
@@ -55,11 +60,17 @@ dsh plugin --profile <profile> remove <包名>
 
 ```sh
 cd packages/jira-worklogs
-pnpm test        # 离线测试（node --test）
+pnpm build       # tsc -p tsconfig.build.json → lib/（入库）
+pnpm test        # 离线测试（node --test，直接跑 src 的 .ts）
 pnpm typecheck   # tsc --noEmit
 ```
 
+运行时加载 `lib/`：改完 `src/` 先 `pnpm build`，再把 `lib/` 一起提交；本地 link 与 GitHub 安装都读它。
+
 运行时平台包由 DSH 提供，声明在 `peerDependencies`；本地开发所需副本在 `devDependencies`。
+
+运行期第三方依赖只有 `undici`（Jira/GitLab HTTP）和 `zod`（存储域 schema）。`zod` 固定到 `4.6.6`，
+与当前 `dsh-storage-domain` 的精确 pin 对齐；升级平台包时同步检查。
 
 ## 文档
 

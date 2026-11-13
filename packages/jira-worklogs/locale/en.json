@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Jira worklogs",
+    "description": "Sidebar worklog panel with a monthly calendar of work-hour gaps and the day's Git commits. Draft entries in place with the host model, then write to Jira only after explicit confirmation; each write checks for duplicates and reads back the result."
+  }
+}

@@ -11,10 +11,9 @@ import {
 import { validate } from '../src/engine/validate.ts'
 
 test('credentialsIssue：凭据错误结构化（SPEC 场景 11）', () => {
-  const issue = credentialsIssue(new Error('缺少 Jira 配置：插件设置不可用，请在插件页 dsh-jira-worklogs 详情页完成配置'))
+  const issue = credentialsIssue(new Error('缺少 Jira 配置：插件设置不可用，请在插件页 Jira 工时记录 详情页完成配置'))
   assert.equal(issue.error, 'jira-credentials')
   assert.ok(issue.message.includes('插件页'))
-  // 非凭据错误不误判
   assert.equal(credentialsIssue(new Error('network down')).error, 'network')
   // 网关空体凭据异常也走结构化
   const empty = credentialsIssue(new Error('Jira 未返回当前用户（凭据无效或网关异常）'))

@@ -8,10 +8,16 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
-const clientSource = readFileSync(
-  join(dirname(fileURLToPath(import.meta.url)), '..', 'client', 'client.js'),
-  'utf8',
-)
+const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
+const clientSource = readFileSync(join(packageRoot, 'client', 'client.js'), 'utf8')
+const packageJson = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as { name: string }
+
+test('client factory id 使用 package name', () => {
+  assert.ok(
+    clientSource.includes(`id: '${packageJson.name}'`),
+    `factory id 应为 ${packageJson.name}`,
+  )
+})
 
 test('remote contribution：三新方法描述符在位（openOutbox/dismissOutbox/saveNotes）', () => {
   for (const method of ['openOutbox', 'dismissOutbox', 'saveNotes']) {
@@ -90,7 +96,7 @@ test('暂存回显表单头：现查已填时数与已填满提示（验收 roun
 
 test('设置入口内嵌组合包详情页（plugins.bundle.config 键＝包名）', () => {
   assert.match(clientSource, /slots\.inject\('plugins\.bundle\.config'/, '应注册进包级配置槽')
-  assert.match(clientSource, /key: 'dsh-jira-worklogs'/, '键应为包名')
+  assert.ok(clientSource.includes(`key: '${packageJson.name}'`), '键应为包名')
   assert.ok(!/slots\.inject\('plugins\.row\.config'/.test(clientSource), '行级注册应移除（包级内嵌为仓规范）')
   assert.ok(!clientSource.includes("view === 'summary'"), 'bundle 槽仅 page 视图，summary 分支应移除')
   assert.ok(!clientSource.includes('CARD_DESC'), 'summary 简介常量应随分支移除')

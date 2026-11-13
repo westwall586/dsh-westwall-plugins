@@ -22,7 +22,7 @@
 1. **npm 上给每个要发布的包配 trusted publisher**：
    - 打开 `https://www.npmjs.com/package/@westwall/dsh-<name>/access`
    - Trusted publisher → GitHub Actions
-   - Repository：`JohnXi029/dsh-westwall-plugins`
+   - Repository：`westwall586/dsh-westwall-plugins`
    - Workflow：`release.yml`
    - Environment：留空（除非使用了 GitHub Environment）
 2. **仓库里打开发布开关**：

@@ -21,7 +21,7 @@ dsh plugin --profile <profile> add @westwall/dsh-hello
 
 ```sh
 dsh plugin --profile <profile> add \
-  "git+https://github.com/JohnXi029/dsh-westwall-plugins.git#<commit>&path:/packages/<插件目录>"
+  "git+https://github.com/westwall586/dsh-westwall-plugins.git#<commit>&path:/packages/<插件目录>"
 ```
 
 - `<commit>` 是 40 位提交 SHA，`<插件目录>` 是包所在的目录名（如 `hello`）。
@@ -44,7 +44,7 @@ dsh plugin --profile <profile> add link:/绝对路径/packages/<插件目录>
 
 ```sh
 dsh plugin --profile <profile> add \
-  "git+https://github.com/JohnXi029/dsh-westwall-plugins.git#<commit>"
+  "git+https://github.com/westwall586/dsh-westwall-plugins.git#<commit>"
 ```
 
 > 前提：聚合里列出的插件都已发布到 npm。根 bundle 的依赖按 npm 版本解析；

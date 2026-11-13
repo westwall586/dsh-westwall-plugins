@@ -15,7 +15,7 @@ dsh plugin --profile <profile> add @westwall/dsh-hello
 
 ```sh
 dsh plugin --profile <profile> add \
-  "git+https://github.com/JohnXi029/dsh-westwall-plugins.git#<commit>&path:/packages/hello"
+  "git+https://github.com/westwall586/dsh-westwall-plugins.git#<commit>&path:/packages/hello"
 ```
 
 本地开发：

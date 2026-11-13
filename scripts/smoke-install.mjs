@@ -9,7 +9,7 @@
  * spec 与 `dsh plugin add` 接受的写法一致：
  *   @westwall/dsh-hello
  *   @westwall/dsh-hello@0.0.1
- *   "git+https://github.com/JohnXi029/dsh-westwall-plugins.git#<commit>&path:/packages/hello"
+ *   "git+https://github.com/westwall586/dsh-westwall-plugins.git#<commit>&path:/packages/hello"
  *   link:/绝对路径/packages/hello
  *
  * 只用于本地验证；会临时修改 profile 的 package.json / lockfile / 补丁，结束时还原。

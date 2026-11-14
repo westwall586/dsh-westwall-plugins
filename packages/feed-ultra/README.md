@@ -4,7 +4,7 @@
 
 RSS 只是起点。榜单、每日早报、X 书签和任意订阅源都可以收进 DSH 桌面端的一个工作区，按天阅读，已读状态跨天继承，简介可按渠道用 AI 翻译。
 
-抓取走本机 Ego Browser 的登录态和固定脚本，不需要付费 API。数据是工作区里的普通 JSON，Agent 也能直接读。
+抓取走本机 ego-lite 浏览器的登录态和固定脚本，不需要付费 API。没装 ego-lite 的话先到 https://lite.ego.app/ 安装。数据是工作区里的普通 JSON，Agent 也能直接读。
 
 ## 快速开始
 
@@ -25,6 +25,14 @@ dsh plugin --profile <profile> add \
 
 预期：工作区里出现 `.dsh-feeds/`，面板出现当天内容与渠道列表。
 
+### 安装 ego-lite
+
+浏览器渠道靠 ego-lite 取数，插件不带浏览器。RSS、GitHub Trending 和 BestBlogs 不需要它；X 书签和后续接入的任意站点需要。
+
+1. 到官网 https://lite.ego.app/ 安装 ego-lite。
+2. 在 ego-lite 里登录要抓取的站点，例如 x.com。
+3. 回到插件设置。「ego-lite 路径」留空时会自动查找 `ego-browser`，找不到就填可执行文件的绝对路径。
+
 ## 配置
 
 | 项 | 说明 |
@@ -34,7 +42,7 @@ dsh plugin --profile <profile> add \
 | 渠道定时 | 每个渠道单独开关与时间，按本地时间；只有 DSH 在运行时才会自动拉取 |
 | 渠道翻译 | 按渠道能力决定是否出现；中文简介跳过，译文按简介哈希跨天复用 |
 | 模型 | 翻译使用的模型。「跟随 DSH 默认」沿用宿主当前选择，也可显式指定 |
-| Ego Browser 路径 | X 书签渠道使用。留空时依次找渠道配置、`EGO_BROWSER_PATH`、PATH、`~/.local/bin/ego-browser` |
+| ego-lite 路径 | X 书签渠道使用。留空时依次找渠道配置、`EGO_BROWSER_PATH`、PATH、`~/.local/bin/ego-browser` |
 
 ## 日常使用
 
@@ -67,8 +75,8 @@ BestBlogs 支持在保留窗口内补拉历史期，中英文是两套各自编�
 
 ### X 书签
 
-- 走 Ego Browser：插件启动它执行内置脚本，在页面上下文里调用书签接口。
-- 需要 Ego Browser 里已经登录 x.com；一次拉取约 10 秒。
+- 走 ego-lite：插件启动它执行内置脚本，在页面上下文里调用书签接口。
+- 需要 ego-lite 里已经登录 x.com；一次拉取约 10 秒。
 - 删除是在推文详情页点「移除书签」，删除后本地卡片标记「已从 X 删除」。
 
 ## 数据布局
@@ -92,13 +100,13 @@ BestBlogs 支持在保留窗口内补拉历史期，中英文是两套各自编�
 | 提示「工作区不可用」 | 目录被移动或没有写权限，重新选一次 |
 | 定时没有触发 | DSH 关闭期间不会拉取；到点后打开面板会补抓当天 |
 | 翻译失败 | 检查模型与网络；分区头有「重试」 |
-| X 书签拉取失败 | Ego Browser 是否已登录 x.com；路径配置是否正确 |
+| X 书签拉取失败 | 是否装了 ego-lite（https://lite.ego.app/）并登录 x.com；路径配置是否正确 |
 
 ## 卸载与清理
 
 1. 在插件页移除，或执行 `dsh plugin --profile <profile> remove @westwall/dsh-feed-ultra`。
 2. 工作区里的 `.dsh-feeds/` 会保留。确认不再需要后可以手动删除。
-3. 没有需要撤销的凭据；X 书签用的是 Ego Browser 自己的登录态。
+3. 没有需要撤销的凭据；X 书签用的是 ego-lite 自己的登录态。
 
 ## 相关链接
 

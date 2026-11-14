@@ -2,7 +2,7 @@
   "gh.starsLabel": "Stars",
   "meta": {
     "title": "Feed Ultra",
-    "description": "RSS alone misses trending lists, briefs and bookmarks. Open Feed Ultra to read a day at a time, mark as read and AI-translate; fetching reuses your local Ego Browser session, with no paid API."
+    "description": "RSS alone misses trending lists, briefs and bookmarks. Open Feed Ultra to read a day at a time, mark as read and AI-translate; fetching reuses your local ego-lite browser session, with no paid API."
   },
   "entry": "Feed Ultra",
   "rail.channels": "Channels",
@@ -136,7 +136,7 @@
   "settings.x.batch": "Bookmarks per pull",
   "settings.x.batchHint": "The pull button fetches this many recent bookmarks",
   "settings.x.batchOption": "{n}",
-  "settings.x.egoNote": "Uses the X account signed in to Ego Browser; a pull starts or reuses Ego Browser and takes about 10 seconds.",
+  "settings.x.egoNote": "Uses the X account signed in to ego-lite; a pull starts or reuses ego-lite and takes about 10 seconds.",
   "settings.saved": "Saved",
   "settings.loading": "Loading settings…",
   "settings.readonly": "These settings are read-only. Edit the configuration file to change them.",

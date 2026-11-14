@@ -2,7 +2,7 @@
   "gh.starsLabel": "星标",
   "meta": {
     "title": "资讯工作台",
-    "description": "只看 RSS 会漏掉榜单、早报和书签里的资讯。打开侧栏「资讯工作台」，按天阅读、标记已读、按需 AI 翻译；抓取复用本机 Ego Browser，不需要付费 API。"
+    "description": "只看 RSS 会漏掉榜单、早报和书签里的资讯。打开侧栏「资讯工作台」，按天阅读、标记已读、按需 AI 翻译；抓取复用本机 ego-lite 浏览器，不需要付费 API。"
   },
   "entry": "资讯工作台",
   "rail.channels": "频道",
@@ -136,7 +136,7 @@
   "settings.x.batch": "每次拉取数量",
   "settings.x.batchHint": "拉取按钮按这个数量取最新收藏",
   "settings.x.batchOption": "{n} 条",
-  "settings.x.egoNote": "使用 Ego Browser 中登录的 X 账号；拉取时会启动或复用 Ego Browser，约 10 秒。",
+  "settings.x.egoNote": "使用 ego-lite 中登录的 X 账号；拉取时会启动或复用 ego-lite，约 10 秒。",
   "settings.saved": "已保存",
   "settings.loading": "正在读取设置…",
   "settings.readonly": "当前设置不可写，请检查配置文件后再修改。",

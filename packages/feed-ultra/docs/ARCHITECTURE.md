@@ -4,7 +4,7 @@
 
 资讯工作台把资讯订阅收进 DSH 桌面端。RSS 只是其中一种来源，目标是把任何资讯源接进来，按天阅读，用 AI 加工。
 
-抓取走本机 Ego Browser 的登录态和固定脚本，不依赖付费 API。数据是工作区里的普通 JSON，DSH 里的 Agent 可以直接读。
+抓取走本机 ego-lite 的登录态和固定脚本，不依赖付费 API。数据是工作区里的普通 JSON，DSH 里的 Agent 可以直接读。
 
 ## 三个半体
 
@@ -60,7 +60,7 @@ export interface SourceAdapter {
 |---|---|---|---|---|
 | GitHub Trending | 每天 | 否 | 是 | HTML 解析 |
 | BestBlogs 每日早报 | 每天 | 是 | 否 | zh 和 en 是两套编选 |
-| X 书签 | 手动 | 否 | 否 | 通过 Ego Browser |
+| X 书签 | 手动 | 否 | 否 | 通过 ego-lite |
 | RSS | 每天 | 否 | 是 | 汇总源，按渠道切片 |
 
 新增来源等于 `src/sources/<id>/` 加 registry 一行，不在引擎里加分支。
@@ -87,13 +87,13 @@ export interface SourceAdapter {
 
 模型可以显式选择，也可以跟随 DSH 默认。翻译失败不回滚抓取，分区头给重试入口。
 
-## Ego Browser 桥
+## ego-lite 桥
 
-`src/sources/x-bookmarks/bridge.ts` 启动 `ego-browser nodejs`，把内置脚本交给浏览器执行，在页面上下文里取数据。脚本只通过带 `@@FEEDULTRA@@` 前缀的 stdout 行回传结果。
+`src/sources/x-bookmarks/bridge.ts` 启动 `ego-browser nodejs`，把内置脚本交给 ego-lite 执行，在页面上下文里取数据。没装 ego-lite 的用户要先到 https://lite.ego.app/ 安装。脚本只通过带 `@@FEEDULTRA@@` 前缀的 stdout 行回传结果。
 
 路径解析顺序是渠道配置 `egoBrowserPath`、`EGO_BROWSER_PATH`、PATH、`~/.local/bin/ego-browser`。
 
-抓取成本来自用户已经登录的浏览器会话。插件不调付费 API，也不需要自建抓取服务。代价是需要本机安装 Ego Browser 并登录目标站点，页面结构变化会让脚本 drift，单次拉取约 10 秒。
+抓取成本来自用户已经登录的 ego-lite 会话。插件不调付费 API，也不需要自建抓取服务。代价是需要本机安装 ego-lite 并登录目标站点，页面结构变化会让脚本 drift，单次拉取约 10 秒。
 
 ## 浏览器半体
 

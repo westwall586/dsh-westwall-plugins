@@ -61,7 +61,7 @@ dsh plugin --profile <profile> remove @westwall/dsh-friendly-expression
 
 卸载后提示词不再注入，Mermaid 代码块恢复为普通代码块。
 
-每个会话的提示词快照保存在 `~/.dsh/storages/friendly_expression/`。快照只有提示词文本和捕获时间，不含凭据。卸载不会自动删除；需要清理时手动删除该目录。删除后，旧会话在下次恢复时不再注入提示词。
+每个会话的提示词快照保存在默认 JSON 存储的 `~/.dsh/storages/friendly_expression/`（如果 profile 使用其他存储后端，路径由该后端决定）。快照只有提示词文本和捕获时间，不含凭据。卸载不会自动删除；需要清理时手动删除该目录。删除后，旧会话在下次恢复时不再注入提示词。
 
 ## 相关链接
 

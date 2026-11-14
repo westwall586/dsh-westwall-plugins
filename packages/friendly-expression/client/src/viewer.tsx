@@ -251,6 +251,7 @@ function ViewerDialog({ state, t, saveFile }: {
 
   return React.createElement('div', {
     className: 'dfe-viewer',
+    onWheel: event => { event.preventDefault() },
     onPointerDown: event => {
       if (event.target === event.currentTarget) closeViewer()
     },

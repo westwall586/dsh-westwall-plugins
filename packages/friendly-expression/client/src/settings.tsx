@@ -27,7 +27,9 @@ export function createSettingsSection(form: ConfigForm): React.ComponentType<Sec
     const unavailable = snapshot.status === 'unavailable'
     const overLimit = draft.length > MAX_PROMPT_CHARS
     const changed = draft !== stored
-    const hasOverride = snapshot.user !== undefined && snapshot.user !== null
+    const user = snapshot.user
+    const hasOverride = user !== undefined && user !== null && typeof user === 'object'
+      && Object.prototype.hasOwnProperty.call(user, 'stylePrompt')
     const canSave = writable && !saving && changed && !overLimit
 
     const save = async (): Promise<void> => {

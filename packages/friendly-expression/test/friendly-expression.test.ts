@@ -17,7 +17,7 @@ function quiet<T>(run: () => Promise<T>): Promise<T> {
 
 test('插件导出形状合法', () => {
   assert.equal(name, 'friendly-expression')
-  assert.deepEqual(inject, ['systemPrompt'])
+  assert.deepEqual(inject, ['systemPrompt', 'storageDomain'])
   assert.equal(typeof apply, 'function')
   assert.notEqual(Config, undefined)
 })

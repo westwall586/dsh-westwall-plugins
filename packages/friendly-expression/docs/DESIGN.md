@@ -62,7 +62,7 @@ ctx.agents // 逐 Agent 注册
 agent.ctx.systemPrompt.section({
   name: 'westwall:friendly-expression',
   order: 9500,
-  text: () => snapshot,
+  text: snapshot, // static string, captured once per session
 })
 ```
 
@@ -72,7 +72,7 @@ agent.ctx.systemPrompt.section({
 - **每个会话一份持久化快照**：使用 `ctx.storageDomain` 打开域 `friendly_expression`，表 `sessions` 以 `SessionId` 为 key，值为 `{ prompt, capturedAt }`。新会话在 `agent/created` 时捕获当前 `stylePrompt`；判定依据是「`source === 'startup'`、没有快照、没有既有消息、非 seeded、非 subagent」。已有会话没有快照就不注册 section，避免在会话中途改变 system prompt。
 - **恢复会话**：只读快照；有快照就注册同样的文本，没有就视为「该会话不启用友好表达」。重启/恢复不会改用最新设置。
 - **前缀缓存**：同一会话内每次请求的 system prompt 文本保持逐字节一致，模型的前缀缓存不会因为设置变更而失效；新会话才换新文案。
-- **存储不可用时的降级**：`storageDomain` 不存在或打开失败时退回进程内 `Map<SessionId, string>`；当前运行内行为不变，重启/恢复后失去快照（会话将不再注入）。不阻塞插件启动。快照写入失败只记录 warning，不阻塞会话创建；本次运行仍使用内存值。
+- **存储依赖与降级**：`storageDomain` 是声明依赖，插件在它可用后才激活；打开失败或写入失败时退回进程内 `Map<SessionId, string>`，当前运行内行为不变，重启/恢复后失去快照。不阻塞会话创建。
 - **数据保留**：快照是插件卸载也不会自动清理的持久数据（会话级 <1 KB）。README 需要说明这一点，并提供清理位置；不在会话删除时做不可靠的自动清理。
 
 选择 scoped section 而不是下面两种方案：
@@ -135,12 +135,12 @@ ctx.slots.inject('conversation.chat.markdown.fence', () => ctx.slots.register({
 
 ### 4.3 浮窗
 
-- 通过 React portal 挂在 `document.body`，`role="dialog"`、`aria-modal`，焦点陷阱，Esc 关闭，点遮罩关闭，关闭后焦点回到触发卡片。
+- 注册在根 `shell.overlay` 槽位，覆盖整个窗口；组件用 `position: fixed` 自己撑满视口，带 `role="dialog"`、`aria-modal`、焦点陷阱、Esc 关闭、点遮罩关闭，关闭后焦点回到触发卡片。
 - 标题：围栏本身没有标题。优先取 Mermaid frontmatter 的 `title:` 或围栏 `meta`（如 ` ```mermaid 加载流程 `）；都没有时，用 `mermaid.detectType(code)` 识别图类型并显示本地化名称（流程图、时序图、状态图、ER 图等），失败则显示「Mermaid 图表」。**不**从节点标签猜测标题。
 - 头部操作：复制源码、下载 SVG、关闭。
 - 底部缩放条：`−`、当前百分比、`+`、`适合窗口`、`1:1`；滚轮缩放以指针为中心，拖拽平移，缩放范围约 20%–800%；打开时默认「适合窗口」。
 - 主题跟随宿主：用 `base` 主题 + 从宿主 token 映射的变量，监听 `theme/change` 重绘；缓存键包含主题标识。
-- 避免同一份 SVG 在页面里出现两次导致 id 冲突：内联卡片渲染 inline SVG，浮窗把同一份 SVG 作为 Blob `<img>` 显示并缩放；下载也直接用这份 SVG 字符串。
+- 内联卡片和浮窗都用 Blob `<img>` 显示 SVG，避免同一份 inline SVG 在页面里出现两次导致 id 冲突；下载也直接用这份 SVG 字符串。
 - 设计稿已去掉的操作说明文字（「滚轮缩放 · 拖拽平移 · Esc 关闭」「Mermaid · 4 个节点」）不再添加。
 
 ### 4.4 错误与自救
@@ -171,7 +171,7 @@ ctx.slots.inject('conversation.chat.markdown.fence', () => ctx.slots.register({
   - mermaid 11.15.0：约 3.31 MB / 0.91 MB
   - mermaid 12.3.0：约 5.54 MB / 1.59 MB
 - 版本选择：12.3.0 很新（12.0.0 于 2026-09 发布），主要变化是 ELK 成为默认布局、`neo` 成为默认外观、解析器升级；四种白名单图类型的基础语法没有变。模型对 11.x 的先验更强，因此 **MVP 默认锁 11.15.0**；发布前用一组真实模型输出的固定语料做 11.15.0 vs 12.3.0 的 A/B，若 12.3.0 的解析成功率不劣于 11.15.0，则升级到 12.3.0（安全修复与后续维护更好）。如果用 12.3.0，显式设置 `layout: 'dagre'`、`look: 'classic'`、`theme: 'base'`，抵消默认布局/外观变化。
-- 若停留在 11.15.0，构建时把 DOMPurify 覆盖到已修复版本，并记录残余依赖风险；发布前做一次依赖审计。
+- 当前锁文件已解析到 DOMPurify 3.4.17；升级 Mermaid 时保持该下限，并在发布前做一次依赖审计。
 - mermaid 采用 MIT 许可，`client.js` 内联其版权声明；构建产物加体积护栏，记录实际大小。
 
 ## 5. 设置页读写

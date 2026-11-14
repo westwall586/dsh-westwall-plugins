@@ -122,5 +122,5 @@ export function readPromptValue(value: unknown): string {
 /** One-line error summary for the card. Full detail stays in the console. */
 export function errorSummary(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error)
-  return message.replace(/\s+/g, ' ').trim().slice(0, 300)
+  return message.replace(/\s+/g, ' ').trim().slice(0, 180)
 }

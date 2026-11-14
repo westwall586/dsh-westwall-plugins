@@ -2,7 +2,7 @@ import z from '@deepseek-ai/schemastery';
 import { DEFAULT_STYLE_PROMPT, MAX_PROMPT_CHARS, SECTION_NAME, SECTION_ORDER } from "./prompt.js";
 import { openSnapshotStore, shouldCapture } from "./snapshot.js";
 export const name = 'friendly-expression';
-export const inject = ['systemPrompt'];
+export const inject = ['systemPrompt', 'storageDomain'];
 export const Config = z.object({
     stylePrompt: z.string().max(MAX_PROMPT_CHARS).default(DEFAULT_STYLE_PROMPT).volatile(),
 });
@@ -23,33 +23,36 @@ export async function apply(ctx, config) {
     const sections = new Map();
     const registerSection = (agent, prompt) => {
         const sessionId = agent.session.id;
-        if (prompt.length === 0 || sections.has(sessionId))
+        const existing = sections.get(sessionId);
+        if (prompt.length === 0) {
+            existing?.dispose();
+            sections.delete(sessionId);
             return;
+        }
+        if (existing?.agent === agent)
+            return;
+        existing?.dispose();
         const promptCtx = agent.ctx;
         const dispose = agent.ctx.effect(() => promptCtx.systemPrompt.section({
             name: SECTION_NAME,
             order: SECTION_ORDER,
             text: prompt,
         }), 'friendly-expression prompt section');
-        sections.set(sessionId, dispose);
+        sections.set(sessionId, { agent, dispose });
     };
     ctx.effect(() => () => store.close(), 'friendly-expression snapshot store');
     ctx.effect(() => () => {
-        for (const dispose of sections.values())
-            dispose();
+        for (const entry of sections.values())
+            entry.dispose();
         sections.clear();
     }, 'friendly-expression prompt sections');
-    ctx.on('agent/created', ({ agent, source }) => {
+    ctx.on('agent/created', ({ agent }) => {
         if (!hasWebSurface(ctx))
             return undefined;
         if (agent.session.header.origin === 'subagent')
             return undefined;
-        if (sections.has(agent.session.id))
-            return undefined;
         let prompt = store.get(agent.session.id);
         if (prompt === undefined) {
-            if (source !== 'startup')
-                return undefined;
             const fresh = shouldCapture({
                 isSubagent: false,
                 isSeeded: agent.session.header.isSeeded,
@@ -66,7 +69,9 @@ export async function apply(ctx, config) {
         return undefined;
     });
     ctx.on('agent/disposed', ({ agent }) => {
-        sections.delete(agent.session.id);
+        const entry = sections.get(agent.session.id);
+        if (entry?.agent === agent)
+            sections.delete(agent.session.id);
     });
     const registry = ctx.get('agents');
     if (registry !== undefined && hasWebSurface(ctx)) {

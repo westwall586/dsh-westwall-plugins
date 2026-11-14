@@ -21,6 +21,7 @@ function createHarness(options: {
   web?: boolean
   agents?: FakeAgent[]
   records?: Record<string, StoredPrompt>
+  putFails?: boolean
 } = {}) {
   const web = options.web ?? true
   const stored = new Map<string, StoredPrompt>(Object.entries(options.records ?? {}))
@@ -38,6 +39,7 @@ function createHarness(options: {
               get: (key: string) => stored.get(key),
               put: async (key: string, value: StoredPrompt) => {
                 puts.push([key, value])
+                if (options.putFails === true) throw new Error('disk full')
                 stored.set(key, value)
               },
             }),
@@ -185,4 +187,51 @@ test('插件卸载时释放已注册的 section', async () => {
   harness.emit('agent/created', { agent, source: 'startup' })
   for (const dispose of harness.disposers) dispose()
   assert.equal(agent.sections[0].disposed, true)
+})
+
+test('配置修改后已有会话仍使用快照，不被新值覆盖', async () => {
+  let current = '第一版提示词'
+  const harness = createHarness()
+  await apply(harness.ctx as never, { stylePrompt: { get: () => current } })
+
+  const first = createAgent('s10')
+  harness.emit('agent/created', { agent: first, source: 'startup' })
+  assert.equal(first.sections[0]?.text, '第一版提示词')
+
+  current = '第二版提示词'
+  const resumed = createAgent('s10', { messages: 2 })
+  harness.emit('agent/created', { agent: resumed, source: 'resume' })
+  assert.equal(first.sections[0]?.disposed, true)
+  assert.equal(resumed.sections[0]?.text, '第一版提示词')
+  assert.equal(harness.puts.length, 1)
+})
+
+test('快照写入失败时仍注册本次运行的 section', async () => {
+  const harness = createHarness({ putFails: true })
+  await apply(harness.ctx as never, config)
+  const agent = createAgent('s11')
+  harness.emit('agent/created', { agent, source: 'startup' })
+  assert.equal(agent.sections[0]?.text, '当前提示词')
+  assert.equal(harness.puts.length, 1)
+})
+
+test('插件加载时跳过子代理的已有快照', async () => {
+  const subagent = createAgent('s12', { origin: 'subagent' })
+  const harness = createHarness({
+    agents: [subagent],
+    records: { s12: { prompt: '不该注入', capturedAt: 1 } },
+  })
+  await apply(harness.ctx as never, config)
+  assert.equal(subagent.sections.length, 0)
+})
+
+test('同一会话被新 Agent 替换时重新注册 section', async () => {
+  const harness = createHarness()
+  await apply(harness.ctx as never, config)
+  const first = createAgent('s13')
+  harness.emit('agent/created', { agent: first, source: 'startup' })
+  const replacement = createAgent('s13', { messages: 1 })
+  harness.emit('agent/created', { agent: replacement, source: 'compact' })
+  assert.equal(first.sections[0]?.disposed, true)
+  assert.equal(replacement.sections[0]?.text, '当前提示词')
 })

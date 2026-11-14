@@ -8,7 +8,7 @@ import { openSnapshotStore, shouldCapture } from './snapshot.ts'
 
 export const name = 'friendly-expression'
 
-export const inject = ['systemPrompt']
+export const inject = ['systemPrompt', 'storageDomain']
 
 export const Config = z.object({
   stylePrompt: z.string().max(MAX_PROMPT_CHARS).default(DEFAULT_STYLE_PROMPT).volatile(),
@@ -51,36 +51,46 @@ function warn(message: string, error: unknown): void {
   console.warn(`[dsh-friendly-expression] ${message}`, error)
 }
 
+interface SectionEntry {
+  agent: AgentLike
+  dispose: () => void
+}
+
 export async function apply(ctx: Context, config: FriendlyExpressionConfig): Promise<void> {
   const store = await openSnapshotStore(ctx)
-  const sections = new Map<string, () => void>()
+  const sections = new Map<string, SectionEntry>()
 
   const registerSection = (agent: AgentLike, prompt: string): void => {
     const sessionId = agent.session.id
-    if (prompt.length === 0 || sections.has(sessionId)) return
+    const existing = sections.get(sessionId)
+    if (prompt.length === 0) {
+      existing?.dispose()
+      sections.delete(sessionId)
+      return
+    }
+    if (existing?.agent === agent) return
+    existing?.dispose()
     const promptCtx = agent.ctx as PromptContext
     const dispose = agent.ctx.effect(() => promptCtx.systemPrompt.section({
       name: SECTION_NAME,
       order: SECTION_ORDER,
       text: prompt,
     }), 'friendly-expression prompt section')
-    sections.set(sessionId, dispose)
+    sections.set(sessionId, { agent, dispose })
   }
 
   ctx.effect(() => () => store.close(), 'friendly-expression snapshot store')
   ctx.effect(() => () => {
-    for (const dispose of sections.values()) dispose()
+    for (const entry of sections.values()) entry.dispose()
     sections.clear()
   }, 'friendly-expression prompt sections')
 
-  ctx.on('agent/created', ({ agent, source }) => {
+  ctx.on('agent/created', ({ agent }) => {
     if (!hasWebSurface(ctx)) return undefined
     if (agent.session.header.origin === 'subagent') return undefined
-    if (sections.has(agent.session.id)) return undefined
 
     let prompt = store.get(agent.session.id)
     if (prompt === undefined) {
-      if (source !== 'startup') return undefined
       const fresh = shouldCapture({
         isSubagent: false,
         isSeeded: agent.session.header.isSeeded,
@@ -98,7 +108,8 @@ export async function apply(ctx: Context, config: FriendlyExpressionConfig): Pro
   })
 
   ctx.on('agent/disposed', ({ agent }) => {
-    sections.delete(agent.session.id)
+    const entry = sections.get(agent.session.id)
+    if (entry?.agent === agent) sections.delete(agent.session.id)
   })
 
   const registry = ctx.get('agents') as AgentRegistryLike | undefined

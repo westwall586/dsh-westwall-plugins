@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "网页剪藏",
-    "description": "复制长网页到会话很费事。在桌面版侧栏浏览器点「添加到会话」，当前页变成带来源的 Markdown 附件；只加入输入框，不会自动发送。"
+    "description": "复制长网页到会话很费事。在桌面版侧栏浏览器点「添加到会话」，当前页变成带来源的 Markdown 附件；同时保存一份可读副本，目录可配置。只加入输入框，不会自动发送。"
   },
   "tabMenu.label": "添加到会话",
   "composer.label": "添加到会话",
@@ -16,5 +16,24 @@
   "error.capture-failed": "读取页面失败，请重试",
   "error.extract-failed": "提取正文失败，请重试",
   "error.composer-busy": "输入框正忙，请稍后再试",
-  "error.attach-failed": "添加失败，请重试"
+  "error.attach-failed": "添加失败，请重试",
+  "toast.copyFailed": "已加入会话，但可读副本未保存：{reason}",
+  "settings.copyHint": "会话附件仍保存在 DSH 中；这里额外保存一份可直接打开的 Markdown 副本。",
+  "settings.currentFolder": "当前目录",
+  "settings.temporaryTag": "临时",
+  "settings.folder": "副本目录",
+  "settings.placeholder": "留空使用系统临时目录",
+  "settings.defaultHint": "留空时使用系统临时目录。指定目录必须是绝对路径。",
+  "settings.save": "保存",
+  "settings.choose": "选择文件夹",
+  "settings.open": "打开文件夹",
+  "settings.useDefault": "恢复默认",
+  "settings.saved": "已保存。",
+  "settings.saveRefused": "设置未能保存。",
+  "settings.directoryUnavailable": "无法读取副本目录。",
+  "settings.openFailed": "无法打开文件夹。",
+  "settings.opened": "已打开 {path}",
+  "settings.loading": "读取中…",
+  "settings.unavailable": "当前 profile 不允许保存设置。",
+  "settings.desktopOnly": "文件夹会在运行 DSH 的电脑上打开。"
 }

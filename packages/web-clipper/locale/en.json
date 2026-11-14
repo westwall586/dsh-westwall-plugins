@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Web Clipper",
-    "description": "Copying a long page into a chat is tedious. In the desktop sidebar browser, add the current page as a Markdown attachment with its source; it only fills the composer and never sends."
+    "description": "Copying a long page into a chat is tedious. Add the current page from the desktop sidebar browser as a sourced Markdown attachment, with a readable copy in a configurable folder. It only fills the composer and never sends."
   },
   "tabMenu.label": "Add to conversation",
   "composer.label": "Add to conversation",
@@ -16,5 +16,24 @@
   "error.capture-failed": "Couldn't read the page. Please retry.",
   "error.extract-failed": "Couldn't extract the article. Please retry.",
   "error.composer-busy": "The composer is busy. Try again in a moment.",
-  "error.attach-failed": "Couldn't add the page. Please retry."
+  "error.attach-failed": "Couldn't add the page. Please retry.",
+  "toast.copyFailed": "Added to the conversation, but the readable copy was not saved: {reason}",
+  "settings.copyHint": "The conversation attachment stays in DSH. This setting adds a readable Markdown copy you can open directly.",
+  "settings.currentFolder": "Current folder",
+  "settings.temporaryTag": "temporary",
+  "settings.folder": "Copy folder",
+  "settings.placeholder": "Leave empty for the system temporary folder",
+  "settings.defaultHint": "Leave empty to use the system temporary folder. A custom path must be absolute.",
+  "settings.save": "Save",
+  "settings.choose": "Choose folder",
+  "settings.open": "Open folder",
+  "settings.useDefault": "Use default",
+  "settings.saved": "Saved.",
+  "settings.saveRefused": "The setting was not saved.",
+  "settings.directoryUnavailable": "The copy folder could not be read.",
+  "settings.openFailed": "The folder could not be opened.",
+  "settings.opened": "Opened {path}",
+  "settings.loading": "Reading…",
+  "settings.unavailable": "This profile does not allow saving settings.",
+  "settings.desktopOnly": "The folder opens on the computer running DSH."
 }

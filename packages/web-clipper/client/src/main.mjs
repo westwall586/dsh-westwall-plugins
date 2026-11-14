@@ -11,7 +11,9 @@ import { attachArtifact } from './attach.mjs'
 import { createClipper, waitForFrames } from './clip.mjs'
 import { extractArticle } from './extractor.mjs'
 import { createToastHost } from './toast.mjs'
+import { createCopyApi } from './remote.mjs'
 import { createComposerButton } from './ui/composer-button.mjs'
+import { createSettingsPage } from './ui/settings.mjs'
 import { createTabMenuItem } from './ui/tab-menu-item.mjs'
 import { isDesktopGlobal } from './ui/visibility.mjs'
 import { captureActivePage } from './webview.mjs'
@@ -25,7 +27,7 @@ const ENTRY_ID = 'web-clipper'
 const ENTRY_ORDER = 40
 
 export default {
-  inject: ['slots', 'locale', 'sidebarRight'],
+  inject: ['slots', 'locale', 'sidebarRight', 'remote', 'uiWorkspace'],
 
   apply(ctx) {
     ctx.effect(
@@ -46,10 +48,14 @@ export default {
     ctx.effect(() => () => toast.dispose(), 'webClipper toast')
 
     const sidebarRight = ctx.sidebarRight
+    const copy = createCopyApi(ctx)
+    // Warm the Remote namespace so the first clip does not wait for its mount.
+    void copy.directory().catch(() => {})
     const clipper = createClipper({
       capture: () => captureActivePage(),
       extract: extractArticle,
       attach: attachArtifact,
+      copy,
       toast,
       t,
       sidebarRight,
@@ -82,6 +88,22 @@ export default {
         order: ENTRY_ORDER,
       }, createComposerButton({ clip: clipper.clip, t, openTabs: sidebarRight.openTabs }))),
       'webClipper composer entry',
+    )
+
+    const SettingsPage = createSettingsPage({ ctx, copy, t, desktop: isDesktopGlobal() })
+    ctx.effect(
+      () => ctx.slots.inject('plugins.bundle.config', () => ctx.slots.register({
+        name: 'plugins.bundle.config',
+        key: '@westwall/dsh-web-clipper',
+      }, SettingsPage)),
+      'webClipper bundle settings',
+    )
+    ctx.effect(
+      () => ctx.slots.inject('plugins.row.config', () => ctx.slots.register({
+        name: 'plugins.row.config',
+        key: '@westwall/dsh-feed-ultra#dsh-web-clipper',
+      }, SettingsPage)),
+      'webClipper row settings',
     )
   },
 }

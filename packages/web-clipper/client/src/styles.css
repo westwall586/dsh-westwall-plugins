@@ -84,3 +84,108 @@
 .dwc-toast--error {
   color: var(--dsw-alias-state-error-primary);
 }
+.dwc-toast--warning {
+  color: var(--dsw-alias-state-warning-primary, var(--dsw-alias-label-primary));
+}
+
+/* ---- plugin configuration page ---- */
+.dwc-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 620px;
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  line-height: 20px;
+}
+.dwc-settings-hint {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary);
+}
+.dwc-settings-current {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-md, 8px);
+  background: var(--dsw-alias-bg-base);
+}
+.dwc-settings-label {
+  color: var(--dsw-alias-label-secondary);
+}
+.dwc-settings-path {
+  overflow-wrap: anywhere;
+  font-family: var(--dsw-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px;
+}
+.dwc-settings-tag {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-elevated);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+}
+.dwc-settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dwc-settings-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 9px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-sm, 6px);
+  background: var(--dsw-alias-bg-base);
+  color: inherit;
+  font: inherit;
+}
+.dwc-settings-input:focus {
+  outline: 2px solid var(--dsw-alias-focus-ring, var(--dsw-alias-interactive-bg-hover));
+  outline-offset: 1px;
+}
+.dwc-settings-input:disabled {
+  color: var(--dsw-alias-label-dimmed);
+}
+.dwc-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.dwc-settings-btn {
+  padding: 6px 12px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-sm, 6px);
+  background: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  cursor: pointer;
+}
+.dwc-settings-btn:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.dwc-settings-btn--primary {
+  border-color: transparent;
+  background: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-bg-base);
+}
+.dwc-settings-btn--quiet {
+  border-color: transparent;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+}
+.dwc-settings-btn:disabled {
+  color: var(--dsw-alias-label-dimmed);
+  cursor: default;
+}
+.dwc-settings-status {
+  margin: 0;
+}
+.dwc-settings-status--ok {
+  color: var(--dsw-alias-state-success-primary, var(--dsw-alias-label-secondary));
+}
+.dwc-settings-status--error {
+  color: var(--dsw-alias-state-error-primary);
+}

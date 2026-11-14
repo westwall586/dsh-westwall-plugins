@@ -26,6 +26,17 @@ export function sanitizeFilename(title, ext) {
 
 const pad = (value) => String(value).padStart(2, '0')
 
+/** Sortable local timestamp for a file name; colons are illegal on Windows. */
+export function fileStamp(date = new Date()) {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+    + `_${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}`
+}
+
+/** A timestamped name so clips of the same page sort chronologically. */
+export function clipFilename(title, ext, clippedAt = new Date()) {
+  return `${fileStamp(clippedAt)}_${sanitizeFilename(title, ext)}`
+}
+
 /** Local ISO timestamp with a numeric UTC offset, e.g. 2026-11-14T12:30:00+08:00. */
 export function localTimestamp(date = new Date()) {
   const offset = -date.getTimezoneOffset()
@@ -70,23 +81,23 @@ function fullPageContent(html, metadata) {
   return `${doctype[0]}\n${comment}\n${html.slice(doctype[0].length)}`
 }
 
-function markdownArtifact(kind, metadata, body) {
+function markdownArtifact(kind, metadata, body, clippedAt) {
   return {
     kind,
     title: metadata.title,
     url: metadata.url,
-    name: sanitizeFilename(metadata.title, 'md'),
+    name: clipFilename(metadata.title, 'md', clippedAt),
     type: 'text/markdown',
     content: `${frontmatter(metadata)}\n${body.trim()}\n`,
   }
 }
 
-function fullPageArtifact(metadata, html) {
+function fullPageArtifact(metadata, html, clippedAt) {
   return {
     kind: 'full-page',
     title: metadata.title,
     url: metadata.url,
-    name: sanitizeFilename(metadata.title, 'html'),
+    name: clipFilename(metadata.title, 'html', clippedAt),
     type: 'text/html',
     content: fullPageContent(html, metadata),
   }
@@ -101,10 +112,11 @@ function fullPageArtifact(metadata, html) {
 
 export function extractArticle(page, options = {}) {
   const { Kernel = Defuddle, clippedAt } = options
+  const at = clippedAt instanceof Date ? clippedAt : new Date()
   const html = String(page?.html ?? '')
   const text = String(page?.text ?? '')
   const url = String(page?.url ?? '')
-  const metadata = (title) => buildMetadata({ title, url, clippedAt })
+  const metadata = (title) => buildMetadata({ title, url, clippedAt: at })
 
   let parsed
   let parsedTitle = ''
@@ -120,7 +132,7 @@ export function extractArticle(page, options = {}) {
 
   if (page?.truncated === true || html === '') {
     if (text.trim() === '') throw new Error('web-clipper: page has no content')
-    return markdownArtifact('text', metadata(title), text)
+    return markdownArtifact('text', metadata(title), text, at)
   }
 
   if (parsed !== undefined) {
@@ -129,14 +141,14 @@ export function extractArticle(page, options = {}) {
       const markdown = String(result?.content ?? '').trim()
       const wordCount = Number(result?.wordCount ?? 0)
       if (wordCount > 0 && markdown !== '') {
-        return markdownArtifact('markdown', metadata(title), markdown)
+        return markdownArtifact('markdown', metadata(title), markdown, at)
       }
     } catch {
       // A kernel failure degrades to the full-page snapshot instead of losing the page.
     }
   }
 
-  if (html !== '') return fullPageArtifact(metadata(title), html)
-  if (text.trim() !== '') return markdownArtifact('text', metadata(title), text)
+  if (html !== '') return fullPageArtifact(metadata(title), html, at)
+  if (text.trim() !== '') return markdownArtifact('text', metadata(title), text, at)
   throw new Error('web-clipper: page has no content')
 }

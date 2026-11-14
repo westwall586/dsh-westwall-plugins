@@ -28,6 +28,7 @@ export function createClipper(deps) {
     capture,
     extract,
     attach,
+    copy,
     toast,
     t,
     sidebarRight,
@@ -92,6 +93,19 @@ export function createClipper(deps) {
         artifact = extract(captured.page, { clippedAt: startedAt })
       } catch (error) {
         return report('extract-failed', error instanceof Error ? error.message : String(error))
+      }
+
+      if (copy !== undefined && copy !== null) {
+        try {
+          const saved = await copy.save(artifact.name, artifact.content)
+          if (!saved?.ok) {
+            toast.show(t('toast.copyFailed', { reason: saved?.detail ?? saved?.code ?? 'unknown' }), 'warning')
+          }
+        } catch (error) {
+          toast.show(t('toast.copyFailed', {
+            reason: error instanceof Error ? error.message : String(error),
+          }), 'warning')
+        }
       }
 
       let conversation

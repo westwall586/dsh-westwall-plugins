@@ -231,3 +231,43 @@ test('resolveTarget prefers the active browser tab, then this Session first brow
     openTabs: { getSnapshot: () => [] },
   }, 's1'), undefined)
 })
+test('a readable copy is saved before the attachment is added', async () => {
+  const order = []
+  const { deps } = setup({
+    copy: {
+      save: async (name, content) => {
+        order.push(`copy:${name}:${content}`)
+        return { ok: true, path: '/tmp/T.md', directory: '/tmp', isDefault: true }
+      },
+    },
+    attach: async () => {
+      order.push('attach')
+      return { ok: true, mode: 'draft' }
+    },
+  })
+  const result = await createClipper(deps).clip({ sessionId: 's1', inputActions: {} })
+  assert.equal(result.ok, true)
+  assert.deepEqual(order, ['copy:T.md:body', 'attach'])
+})
+
+test('a copy failure warns but still adds the attachment', async () => {
+  const { deps, toasts } = setup({
+    copy: { save: async () => ({ ok: false, code: 'write-failed', detail: 'disk full' }) },
+  })
+  const result = await createClipper(deps).clip({ sessionId: 's1', inputActions: {} })
+  assert.equal(result.ok, true)
+  assert.equal(toasts.length, 2)
+  assert.equal(toasts[0].kind, 'warning')
+  assert.equal(toasts[0].message, 'toast.copyFailed')
+  assert.equal(toasts[1].kind, 'success')
+})
+
+test('a copy throw also warns and keeps the attachment', async () => {
+  const { deps, toasts } = setup({
+    copy: { save: async () => { throw new Error('remote offline') } },
+  })
+  const result = await createClipper(deps).clip({ sessionId: 's1', inputActions: {} })
+  assert.equal(result.ok, true)
+  assert.equal(toasts[0].kind, 'warning')
+  assert.equal(toasts[1].kind, 'success')
+})

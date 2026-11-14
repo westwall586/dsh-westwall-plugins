@@ -15,6 +15,7 @@
   → webview.executeJavaScript 读取已渲染 DOM
   → extractor：defuddle 正文 → Markdown
   → metadata：title / url / clipped_at / note
+  → Host copy：按设置目录写一份可读副本
   → attach：createDrafts → inputActions.addAttachments
   → toast 反馈
 ```
@@ -32,11 +33,15 @@
 
 | 文件 | 职责 |
 |---|---|
-| `client/src/main.mjs` | 模块装载入口、locale 与样式注册、两个 Slot 注册 |
+| `client/src/main.mjs` | 模块装载入口、locale 与样式注册、两个剪藏 Slot 与配置页注册 |
 | `client/src/clip.mjs` | 共享流水线、忙锁、目标标签解析、两帧等待 |
 | `client/src/webview.mjs` | 定位可见 webview、8 秒超时、4 MB HTML 上限 |
 | `client/src/extractor.mjs` | defuddle 装配、四字段元数据、整页与纯文本降级、文件名合法化 |
 | `client/src/attach.mjs` | 直接 draft 路径与合成 drop 兜底 |
+| `client/src/remote.mjs` | `remote.webClipper` 描述符、懒挂载与结果解包 |
+| `client/src/ui/settings.mjs` | Plugin Manager 的副本目录配置页 |
+| `src/index.ts` | Host 服务：读取 volatile 配置、保存副本、打开目录 |
+| `src/copy.ts` | 目录解析、文件名合法化、原子写入、Finder/Explorer 打开 |
 | `client/src/toast.mjs` | 轻量反馈浮层 |
 | `client/src/ui/visibility.mjs` | 纯可见性判断 |
 | `client/src/ui/tab-menu-item.mjs` | `sidebar.right.tab.menu.item` 条目 |
@@ -45,11 +50,21 @@
 
 `defuddle/full` 在构建期内联；`react` 由宿主 loader 的 `require` 提供，不进入 bundle。
 
+## 可读副本
+
+副本是附件之外的额外文件，不替代 DSH 附件。`outputDirectory` 是 volatile 配置，改路径不重启插件；空值解析为 `<系统临时目录>/dsh-web-clipper`，非绝对路径直接拒绝。Host 写入时先落同目录临时文件，再用排他硬链接发布；文件名冲突追加 ` (2)`，永不覆盖。
+
+配置页注册在 `plugins.bundle.config`（单独安装，key 为包名）和 `plugins.row.config`（随 Feed Ultra 安装，key 为 `@westwall/dsh-feed-ultra#dsh-web-clipper`）。页面只负责目录输入、选择、保存、恢复默认和打开，不注入宿主 chrome。
+
+副本写入失败只发 warning toast，不改变附件成功结果。`openDirectory` 在 macOS 用 `open`，Windows 用 `explorer.exe`，Linux 用 `xdg-open`；只 spawn 参数数组，不经过 shell。
+
 ## 元数据契约
 
 Markdown frontmatter 固定四个字段，顺序为 `title`、`url`、`clipped_at`、`note`。字符串用 `JSON.stringify`，`clipped_at` 用本地时间加数字偏移。整页 HTML 不用 frontmatter，四个字段变成 doctype 之后的一条 `dsh-clip` JSON 注释，payload 里的 `--` 会被拆开以保持注释合法。
 
 `note` 是固定英文常量，只出现在元数据里。不要添加站点、作者、发布时间、语言、字数、抓取模式，也不要发 feed 事件。
+
+文件名是 `YYYY-MM-DD_HH-mm-ss_<合法标题>.md`，本地时间，全部用短横线避免 Windows 非法字符。整页降级时扩展名是 `.html`，前缀规则相同。
 
 ## 附件入口
 
@@ -63,7 +78,7 @@ Markdown frontmatter 固定四个字段，顺序为 `title`、`url`、`clipped_a
 
 ## 测试
 
-`pnpm test` 先构建再跑 `node:test`。覆盖：四字段 frontmatter 与注释头、本地时间、降级分支、文件名、webview 选择与超时、draft 与 drop 两条附件路径、流水线错误映射与忙锁、入口可见性、构建契约、包清单、聚合去重。
+`pnpm test` 先构建再跑 `node:test`。覆盖：四字段 frontmatter 与注释头、本地时间、时间戳文件名、降级分支、webview 选择与超时、draft 与 drop 两条附件路径、副本目录解析与写入、打开目录、Remote 描述符与解包、流水线错误映射与忙锁、入口可见性、构建契约、包清单、聚合去重。
 
 ## 构建
 

@@ -45,7 +45,13 @@ test('locale meta and every user-facing error key exist in both languages', () =
       'tabMenu.label', 'composer.label', 'toast.region', 'toast.success',
       'error.desktop-only', 'error.no-page', 'error.page-loading', 'error.busy',
       'error.capture-timeout', 'error.capture-failed', 'error.extract-failed',
-      'error.composer-busy', 'error.attach-failed',
+      'error.composer-busy', 'error.attach-failed', 'toast.copyFailed',
+      'settings.copyHint', 'settings.currentFolder', 'settings.folder',
+      'settings.placeholder', 'settings.defaultHint', 'settings.save',
+      'settings.choose', 'settings.open', 'settings.useDefault', 'settings.saved',
+      'settings.saveRefused', 'settings.directoryUnavailable', 'settings.openFailed',
+      'settings.opened', 'settings.loading', 'settings.unavailable', 'settings.desktopOnly',
+      'settings.temporaryTag',
     ]) {
       assert.equal(typeof dictionary[key], 'string', key)
       assert.ok(dictionary[key].length > 0, key)
@@ -55,7 +61,10 @@ test('locale meta and every user-facing error key exist in both languages', () =
   assert.equal(en['tabMenu.label'], 'Add to conversation')
 })
 
-test('the host companion has no Host behavior', () => {
+test('the host companion owns the readable copy service', () => {
   const source = readFileSync(join(root, 'src/index.ts'), 'utf8')
-  assert.match(source, /export function apply\(\): void \{\}/)
+  assert.match(source, /class WebClipper extends TypertRemoteService/)
+  assert.match(source, /async saveCopy/)
+  assert.match(source, /async openDirectory/)
+  assert.match(source, /outputDirectory/)
 })

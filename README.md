@@ -56,7 +56,7 @@ dsh plugin --profile <profile> add \
 |---|---|---|
 | [Jira 工时记录](packages/jira-worklogs/README.md) | 月历查看工时缺口、日详情与 Git 素材，就地起草、确认后写入 Jira | **草稿** · 推荐本地安装 |
 | [资讯工作台](packages/feed-ultra/README.md) | RSS、GitHub 榜单、每日早报与 X 书签收进一个工作区，按天阅读并做 AI 翻译 | **草稿** · 推荐本地安装 |
-| [网页剪藏](packages/web-clipper/README.md) | 把侧栏浏览器当前页作为 Markdown 附件加进会话（桌面版） | **草稿** · 推荐本地安装 |
+| [网页剪藏](packages/web-clipper/README.md) | 把侧栏浏览器当前页作为 Markdown 附件加进会话，并在可配置目录保存可读副本（桌面版） | **草稿** · 推荐本地安装 |
 
 ## 兼容性
 

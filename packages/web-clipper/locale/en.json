@@ -1,0 +1,20 @@
+{
+  "meta": {
+    "title": "Web Clipper",
+    "description": "Copying a long page into a chat is tedious. In the desktop sidebar browser, add the current page as a Markdown attachment with its source; it only fills the composer and never sends."
+  },
+  "tabMenu.label": "Add to conversation",
+  "composer.label": "Add to conversation",
+  "toast.region": "Notifications",
+  "toast.success": "Added “{title}”",
+  "toast.successFullPage": "No article detected; added the full page “{title}”",
+  "error.desktop-only": "Web Clipper works in the desktop app only",
+  "error.no-page": "No page to add. Open a page in the sidebar browser first.",
+  "error.page-loading": "The page is still loading. Try again in a moment.",
+  "error.busy": "Already adding a page. One moment.",
+  "error.capture-timeout": "Reading the page timed out. Please retry.",
+  "error.capture-failed": "Couldn't read the page. Please retry.",
+  "error.extract-failed": "Couldn't extract the article. Please retry.",
+  "error.composer-busy": "The composer is busy. Try again in a moment.",
+  "error.attach-failed": "Couldn't add the page. Please retry."
+}

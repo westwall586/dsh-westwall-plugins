@@ -1,0 +1,87 @@
+/**
+ * @westwall/dsh-web-clipper client entry.
+ *
+ * Registers the locale and styles, then mounts the two official extension
+ * seats through the one shared clip pipeline. Nothing here observes the DOM or
+ * injects controls into host chrome.
+ */
+import en from '../../locale/en.json'
+import zh from '../../locale/zh.json'
+import { attachArtifact } from './attach.mjs'
+import { createClipper, waitForFrames } from './clip.mjs'
+import { extractArticle } from './extractor.mjs'
+import { createToastHost } from './toast.mjs'
+import { createComposerButton } from './ui/composer-button.mjs'
+import { createTabMenuItem } from './ui/tab-menu-item.mjs'
+import { isDesktopGlobal } from './ui/visibility.mjs'
+import { captureActivePage } from './webview.mjs'
+import CSS from './styles.css'
+
+const NAMESPACE = 'webClipper'
+const STYLE_ATTRIBUTE = 'data-dsh-web-clipper-style'
+const TAB_MENU_SLOT = 'sidebar.right.tab.menu.item'
+const COMPOSER_SLOT = 'conversation.input.left'
+const ENTRY_ID = 'web-clipper'
+const ENTRY_ORDER = 40
+
+export default {
+  inject: ['slots', 'locale', 'sidebarRight'],
+
+  apply(ctx) {
+    ctx.effect(
+      () => ctx.locale.register(NAMESPACE, { zh, en, 'zh-CN': zh, 'en-US': en }),
+      'webClipper locale',
+    )
+    const t = ctx.locale.bind(NAMESPACE)
+
+    ctx.effect(() => {
+      const style = document.createElement('style')
+      style.setAttribute(STYLE_ATTRIBUTE, '')
+      style.textContent = CSS
+      document.head.append(style)
+      return () => style.remove()
+    }, 'webClipper styles')
+
+    const toast = createToastHost(t)
+    ctx.effect(() => () => toast.dispose(), 'webClipper toast')
+
+    const sidebarRight = ctx.sidebarRight
+    const clipper = createClipper({
+      capture: () => captureActivePage(),
+      extract: extractArticle,
+      attach: attachArtifact,
+      toast,
+      t,
+      sidebarRight,
+      conversationFor: (sessionId) => {
+        const conversation = ctx.get('conversation')
+        if (conversation !== undefined && conversation !== null
+          && typeof conversation.createDrafts === 'function') {
+          return conversation
+        }
+        return ctx.get('sessions')?.scope?.(sessionId)?.get?.('conversation')
+      },
+      desktop: isDesktopGlobal,
+      now: () => new Date(),
+      waitFrames: () => waitForFrames(2),
+    })
+
+    ctx.effect(
+      () => ctx.slots.inject(TAB_MENU_SLOT, () => ctx.slots.register({
+        name: TAB_MENU_SLOT,
+        id: ENTRY_ID,
+        order: ENTRY_ORDER,
+      }, createTabMenuItem({ clip: clipper.clip, t }))),
+      'webClipper tab menu entry',
+    )
+
+    ctx.effect(
+      () => ctx.slots.inject(COMPOSER_SLOT, () => ctx.slots.register({
+        name: COMPOSER_SLOT,
+        id: ENTRY_ID,
+        order: ENTRY_ORDER,
+      }, createComposerButton({ clip: clipper.clip, t, openTabs: sidebarRight.openTabs }))),
+      'webClipper composer entry',
+    )
+  },
+}

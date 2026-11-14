@@ -1,0 +1,87 @@
+/*
+ * Styles shared by both clip entries. Colors and radii come from host theme
+ * tokens only; the bundle never imports a host stylesheet.
+ */
+
+/* ---- tab menu row ---- */
+.dwc-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--dsw-radius-sm, 6px);
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  text-align: left;
+  cursor: pointer;
+}
+.dwc-menu-item:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.dwc-menu-item:active {
+  background: var(--dsw-alias-interactive-bg-active);
+}
+.dwc-menu-item svg {
+  flex: none;
+  color: var(--dsw-alias-label-secondary);
+}
+.dwc-menu-item-label {
+  white-space: nowrap;
+}
+
+/* ---- composer icon button ---- */
+.dwc-composer-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--dsw-radius-sm, 6px);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+.dwc-composer-btn:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+.dwc-composer-btn:disabled {
+  color: var(--dsw-alias-label-dimmed);
+  cursor: default;
+}
+
+/* ---- toast ---- */
+.dwc-toasts {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.dwc-toast {
+  max-width: 320px;
+  padding: 8px 14px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-md, 8px);
+  background: var(--dsw-alias-bg-layer-2);
+  box-shadow: 0 6px 20px var(--dsw-alias-bg-mask-1);
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  line-height: 20px;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.dwc-toast--error {
+  color: var(--dsw-alias-state-error-primary);
+}

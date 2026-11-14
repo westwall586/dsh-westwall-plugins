@@ -1,0 +1,20 @@
+{
+  "meta": {
+    "title": "网页剪藏",
+    "description": "复制长网页到会话很费事。在桌面版侧栏浏览器点「添加到会话」，当前页变成带来源的 Markdown 附件；只加入输入框，不会自动发送。"
+  },
+  "tabMenu.label": "添加到会话",
+  "composer.label": "添加到会话",
+  "toast.region": "通知",
+  "toast.success": "已添加「{title}」",
+  "toast.successFullPage": "未识别正文，已添加整页「{title}」",
+  "error.desktop-only": "网页剪藏只在桌面版可用",
+  "error.no-page": "没找到可添加的网页，请先在侧栏浏览器打开页面",
+  "error.page-loading": "页面还在加载，请稍后再试",
+  "error.busy": "正在添加，请稍候",
+  "error.capture-timeout": "读取页面超时，请重试",
+  "error.capture-failed": "读取页面失败，请重试",
+  "error.extract-failed": "提取正文失败，请重试",
+  "error.composer-busy": "输入框正忙，请稍后再试",
+  "error.attach-failed": "添加失败，请重试"
+}

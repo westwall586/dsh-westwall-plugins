@@ -2,7 +2,9 @@
 
 > **状态：草稿。** 未发布。推荐用本地目录安装，或从 GitHub 固定提交安装。
 
-关注的 RSS、GitHub 榜单、每日早报和 X 书签散在不同地方。资讯工作台把它们收进一个绑定的工作区，按天排好，已读状态跨天继承；简介可以按渠道用 AI 翻译。数据是工作区里的普通 JSON，Agent 也能直接读。
+RSS 只是起点。榜单、每日早报、X 书签和任意订阅源都可以收进 DSH 桌面端的一个工作区，按天阅读，已读状态跨天继承，简介可按渠道用 AI 翻译。
+
+抓取走本机 Ego Browser 的登录态和固定脚本，不需要付费 API。数据是工作区里的普通 JSON，Agent 也能直接读。
 
 ## 快速开始
 
@@ -113,6 +115,9 @@ dsh plugin --profile <profile> add \
 ```
 
 ### 维护者文档
+
+- 架构与数据契约：[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- 设计取舍：[docs/DECISIONS.md](docs/DECISIONS.md)
 
 本包是 TS 直载包：`exports` 指向 `src/index.ts`，没有 `lib/`，只使用可擦除的 TS 语法。浏览器半体由 esbuild 打成 `client.js` 并入库。
 

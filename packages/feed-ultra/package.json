@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "资讯工作台（草稿）：RSS、GitHub Trending、每日早报与 X 书签按天阅读，AI 翻译，数据落在绑定工作区。",
+  "description": "资讯工作台（草稿）：把 RSS、榜单、早报、书签等资讯源收进一个工作区，按天阅读，AI 翻译，数据落在本机。",
   "icon": "./icon.svg",
   "exports": {
     ".": "./src/index.ts",
@@ -20,7 +20,8 @@
     "cordis.patch.yml",
     "locale",
     "icon.svg",
-    "README.md"
+    "README.md",
+    "docs"
   ],
   "dsh": {
     "manifestVersion": 1,

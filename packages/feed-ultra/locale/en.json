@@ -2,7 +2,7 @@
   "gh.starsLabel": "Stars",
   "meta": {
     "title": "Feed Ultra",
-    "description": "RSS feeds, GitHub Trending, daily briefs and X bookmarks land in one workspace, one day at a time. Read, mark and AI-translate them in the sidebar; the workspace folder stays available to other agents."
+    "description": "RSS alone misses trending lists, briefs and bookmarks. Open Feed Ultra to read a day at a time, mark as read and AI-translate; fetching reuses your local Ego Browser session, with no paid API."
   },
   "entry": "Feed Ultra",
   "rail.channels": "Channels",

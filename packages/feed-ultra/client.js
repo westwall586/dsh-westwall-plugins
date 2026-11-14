@@ -38,7 +38,7 @@ var DshFeedUltraClient = (() => {
     "gh.starsLabel": "Stars",
     meta: {
       title: "Feed Ultra",
-      description: "RSS feeds, GitHub Trending, daily briefs and X bookmarks land in one workspace, one day at a time. Read, mark and AI-translate them in the sidebar; the workspace folder stays available to other agents."
+      description: "RSS alone misses trending lists, briefs and bookmarks. Open Feed Ultra to read a day at a time, mark as read and AI-translate; fetching reuses your local Ego Browser session, with no paid API."
     },
     entry: "Feed Ultra",
     "rail.channels": "Channels",
@@ -341,7 +341,7 @@ var DshFeedUltraClient = (() => {
     "gh.starsLabel": "星标",
     meta: {
       title: "资讯工作台",
-      description: "关注的 RSS、GitHub 榜单、每日早报和 X 书签散在不同地方。打开侧栏「资讯工作台」，按天阅读、标记已读、按需 AI 翻译；数据落在绑定工作区，其他 Agent 也能直接复用。"
+      description: "只看 RSS 会漏掉榜单、早报和书签里的资讯。打开侧栏「资讯工作台」，按天阅读、标记已读、按需 AI 翻译；抓取复用本机 Ego Browser，不需要付费 API。"
     },
     entry: "资讯工作台",
     "rail.channels": "频道",

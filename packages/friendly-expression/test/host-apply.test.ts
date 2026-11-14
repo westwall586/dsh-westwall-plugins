@@ -1,0 +1,188 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+
+import { apply } from '../src/index.ts'
+
+type Listener = (payload: never) => void
+
+interface StoredPrompt {
+  prompt: string
+  capturedAt: number
+}
+
+interface SectionCall {
+  name: string
+  order: number
+  text: string
+  disposed: boolean
+}
+
+function createHarness(options: {
+  web?: boolean
+  agents?: FakeAgent[]
+  records?: Record<string, StoredPrompt>
+} = {}) {
+  const web = options.web ?? true
+  const stored = new Map<string, StoredPrompt>(Object.entries(options.records ?? {}))
+  const puts: [string, StoredPrompt][] = []
+  const listeners = new Map<string, Listener[]>()
+  const disposers: (() => void)[] = []
+  const agents = options.agents ?? []
+  const ctx = {
+    get(name: string) {
+      if (name === 'webApp' && web) return {}
+      if (name === 'storageDomain') {
+        return {
+          open: async () => ({
+            table: () => ({
+              get: (key: string) => stored.get(key),
+              put: async (key: string, value: StoredPrompt) => {
+                puts.push([key, value])
+                stored.set(key, value)
+              },
+            }),
+            close: async () => {},
+          }),
+        }
+      }
+      if (name === 'agents') return { list: () => agents }
+      return undefined
+    },
+    on(name: string, listener: Listener) {
+      const list = listeners.get(name) ?? []
+      list.push(listener)
+      listeners.set(name, list)
+      return () => {}
+    },
+    effect(run: () => (() => void) | void) {
+      const disposer = run()
+      if (typeof disposer === 'function') disposers.push(disposer)
+      return () => {}
+    },
+    emit(name: string, payload: unknown) {
+      for (const listener of listeners.get(name) ?? []) listener(payload as never)
+    },
+  }
+  return { ctx, stored, puts, disposers, emit: ctx.emit }
+}
+
+interface FakeAgent {
+  session: {
+    id: string
+    header: { origin?: 'subagent'; isSeeded: boolean }
+    surface: { nodes: readonly unknown[] }
+  }
+  ctx: {
+    effect(run: () => (() => void) | void): () => void
+    systemPrompt: { section(spec: { name: string; order: number; text: string }): () => void }
+  }
+  sections: SectionCall[]
+}
+
+function createAgent(id: string, options: {
+  origin?: 'subagent'
+  seeded?: boolean
+  messages?: number
+} = {}): FakeAgent {
+  const sections: SectionCall[] = []
+  return {
+    session: {
+      id,
+      header: {
+        ...options.origin === undefined ? {} : { origin: options.origin },
+        isSeeded: options.seeded ?? false,
+      },
+      surface: { nodes: Array.from({ length: options.messages ?? 0 }, () => ({})) },
+    },
+    ctx: {
+      effect(run) { return run() ?? (() => {}) },
+      systemPrompt: {
+        section(spec) {
+          const call = { ...spec, disposed: false }
+          sections.push(call)
+          return () => { call.disposed = true }
+        },
+      },
+    },
+    sections,
+  }
+}
+
+const config = { stylePrompt: { get: () => '当前提示词' } }
+
+test('新建 Web 会话捕获提示词并注册 scoped section', async () => {
+  const harness = createHarness()
+  await apply(harness.ctx as never, config)
+  const agent = createAgent('s1')
+  harness.emit('agent/created', { agent, source: 'startup' })
+  assert.equal(agent.sections.length, 1)
+  assert.equal(agent.sections[0].name, 'westwall:friendly-expression')
+  assert.equal(agent.sections[0].order, 9500)
+  assert.equal(agent.sections[0].text, '当前提示词')
+  assert.equal(harness.stored.get('s1')?.prompt, '当前提示词')
+})
+
+test('已有快照的会话使用快照且不覆盖存储', async () => {
+  const harness = createHarness({ records: { s2: { prompt: '旧提示词', capturedAt: 1 } } })
+  await apply(harness.ctx as never, config)
+  const agent = createAgent('s2', { messages: 3 })
+  harness.emit('agent/created', { agent, source: 'resume' })
+  assert.equal(agent.sections[0]?.text, '旧提示词')
+  assert.equal(harness.puts.length, 0)
+})
+
+test('没有快照的恢复会话不注册也不捕获', async () => {
+  const harness = createHarness()
+  await apply(harness.ctx as never, config)
+  const agent = createAgent('s3', { messages: 2 })
+  harness.emit('agent/created', { agent, source: 'resume' })
+  assert.equal(agent.sections.length, 0)
+  assert.equal(harness.puts.length, 0)
+})
+
+test('子代理不注册 section', async () => {
+  const harness = createHarness({ records: { s4: { prompt: '不该注入', capturedAt: 1 } } })
+  await apply(harness.ctx as never, config)
+  const agent = createAgent('s4', { origin: 'subagent' })
+  harness.emit('agent/created', { agent, source: 'startup' })
+  assert.equal(agent.sections.length, 0)
+})
+
+test('没有 Web 渲染面时不捕获也不注册', async () => {
+  const harness = createHarness({ web: false })
+  await apply(harness.ctx as never, config)
+  const agent = createAgent('s5')
+  harness.emit('agent/created', { agent, source: 'startup' })
+  assert.equal(agent.sections.length, 0)
+  assert.equal(harness.puts.length, 0)
+})
+
+test('插件加载时只恢复已有快照的活跃会话', async () => {
+  const withSnapshot = createAgent('s6')
+  const withoutSnapshot = createAgent('s7')
+  const harness = createHarness({
+    agents: [withSnapshot, withoutSnapshot],
+    records: { s6: { prompt: '恢复提示词', capturedAt: 1 } },
+  })
+  await apply(harness.ctx as never, config)
+  assert.equal(withSnapshot.sections[0]?.text, '恢复提示词')
+  assert.equal(withoutSnapshot.sections.length, 0)
+  assert.equal(harness.puts.length, 0)
+})
+
+test('空快照不注册 section', async () => {
+  const harness = createHarness({ records: { s8: { prompt: '', capturedAt: 1 } } })
+  await apply(harness.ctx as never, config)
+  const agent = createAgent('s8')
+  harness.emit('agent/created', { agent, source: 'resume' })
+  assert.equal(agent.sections.length, 0)
+})
+
+test('插件卸载时释放已注册的 section', async () => {
+  const harness = createHarness()
+  await apply(harness.ctx as never, config)
+  const agent = createAgent('s9')
+  harness.emit('agent/created', { agent, source: 'startup' })
+  for (const dispose of harness.disposers) dispose()
+  assert.equal(agent.sections[0].disposed, true)
+})

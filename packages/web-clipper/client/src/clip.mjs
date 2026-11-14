@@ -63,6 +63,11 @@ export function createClipper(deps) {
         : { tabId: tab.id, kind: tab.kind }
       if (target === undefined || target.tabId === undefined) return report('no-page')
 
+      if (sidebarRight?.isExpanded?.() === false) {
+        sidebarRight.toggleExpanded?.()
+        await waitFrames()
+      }
+
       const activeId = sidebarRight?.active?.()?.id
       if (activeId !== target.tabId) sidebarRight?.focus?.(target.tabId)
       await waitFrames()

@@ -170,6 +170,24 @@ test('a tab that never becomes active is refused instead of clipping another pag
   assert.deepEqual(toasts, [{ message: 'error.no-page', kind: 'error' }])
 })
 
+test('a collapsed sidebar is expanded before capture', async () => {
+  let expanded = false
+  let toggles = 0
+  let activeTab = { id: 'b1', kind: 'browser' }
+  const { deps } = setup({
+    sidebarRight: {
+      active: () => activeTab,
+      openTabs: { getSnapshot: () => [{ sessionId: 's1', tabId: 'b1', kind: 'browser' }] },
+      focus: (id) => { activeTab = { id, kind: 'browser' } },
+      isExpanded: () => expanded,
+      toggleExpanded: () => { toggles += 1; expanded = true },
+    },
+  })
+  const result = await createClipper(deps).clip({ sessionId: 's1', inputActions: {} })
+  assert.equal(result.ok, true)
+  assert.equal(toggles, 1)
+})
+
 test('the tab entry focuses its own tab even when another tab is active', async () => {
   const { deps, focused } = setup()
   const result = await createClipper(deps).clip({

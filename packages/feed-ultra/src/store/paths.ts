@@ -1,4 +1,3 @@
-import { existsSync, renameSync } from 'node:fs';
 import path from 'node:path';
 
 /** Absolute paths of the `.dsh-feeds` tree inside a bound workspace. */
@@ -12,28 +11,11 @@ export interface Layout {
   feedback: string;
 }
 
-const ROOT_DIR = '.dsh-feeds';
-/** Data dir written by the plugin before it was renamed. */
-const LEGACY_ROOT_DIR = '.dailies';
-
 const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const SOURCE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 
-/** Move a legacy root into place once, so an upgraded workspace keeps its history. */
-function rootOf(workspaceRoot: string): string {
-  const root = path.resolve(workspaceRoot, ROOT_DIR);
-  const legacy = path.resolve(workspaceRoot, LEGACY_ROOT_DIR);
-  if (existsSync(root) || !existsSync(legacy)) return root;
-  try {
-    renameSync(legacy, root);
-    return root;
-  } catch {
-    return existsSync(root) ? root : legacy;
-  }
-}
-
 export function layout(workspaceRoot: string): Layout {
-  const root = rootOf(workspaceRoot);
+  const root = path.resolve(workspaceRoot, '.dsh-feeds');
   const data = path.join(root, 'data');
   return {
     root,

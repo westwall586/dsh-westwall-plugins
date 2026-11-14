@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test, type TestContext } from 'node:test';
@@ -151,14 +150,4 @@ test('the written file is readable JSON with a trailing newline', async (t) => {
   const text = await readFile(itemFile(l, '2026-11-10', 'github_trending'), 'utf8');
   assert.ok(text.endsWith('\n'));
   assert.equal(JSON.parse(text).items.length, 1);
-});
-
-test('a legacy .dailies root is moved to .dsh-feeds on first use', async (t) => {
-  const root = await workspace(t);
-  await mkdir(path.join(root, '.dailies', 'data'), { recursive: true });
-  await writeFile(path.join(root, '.dailies', 'data', 'marker.txt'), 'kept', 'utf8');
-  const l = layout(root);
-  assert.equal(l.root, path.join(root, '.dsh-feeds'));
-  assert.equal(await readFile(path.join(root, '.dsh-feeds', 'data', 'marker.txt'), 'utf8'), 'kept');
-  assert.equal(existsSync(path.join(root, '.dailies')), false);
 });

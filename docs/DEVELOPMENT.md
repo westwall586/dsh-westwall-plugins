@@ -28,8 +28,39 @@ CI 会自动拦住常见错误（聚合清单过期、产物没入库、类型�
 ├── packages/<name>/      # 一个插件包 = 一个可独立安装的 bundle
 ├── templates/hello/      # 新插件蓝本
 ├── scripts/              # aggregate（生成聚合清单）、create-plugin（脚手架）
+├── deepseek-harness/     # submodule：DSH 上游源码，只读参考
 └── docs/                 # 本文档、发布流程、设计决定
 ```
+
+## 上游源码（只读参考）
+
+`deepseek-harness/` 是 DSH 上游仓库的 submodule，浅克隆，只用来读实现、查 API；
+它不参与 `packages/*` 的构建与发布，CI 也不初始化它。**不要修改它，也不要在子模块里提交。**
+
+首次检出：
+
+```sh
+git submodule update --init
+```
+
+把源码切到与本机 DSH 一致的版本（上游 tag 形如 `dsh-v0.2.2-rc.3`，与 `dsh --version` 对应）：
+
+```sh
+cd deepseek-harness
+git fetch --depth 1 origin tag dsh-v<version>
+git checkout --detach dsh-v<version>
+cd ..
+```
+
+切换后父仓库会显示 submodule 指针变化。想把这版源码记进历史，就提交这个指针：
+
+```sh
+git add deepseek-harness
+git commit -m "chore: bump dsh source to dsh-v<version>"
+```
+
+只想本地看、不想让父仓库变脏，可以 `git config submodule.deepseek-harness.ignore all`。
+需要更早的历史时，在子模块里执行 `git fetch --unshallow`（会补全完整历史，体积较大）。
 
 ## 常用命令
 

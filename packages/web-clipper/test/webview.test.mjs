@@ -74,6 +74,20 @@ test('captures title, final URL, html and text together', async () => {
   })
 })
 
+test('the guest script enforces the HTML cap before crossing IPC', async () => {
+  let script
+  const guest = webview({
+    execute: async (source) => {
+      script = source
+      return { title: 'Page', url: 'https://example.com/final', html: '', text: 'x', truncated: true }
+    },
+  })
+  const result = await captureActivePage({ doc: docOf([guest]) })
+  assert.match(script, /TextEncoder/)
+  assert.ok(script.includes(String(MAX_HTML_BYTES)))
+  assert.equal(result.page.truncated, true)
+})
+
 test('falls back to innerText above the 4 MB HTML cap', async () => {
   const guest = webview({ result: {
     title: 'Huge',

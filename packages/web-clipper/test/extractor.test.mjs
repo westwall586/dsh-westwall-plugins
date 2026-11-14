@@ -105,7 +105,7 @@ test('full-page fallback puts the four fields in one HTML comment after the doct
   assert.equal(parsed.note, CLIP_NOTE)
 })
 
-test('the HTML comment payload escapes -- so the comment stays valid', () => {
+test('the HTML comment payload escapes -- without corrupting the values', () => {
   const artifact = extractArticle(page({
     title: 'A -- B',
     url: 'https://example.com/a--b',
@@ -116,8 +116,8 @@ test('the HTML comment payload escapes -- so the comment stays valid', () => {
   })
   const { raw, parsed } = commentMeta(artifact.content)
   assert.equal(raw.includes('--'), false)
-  assert.equal(parsed.title, 'A - - B')
-  assert.equal(parsed.url, 'https://example.com/a- -b')
+  assert.equal(parsed.title, 'A -- B')
+  assert.equal(parsed.url, 'https://example.com/a--b')
 })
 
 test('text-only capture becomes a Markdown artifact', () => {

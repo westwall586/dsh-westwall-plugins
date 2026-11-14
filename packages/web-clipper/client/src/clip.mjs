@@ -67,6 +67,13 @@ export function createClipper(deps) {
       if (activeId !== target.tabId) sidebarRight?.focus?.(target.tabId)
       await waitFrames()
 
+      // Focus must land on the tab we intend to capture; a stale active tab
+      // would otherwise put a different page in the conversation.
+      const focused = sidebarRight?.active?.()
+      if (focused === undefined || focused.id !== target.tabId) {
+        return report('no-page', 'target tab did not become active')
+      }
+
       let captured
       try {
         captured = await capture()

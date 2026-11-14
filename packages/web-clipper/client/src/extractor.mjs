@@ -58,11 +58,13 @@ function frontmatter(metadata) {
     + '---\n'
 }
 
-/** `--` would terminate the HTML comment early, so split it inside the payload. */
-const commentSafe = (value) => value.replaceAll('--', '- -')
-
+/**
+ * JSON is the comment payload, so a literal `--` would terminate the comment.
+ * `\u002d` is a valid JSON escape and parses back to the original character.
+ */
 function fullPageContent(html, metadata) {
-  const comment = `<!-- dsh-clip: ${commentSafe(JSON.stringify(metadata))} -->`
+  const payload = JSON.stringify(metadata).replaceAll('--', '\\u002d\\u002d')
+  const comment = `<!-- dsh-clip: ${payload} -->`
   const doctype = DOC_TYPE.exec(html)
   if (doctype === null) return `${comment}\n${html}`
   return `${doctype[0]}\n${comment}\n${html.slice(doctype[0].length)}`

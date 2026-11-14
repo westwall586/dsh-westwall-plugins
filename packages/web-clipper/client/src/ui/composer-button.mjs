@@ -21,6 +21,10 @@ function createTabReader(openTabs) {
  * @returns the slot component for `conversation.input.left`.
  */
 export function createComposerButton({ clip, t, openTabs }) {
+  if (openTabs === undefined || openTabs === null
+    || typeof openTabs.getSnapshot !== 'function' || typeof openTabs.subscribe !== 'function') {
+    return function ComposerButtonUnavailable() { return null }
+  }
   const readTabs = createTabReader(openTabs)
   const subscribe = (onChange) => openTabs.subscribe(onChange)
 

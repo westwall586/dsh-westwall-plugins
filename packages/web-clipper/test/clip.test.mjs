@@ -21,6 +21,7 @@ function artifact(overrides = {}) {
 function setup(overrides = {}) {
   const toasts = []
   const focused = []
+  let activeTab = { id: 'b1', kind: 'browser' }
   const deps = {
     capture: async () => ({ ok: true, page: PAGE }),
     extract: () => artifact(),
@@ -28,9 +29,12 @@ function setup(overrides = {}) {
     toast: { show: (message, kind) => toasts.push({ message, kind }) },
     t: (key, params) => (params?.title === undefined ? key : `${key}:${params.title}`),
     sidebarRight: {
-      active: () => ({ id: 'b1', kind: 'browser' }),
+      active: () => activeTab,
       openTabs: { getSnapshot: () => [{ sessionId: 's1', tabId: 'b1', kind: 'browser' }] },
-      focus: (id) => focused.push(id),
+      focus: (id) => {
+        focused.push(id)
+        activeTab = { id, kind: 'browser' }
+      },
     },
     conversationFor: () => undefined,
     desktop: () => true,
@@ -129,19 +133,41 @@ test('Web reports desktop-only and shows no toast', async () => {
 })
 
 test('the composer entry focuses the first browser tab when the active tab is not one', async () => {
-  const { deps, focused } = setup({
+  const focused = []
+  let activeTab = { id: 'g', kind: 'guide' }
+  const { deps } = setup({
     sidebarRight: {
-      active: () => ({ id: 'g', kind: 'guide' }),
+      active: () => activeTab,
       openTabs: { getSnapshot: () => [
         { sessionId: 's1', tabId: 'b1', kind: 'browser' },
         { sessionId: 's1', tabId: 'b2', kind: 'browser' },
       ] },
-      focus: (id) => focused.push(id),
+      focus: (id) => {
+        focused.push(id)
+        activeTab = { id, kind: 'browser' }
+      },
     },
   })
   const result = await createClipper(deps).clip({ sessionId: 's1', inputActions: {} })
   assert.equal(result.ok, true)
   assert.deepEqual(focused, ['b1'])
+})
+
+test('a tab that never becomes active is refused instead of clipping another page', async () => {
+  const { deps, toasts } = setup({
+    sidebarRight: {
+      active: () => ({ id: 'b1', kind: 'browser' }),
+      openTabs: { getSnapshot: () => [] },
+      focus: () => {},
+    },
+  })
+  const result = await createClipper(deps).clip({
+    sessionId: 's1',
+    inputActions: {},
+    tab: { id: 'b9', kind: 'browser' },
+  })
+  assert.deepEqual(result, { ok: false, code: 'no-page', detail: 'target tab did not become active' })
+  assert.deepEqual(toasts, [{ message: 'error.no-page', kind: 'error' }])
 })
 
 test('the tab entry focuses its own tab even when another tab is active', async () => {

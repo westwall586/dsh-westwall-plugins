@@ -11,7 +11,19 @@ export const WEBVIEW_SELECTOR = 'webview[data-sidebar-browser-frame="webview"]'
 export const MAX_HTML_BYTES = 4 * 1024 * 1024
 export const CAPTURE_TIMEOUT_MS = 8000
 
-const SERIALIZE = '({ html: document.documentElement.outerHTML, text: (document.body && document.body.innerText) || "", url: location.href, title: document.title })'
+/** Serialize in the guest so an oversized page never crosses the IPC boundary. */
+const serializeScript = (maxBytes) => `(() => {
+  const html = document.documentElement.outerHTML
+  const bytes = typeof TextEncoder === 'function' ? new TextEncoder().encode(html).length : html.length
+  const truncated = bytes > ${maxBytes}
+  return {
+    html: truncated ? '' : html,
+    text: (document.body && document.body.innerText) || '',
+    url: location.href,
+    title: document.title,
+    truncated,
+  }
+})()`
 const TIMED_OUT = Symbol('capture-timeout')
 
 const failure = (code, detail) => (detail === undefined ? { ok: false, code } : { ok: false, code, detail })
@@ -81,7 +93,7 @@ export async function captureActivePage(options = {}) {
 
   let raw
   try {
-    raw = await withTimeout(target.executeJavaScript(SERIALIZE, false), timeoutMs)
+    raw = await withTimeout(target.executeJavaScript(serializeScript(MAX_HTML_BYTES), false), timeoutMs)
   } catch (error) {
     return failure('capture-failed', error instanceof Error ? error.message : String(error))
   }
@@ -90,7 +102,7 @@ export async function captureActivePage(options = {}) {
 
   const text = String(raw.text ?? '')
   const html = String(raw.html ?? '')
-  const truncated = byteLength(html) > MAX_HTML_BYTES
+  const truncated = raw.truncated === true || byteLength(html) > MAX_HTML_BYTES
   return {
     ok: true,
     page: {

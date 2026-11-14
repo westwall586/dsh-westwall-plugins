@@ -53,7 +53,7 @@ Markdown frontmatter 固定四个字段，顺序为 `title`、`url`、`clipped_a
 
 ## 附件入口
 
-主路径读取 `ctx.get('conversation')`；没有时退回 `ctx.sessions.scope(sessionId).get('conversation')`。命中具体服务后调用 `createDrafts(sessionId, [file], true)`，再用公开的 `inputActions.addAttachments(ids)`。
+主路径读取 `ctx.get('conversation')`；没有时退回 `ctx.get('sessions')?.scope(sessionId)?.get('conversation')`。命中具体服务后调用 `createDrafts(sessionId, [file], true)`，再用公开的 `inputActions.addAttachments(ids)`。
 
 `addAttachments` 返回 `false` 时调用 `releaseDraftAttachments(drafts)` 并报 `composer-busy`。只有直接路径完全不可用时才合成 `document` 级 `drop`，并轮询 `[data-slot="conversation.input.attachments"]` 确认入位。两条路径都不会提交消息。
 

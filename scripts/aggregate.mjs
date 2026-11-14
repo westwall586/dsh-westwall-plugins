@@ -81,9 +81,15 @@ const patchLines = [
   `    - id: ${SELF_ID}`,
   `      name: '${SELF_NAME}'`,
 ]
+// 一个包可以插入兄弟 bundle 的行（例如 feed-ultra 随附 web-clipper），
+// 因此同一 id 可能来自多个包；根清单按首次出现保留一行，顺序仍由目录名决定。
+const seenRowIds = new Set()
 for (const p of ordered) {
+  const rows = p.rows.filter((row) => !seenRowIds.has(row.id))
+  if (rows.length === 0) continue
+  for (const row of rows) seenRowIds.add(row.id)
   patchLines.push('', `# from packages/${p.dir}`, '- insert:')
-  for (const row of p.rows) {
+  for (const row of rows) {
     patchLines.push(`    - id: ${row.id}`, `      name: '${row.name}'`)
   }
 }

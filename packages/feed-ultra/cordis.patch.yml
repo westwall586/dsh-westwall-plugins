@@ -1,6 +1,9 @@
-# dsh-feed-ultra bundle patch：把本插件行插入 profile 阵容。
+# dsh-feed-ultra bundle patch：把本插件行与随附的网页剪藏行插入 profile 阵容。
 # 作为 bundle 层（package.json#dsh.bundle.patch）叠加到 dsh-base 之上：
 #   dsh plugin --profile web add link:$(pwd)/packages/feed-ultra
+# web-clipper 也可以单独安装；同时装 feed-ultra 与 web-clipper 会重复插入同一行。
 - insert:
     - id: dsh-feed-ultra
       name: '@westwall/dsh-feed-ultra'
+    - id: dsh-web-clipper
+      name: '@westwall/dsh-web-clipper'

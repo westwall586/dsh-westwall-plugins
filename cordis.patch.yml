@@ -10,6 +10,8 @@
 - insert:
     - id: dsh-feed-ultra
       name: '@westwall/dsh-feed-ultra'
+    - id: dsh-web-clipper
+      name: '@westwall/dsh-web-clipper'
 
 # from packages/jira-worklogs
 - insert:

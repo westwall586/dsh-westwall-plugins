@@ -49,6 +49,7 @@
     "dev:fetch": "node src/dev/fetch.ts"
   },
   "dependencies": {
+    "@westwall/dsh-web-clipper": "0.1.0",
     "feedsmith": "3.0.1",
     "node-html-parser": "^7.0.1",
     "undici": "7.30.2",

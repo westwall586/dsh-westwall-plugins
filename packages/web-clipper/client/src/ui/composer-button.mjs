@@ -22,13 +22,11 @@ function createTabReader(openTabs) {
  */
 export function createComposerButton({ clip, t, openTabs }) {
   const readTabs = createTabReader(openTabs)
+  const subscribe = (onChange) => openTabs.subscribe(onChange)
 
   return function ComposerButton(props) {
     const { sessionId, inputActions } = props
-    const tabs = useSyncExternalStore(
-      (onChange) => openTabs.subscribe(onChange),
-      () => readTabs(sessionId),
-    )
+    const tabs = useSyncExternalStore(subscribe, () => readTabs(sessionId))
     const [busy, setBusy] = useState(false)
     if (!composerButtonVisible({ desktop: isDesktopGlobal(), sessionId, tabs })) return null
     const label = t('composer.label')

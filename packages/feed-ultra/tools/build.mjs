@@ -8,7 +8,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 const root = new URL('../', import.meta.url);
-const PACKAGE_ID = 'dsh-feed-ultra';
+const PACKAGE_ID = '@westwall/dsh-feed-ultra';
 const GLOBAL_NAME = 'DshFeedUltraClient';
 const OUT = 'client.js';
 

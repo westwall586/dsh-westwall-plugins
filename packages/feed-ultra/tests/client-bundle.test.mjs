@@ -35,11 +35,11 @@ function loadBundle() {
 }
 
 test('the generated bundle registers the dsh-feed-ultra plugin contract', () => {
-  assert.match(SOURCE, /id: 'dsh-feed-ultra'/);
+  assert.match(SOURCE, /id: '@westwall\/dsh-feed-ultra'/);
   assert.match(SOURCE, /return DshFeedUltraClient\.default;/);
 
   const registration = loadBundle();
-  assert.equal(registration.id, 'dsh-feed-ultra');
+  assert.equal(registration.id, '@westwall/dsh-feed-ultra');
   assert.equal(typeof registration.factory, 'function');
 
   const plugin = registration.factory((name) => {

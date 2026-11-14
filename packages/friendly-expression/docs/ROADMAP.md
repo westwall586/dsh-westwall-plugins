@@ -1,48 +1,55 @@
 # 迭代路线
 
-> 状态：设计阶段。下面的阶段是给实现排期用的，日期与版本号在开工时再定。
+> 状态：v0.1 MVP。功能以 `designs/friendly-expression/` 的设计稿为准，实现方式以 DSH 当前插件最佳实践为准。
 
-## v0：设计与骨架（当前）
+## v0：设计与骨架（已完成）
 
 - 建立 `@westwall/dsh-friendly-expression` 包骨架、bundle patch、locale 与图标占位。
 - 写清定位、注入机制、默认提示词、MVP 范围与验收（[DESIGN.md](DESIGN.md)）。
-- 不注册任何提示词、不渲染 Mermaid；安装后不改变宿主行为。
+- 安装后不改变宿主行为。
 
-完成标准：包可构建、测试通过、聚合清单一致；设计文档评审通过。
+## v0.1：MVP（当前）
 
-## v0.1：MVP
-
-目标：一段可编辑的提示词 + 一个能看的 Mermaid 图。
+目标：一段可编辑的提示词，加上一个能看的 Mermaid 图。
 
 Host：
 
-- `Config`：`enabled`、`stylePrompt`（≤800 字符，`.volatile()`，带默认文案）。
-- 注册 system prompt section；仅 Web/桌面注入；改配置下一轮生效；关闭后为空。
-- 配置入口：Plugins 页 bundle 详情的自定义页面，`ConfigField` textarea + Reset。
+- `Config`：`stylePrompt`（≤800 字符，`.volatile()`，默认 282 字文案）。
+- 按 Agent 注册 system prompt section，仅 Web/桌面注入。
+- 新会话创建时把提示词写入 `storageDomain` 快照；已有会话使用快照，重启/恢复不变。子代理不注入。
+- 设置页：`settings.section` + `settings.section.icon`，用 `ctx.configForms` 读写，自绘 textarea，不加 `ConfigField` 依赖。
 
 客户端：
 
 - 声明 `dsh.client`，注册 `conversation.chat.markdown.fence` 的 `mermaid` 层。
-- 流式显示源码、落定渲染；解析/渲染失败回退源码块。
-- 弹窗缩放/平移/滚动；复制源码、下载 SVG。
-- 主题跟随；`code + theme` 缓存；可视区懒渲染。
+- 流式显示源码，落定渲染；解析/渲染失败回退源码块，并提供「复制错误给 Agent」。
+- 内联卡片：源码切换、复制、放大。
+- 浮窗：滚轮缩放、拖拽平移、适合窗口、1:1、复制源码、下载 SVG。
+- `shell.overlay` 承载浮窗；`<img>` + Blob URL 显示 SVG，避免重复 id 和脚本执行。
+- 主题跟随、`code + theme` 缓存、可视区懒渲染。
+- 会话头部「友好表达已开启」小徽章；插件级状态，提示词为空时隐藏。
+- Mermaid 11.15.0，构建进 `client.js`；动态加载，初始化时固定 `securityLevel: 'strict'`、`maxTextSize: 20000`、`maxEdges: 500`。
 
 验收：
 
 - Web 会话里模型输出 Mermaid 代码块能渲染成图，点击可放大查看。
-- 非法语法不影响整条消息。
+- 非法语法不影响整条消息，错误信息可复制给 Agent。
 - 800 字符超限被拒绝；恢复默认回落到推荐文案。
+- 旧会话保持快照，重启/恢复后 system prompt 不变；子代理不注入。
 - CLI/headless 不注入提示词。
-- 记录 mermaid bundle 的首屏下载/解析耗时，形成是否继续打包的结论。
+- 设置页、徽章、浮窗在 Web/桌面实际界面可用。
+- 记录 `client.js` 体积与首屏解析耗时。
 
 ## v0.2：打磨
 
 - 主题令牌映射细化，暗色模式对比度检查。
 - 错误提示与重试、空图/超大图的边界。
 - 可访问性：标题/描述、键盘操作、焦点管理。
-- 国际化：配置页与错误文案走 locale。
-- 复制/下载之外的操作（源码切换）按实际需要再加。
-- 测试补齐：层渲染、回退、弹窗交互、配置页 reset。
+- 国际化补齐：配置页、错误文案、浮窗和徽章全部走 locale。
+- 源码切换、复制、下载之外的操作为实际需要再加。
+- 测试补齐：层渲染、回退、浮窗交互、配置页 reset。
+- 评估严格的逐会话徽章状态；现在徽章只表示插件已开启。
+- 评估 Mermaid 12.x：用真实模型输出做 11.15.0 与 12.x 的 A/B，若成功率不劣再升级。
 
 ## v1.0：手动触发的 skill
 

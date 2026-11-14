@@ -38,7 +38,24 @@ export default class WebClipper extends TypertRemoteService {
   }
 
   private get configuredDirectory(): string {
-    const raw = deref(this.ctx.fiber.rawConfig)
+    // The settings service reads the effective (volatile) value. The fiber's
+    // raw config can lag a live settings write, so prefer the service and use
+    // the effective config only as a fallback.
+    try {
+      const settings = this.ctx.get('settings') as
+        | { describe(): Array<{ ns: string; value?: unknown }> }
+        | undefined
+      const live = settings?.describe().find((row) => row.ns === 'dsh-web-clipper'
+        || row.ns === 'include:dsh-web-clipper')
+      const value = deref(live?.value)
+      if (typeof value === 'object' && value !== null) {
+        const directory = deref((value as { outputDirectory?: unknown }).outputDirectory)
+        if (typeof directory === 'string') return directory
+      }
+    } catch {
+      // Fall through to the activation config.
+    }
+    const raw = deref(this.ctx.fiber.effectiveConfig)
     if (typeof raw !== 'object' || raw === null) return ''
     const value = deref((raw as { outputDirectory?: unknown }).outputDirectory)
     return typeof value === 'string' ? value : ''
@@ -57,5 +74,22 @@ export default class WebClipper extends TypertRemoteService {
   /** Create the effective folder if needed and open it in the desktop file manager. */
   async openDirectory(): Promise<OpenDirectoryOutcome> {
     return openCopyFolder(this.configuredDirectory)
+  }
+}
+
+
+const METHODS = ['directory', 'saveCopy', 'openDirectory'] as const
+
+Object.defineProperty(WebClipper.prototype, '@deepseek-ai/dsh-typert-protocol/remote-methods', {
+  configurable: true,
+  value: Object.freeze(
+    structuredClone({ version: 1, methods: METHODS.map((method) => ({ method, invocation: { kind: 'direct' } })) }),
+  ),
+})
+
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    /** Readable-copy Host service registered by the clipper row. */
+    webClipper: WebClipper
   }
 }

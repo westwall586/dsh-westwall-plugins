@@ -35,5 +35,11 @@
   "settings.opened": "Opened {path}",
   "settings.loading": "Reading…",
   "settings.unavailable": "This profile does not allow saving settings.",
-  "settings.desktopOnly": "The folder opens on the computer running DSH."
+  "settings.desktopOnly": "The folder opens on the computer running DSH.",
+  "tabMenu.loading": "The page is still loading. One moment.",
+  "composer.loading": "The page is still loading. One moment.",
+  "detail.title": "Usage",
+  "detail.usage": "Open a page in the desktop sidebar browser, then use the tab menu or the page-plus composer control. The page becomes a Markdown attachment in the composer and is never sent automatically.",
+  "detail.copy": "Each clip also writes a readable copy. It defaults to the system temporary folder; use the configuration area to choose and open another folder.",
+  "detail.naming": "Names start with a local timestamp, for example 2026-11-14_17-32-05_Page title.md. A full-page fallback uses .html."
 }

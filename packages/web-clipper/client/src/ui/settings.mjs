@@ -147,4 +147,12 @@ export function createSettingsPage({ ctx, copy, t, desktop }) {
         ? createElement('p', { className: 'dwc-settings-hint' }, t('settings.desktopOnly'))
         : null)
   }
+
+  return function WebClipperSettings(props) {
+    // The row/bundle configuration seats ask for `page`; a missing view is
+    // treated as the page so a host that omits the marker still renders the
+    // form instead of silently dropping it.
+    if (props?.view === 'summary') return null
+    return createElement(SettingsBody, props)
+  }
 }

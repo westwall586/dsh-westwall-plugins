@@ -35,5 +35,11 @@
   "settings.opened": "已打开 {path}",
   "settings.loading": "读取中…",
   "settings.unavailable": "当前 profile 不允许保存设置。",
-  "settings.desktopOnly": "文件夹会在运行 DSH 的电脑上打开。"
+  "settings.desktopOnly": "文件夹会在运行 DSH 的电脑上打开。",
+  "tabMenu.loading": "页面加载中，请稍候",
+  "composer.loading": "页面加载中，请稍候",
+  "detail.title": "使用说明",
+  "detail.usage": "在桌面版侧栏浏览器打开网页，点标签菜单或输入框左侧的加页图标，当前页会作为 Markdown 附件加入输入框，不会自动发送。",
+  "detail.copy": "每次剪藏会额外保存一份可读副本；默认在系统临时目录，可在配置区改成自己的文件夹并直接打开。",
+  "detail.naming": "文件名以本地时间戳开头，例如 2026-11-14_17-32-05_页面标题.md；整页降级时扩展名是 .html。"
 }

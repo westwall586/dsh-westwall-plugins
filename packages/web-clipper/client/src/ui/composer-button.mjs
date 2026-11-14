@@ -1,6 +1,7 @@
 /** Compact composer control shown while the Session has a browser tab open. */
 import { createElement, useState, useSyncExternalStore } from 'react'
 import { PagePlusIcon } from './icons.mjs'
+import { useActivePageLoading } from './page-loading.mjs'
 import { composerButtonVisible, isDesktopGlobal } from './visibility.mjs'
 
 /** Stable per-Session filtered snapshots; `useSyncExternalStore` needs reference equality. */
@@ -32,11 +33,12 @@ export function createComposerButton({ clip, t, openTabs }) {
     const { sessionId, inputActions } = props
     const tabs = useSyncExternalStore(subscribe, () => readTabs(sessionId))
     const [busy, setBusy] = useState(false)
+    const loading = useActivePageLoading()
     if (!composerButtonVisible({ desktop: isDesktopGlobal(), sessionId, tabs })) return null
     const label = t('composer.label')
 
     const run = async () => {
-      if (busy) return
+      if (busy || loading) return
       setBusy(true)
       try {
         await clip({ sessionId, inputActions })
@@ -48,10 +50,11 @@ export function createComposerButton({ clip, t, openTabs }) {
     return createElement('button', {
       type: 'button',
       className: 'dwc-composer-btn',
-      'aria-label': label,
-      title: label,
+      'aria-label': loading ? t('composer.loading') : label,
+      title: loading ? t('composer.loading') : label,
       'aria-busy': busy ? 'true' : undefined,
-      disabled: busy,
+      'aria-disabled': loading ? 'true' : undefined,
+      disabled: busy || loading,
       onClick: run,
     }, createElement(PagePlusIcon, { size: 14 }))
   }

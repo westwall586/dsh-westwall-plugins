@@ -56,7 +56,7 @@ export function findActiveWebview(doc = document) {
   return candidates.find((element) => element.closest?.('[data-dockkit-pane-active]') !== null) ?? candidates[0]
 }
 
-function isLoading(element) {
+export function isWebviewLoading(element) {
   try {
     return typeof element.isLoading === 'function' && element.isLoading() === true
   } catch {
@@ -89,7 +89,7 @@ export async function captureActivePage(options = {}) {
   const { doc = globalThis.document, webview, timeoutMs = CAPTURE_TIMEOUT_MS } = options
   const target = webview ?? findActiveWebview(doc)
   if (target === undefined) return failure('no-page')
-  if (isLoading(target)) return failure('page-loading')
+  if (isWebviewLoading(target)) return failure('page-loading')
 
   let raw
   try {

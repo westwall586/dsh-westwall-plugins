@@ -42,7 +42,8 @@ test('locale meta and every user-facing error key exist in both languages', () =
     assert.ok(dictionary.meta.title.length > 0)
     assert.ok(dictionary.meta.description.length > 0)
     for (const key of [
-      'tabMenu.label', 'composer.label', 'toast.region', 'toast.success',
+      'tabMenu.label', 'tabMenu.loading', 'composer.label', 'composer.loading',
+      'toast.region', 'toast.success',
       'error.desktop-only', 'error.no-page', 'error.page-loading', 'error.busy',
       'error.capture-timeout', 'error.capture-failed', 'error.extract-failed',
       'error.composer-busy', 'error.attach-failed', 'toast.copyFailed',
@@ -51,7 +52,7 @@ test('locale meta and every user-facing error key exist in both languages', () =
       'settings.choose', 'settings.open', 'settings.useDefault', 'settings.saved',
       'settings.saveRefused', 'settings.directoryUnavailable', 'settings.openFailed',
       'settings.opened', 'settings.loading', 'settings.unavailable', 'settings.desktopOnly',
-      'settings.temporaryTag',
+      'settings.temporaryTag', 'detail.title', 'detail.usage', 'detail.copy', 'detail.naming',
     ]) {
       assert.equal(typeof dictionary[key], 'string', key)
       assert.ok(dictionary[key].length > 0, key)
@@ -67,4 +68,6 @@ test('the host companion owns the readable copy service', () => {
   assert.match(source, /async saveCopy/)
   assert.match(source, /async openDirectory/)
   assert.match(source, /outputDirectory/)
+  assert.match(source, /remote-methods/)
+  assert.match(source, /'saveCopy'/)
 })

@@ -40,6 +40,8 @@
 | `client/src/attach.mjs` | 直接 draft 路径与合成 drop 兜底 |
 | `client/src/remote.mjs` | `remote.webClipper` 描述符、懒挂载与结果解包 |
 | `client/src/ui/settings.mjs` | Plugin Manager 的副本目录配置页 |
+| `client/src/ui/detail.mjs` | 随 Feed Ultra 安装时的行详情使用说明 |
+| `client/src/ui/page-loading.mjs` | 活动 webview 的加载态，用于禁用两个入口 |
 | `src/index.ts` | Host 服务：读取 volatile 配置、保存副本、打开目录 |
 | `src/copy.ts` | 目录解析、文件名合法化、原子写入、Finder/Explorer 打开 |
 | `client/src/toast.mjs` | 轻量反馈浮层 |
@@ -54,7 +56,11 @@
 
 副本是附件之外的额外文件，不替代 DSH 附件。`outputDirectory` 是 volatile 配置，改路径不重启插件；空值解析为 `<系统临时目录>/dsh-web-clipper`，非绝对路径直接拒绝。Host 写入时先落同目录临时文件，再用排他硬链接发布；文件名冲突追加 ` (2)`，永不覆盖。
 
-配置页注册在 `plugins.bundle.config`（单独安装，key 为包名）和 `plugins.row.config`（随 Feed Ultra 安装，key 为 `@westwall/dsh-feed-ultra#dsh-web-clipper`）。页面只负责目录输入、选择、保存、恢复默认和打开，不注入宿主 chrome。
+Host 服务用 `effectiveConfig` 和 `settings.describe()` 读取实时目录；只读 `rawConfig` 会在 volatile 写入后滞后。三个方法通过 Typert 的 `remote-methods` 原型标记导出，客户端描述符才能命中 `/api/webClipper/*`。
+
+配置页注册在 `plugins.bundle.config`（单独安装，key 为包名）和 `plugins.row.config`（随 Feed Ultra 安装，key 为 `@westwall/dsh-feed-ultra#dsh-web-clipper`；另注册单独安装的 row key）。行详情页不渲染包 README，因此 `plugins.detail.section` 额外给出一段紧凑使用说明。页面只负责目录输入、选择、保存、恢复默认和打开，不注入宿主 chrome。
+
+两个入口在活动 webview 报加载中时禁用并变灰；`page-loading.mjs` 监听 `did-start-loading` / `did-stop-loading` 等事件，并用短轮询覆盖标签切换。抓取流水线仍然自己检查加载态，键盘或竞态点击仍会得到 `page-loading`。
 
 副本写入失败只发 warning toast，不改变附件成功结果。`openDirectory` 在 macOS 用 `open`，Windows 用 `explorer.exe`，Linux 用 `xdg-open`；只 spawn 参数数组，不经过 shell。
 

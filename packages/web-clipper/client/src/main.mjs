@@ -13,6 +13,7 @@ import { extractArticle } from './extractor.mjs'
 import { createToastHost } from './toast.mjs'
 import { createCopyApi } from './remote.mjs'
 import { createComposerButton } from './ui/composer-button.mjs'
+import { createDetailSection } from './ui/detail.mjs'
 import { createSettingsPage } from './ui/settings.mjs'
 import { createTabMenuItem } from './ui/tab-menu-item.mjs'
 import { isDesktopGlobal } from './ui/visibility.mjs'
@@ -77,7 +78,7 @@ export default {
         name: TAB_MENU_SLOT,
         id: ENTRY_ID,
         order: ENTRY_ORDER,
-      }, createTabMenuItem({ clip: clipper.clip, t }))),
+      }, createTabMenuItem({ clip: clipper.clip, t, sidebarRight }))),
       'webClipper tab menu entry',
     )
 
@@ -90,20 +91,39 @@ export default {
       'webClipper composer entry',
     )
 
-    const SettingsPage = createSettingsPage({ ctx, copy, t, desktop: isDesktopGlobal() })
+    const settingsDeps = { ctx, copy, t, desktop: isDesktopGlobal() }
+    const BundleSettingsPage = createSettingsPage(settingsDeps)
+    const RowSettingsPage = createSettingsPage(settingsDeps)
+    const StandaloneRowSettingsPage = createSettingsPage(settingsDeps)
     ctx.effect(
       () => ctx.slots.inject('plugins.bundle.config', () => ctx.slots.register({
         name: 'plugins.bundle.config',
         key: '@westwall/dsh-web-clipper',
-      }, SettingsPage)),
+      }, BundleSettingsPage)),
       'webClipper bundle settings',
     )
     ctx.effect(
       () => ctx.slots.inject('plugins.row.config', () => ctx.slots.register({
         name: 'plugins.row.config',
         key: '@westwall/dsh-feed-ultra#dsh-web-clipper',
-      }, SettingsPage)),
+      }, RowSettingsPage)),
       'webClipper row settings',
+    )
+    ctx.effect(
+      () => ctx.slots.inject('plugins.row.config', () => ctx.slots.register({
+        name: 'plugins.row.config',
+        key: '@westwall/dsh-web-clipper#dsh-web-clipper',
+      }, StandaloneRowSettingsPage)),
+      'webClipper standalone row settings',
+    )
+    const DetailSection = createDetailSection({ t })
+    ctx.effect(
+      () => ctx.slots.inject('plugins.detail.section', () => ctx.slots.register({
+        name: 'plugins.detail.section',
+        id: 'web-clipper-help',
+        order: 20,
+      }, DetailSection)),
+      'webClipper row help',
     )
   },
 }

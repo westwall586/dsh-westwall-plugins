@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-const { MAX_HTML_BYTES, captureActivePage, findActiveWebview } = await import('../client/src/webview.mjs')
+const { MAX_HTML_BYTES, captureActivePage, findActiveWebview, isWebviewLoading } = await import('../client/src/webview.mjs')
 
 function webview(options = {}) {
   const {
@@ -114,4 +114,10 @@ test('reports a guest exception as capture-failed', async () => {
   assert.equal(result.ok, false)
   assert.equal(result.code, 'capture-failed')
   assert.equal(result.detail, 'guest crashed')
+})
+test('the loading flag is read without throwing for a missing guest method', () => {
+  assert.equal(isWebviewLoading(webview({ loading: true })), true)
+  assert.equal(isWebviewLoading(webview({ loading: false })), false)
+  assert.equal(isWebviewLoading({ isLoading() { throw new Error('not ready') } }), false)
+  assert.equal(isWebviewLoading(undefined), false)
 })

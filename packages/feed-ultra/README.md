@@ -25,6 +25,8 @@ dsh plugin --profile <profile> add \
 
 预期：工作区里出现 `.dsh-feeds/`，面板出现当天内容与渠道列表。
 
+安装资讯工作台会同时启用随附的「网页剪藏」，桌面版侧栏浏览器因此多出「添加到会话」入口。不要再单独安装网页剪藏，否则同一个插件行会挂两次。
+
 ### 安装 ego-lite
 
 浏览器渠道靠 ego-lite 取数，插件不带浏览器。RSS、GitHub Trending 和 BestBlogs 不需要它；X 书签和后续接入的任意站点需要。

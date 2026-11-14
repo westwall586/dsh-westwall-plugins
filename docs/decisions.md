@@ -43,6 +43,19 @@
 - **安装**与发布都使用 npm 官方 registry（`registry.npmjs.org`）。
 - **发布**固定到 `https://registry.npmjs.org/`：各包 `publishConfig.registry` 已声明。
 
+## bundle 组合
+
+- 一个 bundle 可以**随附**另一个可独立安装的 bundle：在自己的 `dependencies` 里钉它的版本，
+  并在自己的 `cordis.patch.yml` 插入它的行，用户装一个 bundle 就得到整套能力。
+- 组合仍然遵守自包含：源码不互相 import，依赖里不出现 `workspace:`。被随附的包保持独立可装。
+- 例：`feed-ultra` 随附 `web-clipper`；`web-clipper` 也可以单独安装。
+- 根聚合由 `scripts/aggregate.mjs` 生成，插入行按行 id 去重并保留首次出现，因此同一个插件行
+  不会在根清单里出现两次。
+- 安装约束：**组合 bundle 与被随附的包不要同时安装**，否则同一行挂两次，启动报
+  `duplicate loader entry id`。
+- 发布顺序：**先发被随附的包，再发组合 bundle**。组合的依赖按 npm 版本解析，被随附包尚未
+  发布时组合安装会失败；根聚合包同样受这条约束。
+
 ## 版本管理
 
 核心：**一个包一个版本号，只在决定发布时 bump；tag 是发布开关。**

@@ -15,6 +15,8 @@
 2. 发布凭据可用：优先 **trusted publishing（OIDC）**；未配置时用人工 2FA（`pnpm publish` 会提示验证码）。
 3. 目标 DSH 版本满足该包声明的 `engines.dsh` / `peerDependencies`。
 4. 目标包不能是 `private: true`，否则 `npm publish` 直接拒绝；未打磨到位的包保持 private（`jira-worklogs` 当前如此）。
+5. 发布顺序：被随附的包先发，组合 bundle 后发。`web-clipper` 必须在 `feed-ultra` 之前发布；
+   组合的依赖按 npm 版本解析，被随附包缺失时安装会失败。
 
 ## 一次性配置（开启自动发布）
 

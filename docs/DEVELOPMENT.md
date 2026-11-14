@@ -77,8 +77,9 @@ dsh plugin --profile <profile> add link:$(pwd)/packages/<name>
 
 1. **构建产物入库。** `lib/`（以及 `client.js`）随源码提交。从 GitHub 安装时 pnpm 不会构建，
    只按 `files` 打包仓库里已有的文件；不入库就会装到空壳。
-2. **包必须自包含。** 插件之间不互相 import；运行期只依赖宿主提供的 `@deepseek-ai/*`
-   （声明为 `peerDependencies`）。依赖里不要出现 `workspace:`。
+2. **包必须自包含。** 源码不 import 兄弟包；运行期只依赖宿主提供的 `@deepseek-ai/*`
+   （声明为 `peerDependencies`）。依赖里不要出现 `workspace:`。唯一的例外是 bundle 组合：
+   一个包可以声明另一个可独立安装的 bundle 为依赖，并插入它的行；组合与被随附包不要同时安装。
 3. **聚合清单是生成物。** 根 `cordis.patch.yml` 与根 `package.json` 的依赖由
    `pnpm aggregate` 生成，不要手改；增删包或改版本后必须重新生成并提交。
 4. **根包与子包不要同时安装。** 否则同一行会被挂两次，启动报 `duplicate loader entry id`。

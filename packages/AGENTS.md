@@ -9,6 +9,7 @@
 |---|---|---|
 | [jira-worklogs](jira-worklogs/README.md) | Jira 工时记录：月历缺口、日详情、Git 素材，就地起草并确认后写入 Jira | 草稿 · 推荐本地安装 |
 | [feed-ultra](feed-ultra/README.md) | 资讯工作台：RSS、GitHub 榜单、每日早报与 X 书签按天阅读，渠道定时与 AI 翻译 | 草稿 · 推荐本地安装 |
+| [web-clipper](web-clipper/README.md) | 网页剪藏：桌面版侧栏浏览器一键把当前页作为 Markdown 附件加入会话 | 草稿 · 推荐本地安装 |
 
 新增插件后把这一行补上。
 
@@ -25,7 +26,14 @@
 
 ### 依赖
 
-- **包必须自包含**：插件之间不互相 import，不依赖兄弟包，依赖里不出现 `workspace:`。
+- **包必须自包含**：源码不 import 兄弟包，运行期依赖里不出现 `workspace:`。
+- **组合 bundle 是唯一例外**：可以声明一个可独立安装的兄弟 bundle 为依赖，并在自己的
+  `cordis.patch.yml` 里插入它的行，让用户装一个 bundle 就得到整套能力。例子是 feed-ultra
+  随附 web-clipper；被随附的包仍然可以单独安装。
+- 组合会让根聚合出现重复行 id。`scripts/aggregate.mjs` 按行 id 去重，保留首次出现的一行；
+  新增同类组合时不要手改根清单。
+- **不要把组合 bundle 和被随附的包同时安装**（例如 feed-ultra 与 web-clipper），否则同一行
+  挂两次，启动报 `duplicate loader entry id`。包 README 必须写清这一点。
 - 运行期只依赖宿主提供的 `@deepseek-ai/*`：声明进 `peerDependencies`，需要本地类型/测试时再进
   `devDependencies`（从 npm 官方 registry 安装；部分平台包只在官方 registry 有）。
 - 第三方运行依赖保持最少，并在包 README 里说明理由。
@@ -40,7 +48,8 @@
 
 - 根 `cordis.patch.yml` 与根 `package.json` 的依赖是生成物：改完包后跑 `pnpm aggregate`，
   **不要手改**。
-- **根包与子包不要同时安装**，否则启动报 `duplicate loader entry id`。
+- **根包与子包不要同时安装**，否则启动报 `duplicate loader entry id`。同理，组合 bundle
+  与被它随附的包不要同时安装。
 
 ### 文档
 

@@ -25,7 +25,7 @@
 ## 项目级约束
 
 - 构建产物**入库**：`lib/`（有浏览器半体时含 `client.js`）。从 GitHub 安装时 pnpm 不构建，CI 会校验产物与源码一致
-- 插件包必须**自包含**：插件之间不互相 import，不依赖兄弟包，依赖里不出现 `workspace:`
+- 插件包必须**自包含**：源码不 import 兄弟包，依赖里不出现 `workspace:`。bundle 组合（一个包随附另一个已发布 bundle 的行）是唯一例外，规则见 [packages/AGENTS.md](packages/AGENTS.md)
 - 聚合清单是生成物：根 `cordis.patch.yml` 与根 `dependencies` 由 `pnpm aggregate` 生成，**禁止手改**
 - **根包与子包不得同时安装**，否则同一行挂两次，启动报 `duplicate loader entry id`
 - 发布只针对打磨到位的包，tag 形如 `dsh-<name>@<version>`；一个 tag 只发一个包

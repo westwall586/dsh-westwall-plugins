@@ -11,6 +11,9 @@ importers:
       '@westwall/dsh-feed-ultra':
         specifier: 0.1.0
         version: link:packages/feed-ultra
+      '@westwall/dsh-friendly-expression':
+        specifier: 0.0.1
+        version: link:packages/friendly-expression
       '@westwall/dsh-jira-worklogs':
         specifier: 0.1.0
         version: link:packages/jira-worklogs
@@ -62,6 +65,18 @@ importers:
         version: 0.25.12
       typescript:
         specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/friendly-expression:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: ^4.0.4
+        version: 4.1.0(@deepseek-ai/cordis-plugin-loader@1.1.0)
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.19.2
+      typescript:
+        specifier: ~5.9.3
         version: 5.9.3
 
   packages/jira-worklogs:

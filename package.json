@@ -38,6 +38,7 @@
   },
   "dependencies": {
     "@westwall/dsh-feed-ultra": "0.1.0",
+    "@westwall/dsh-friendly-expression": "0.0.1",
     "@westwall/dsh-jira-worklogs": "0.1.0",
     "@westwall/dsh-web-clipper": "0.1.0"
   }

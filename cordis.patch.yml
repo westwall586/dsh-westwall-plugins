@@ -13,6 +13,11 @@
     - id: dsh-web-clipper
       name: '@westwall/dsh-web-clipper'
 
+# from packages/friendly-expression
+- insert:
+    - id: friendly-expression
+      name: '@westwall/dsh-friendly-expression'
+
 # from packages/jira-worklogs
 - insert:
     - id: dsh-jira-worklogs

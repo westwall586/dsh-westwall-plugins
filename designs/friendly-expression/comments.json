@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "threads": [
+    {
+      "id": "c_2ca9c0c8c0",
+      "anchor": "#dc-root > div:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > section:nth-of-type(2) > dcfx1gat5zo:nth-of-type(1) > dct:nth-of-type(73) > dcedefebb575c7200863256:nth-of-type(1)",
+      "label": "设置 · 友好表达 › shape \"表达形态 Mermaid 代码块会显示为图，点击可放大查看；解…\"",
+      "detail": "Settings.dc.html: #72:1/1/4 shape \"表达形态 Mermaid 代码块会显示为图，点击可放大查看；解析失败时回退为源…\"",
+      "location": {
+        "file": "project/Settings.dc.html",
+        "board": "Settings.dc.html"
+      },
+      "status": "resolved",
+      "createdAt": "2026-11-14T12:57:31.885Z",
+      "updatedAt": "2026-11-14T12:59:47.731Z",
+      "messages": [
+        {
+          "id": "m_25aa92d187",
+          "author": {
+            "kind": "user",
+            "name": "user"
+          },
+          "text": "表达形态无需设置，自动内置",
+          "at": "2026-11-14T12:57:31.885Z"
+        },
+        {
+          "id": "m_ec92fae43b",
+          "author": {
+            "kind": "agent",
+            "name": "agent"
+          },
+          "text": "已去掉表达形态设置，Mermaid 渲染按内置行为处理。",
+          "at": "2026-11-14T12:59:47.731Z"
+        }
+      ],
+      "resolvedAt": "2026-11-14T12:59:47.731Z"
+    },
+    {
+      "id": "c_4baec9f0f5",
+      "anchor": "#dc-root > div:nth-of-type(1) > div:nth-of-type(1) > section:nth-of-type(1) > header:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > dcfx0mvpwgn:nth-of-type(1) > dct:nth-of-type(47) > dceee825301792745064092:nth-of-type(1)",
+      "label": "浮窗 · 放大查看 › text \"Mermaid · 4 个节点\"",
+      "detail": "Viewer.dc.html: #46:1/3/0/0/2 text \"Mermaid · 4 个节点\"",
+      "location": {
+        "file": "project/Viewer.dc.html",
+        "board": "Viewer.dc.html"
+      },
+      "status": "resolved",
+      "createdAt": "2026-11-14T12:58:23.394Z",
+      "updatedAt": "2026-11-14T12:59:47.765Z",
+      "messages": [
+        {
+          "id": "m_963861f4cb",
+          "author": {
+            "kind": "user",
+            "name": "user"
+          },
+          "text": "去掉说明",
+          "at": "2026-11-14T12:58:23.394Z"
+        },
+        {
+          "id": "m_3da023dc6b",
+          "author": {
+            "kind": "agent",
+            "name": "agent"
+          },
+          "text": "已去掉。",
+          "at": "2026-11-14T12:59:47.765Z"
+        }
+      ],
+      "resolvedAt": "2026-11-14T12:59:47.765Z"
+    },
+    {
+      "id": "c_a3ff6b7eed",
+      "anchor": "#dc-root > div:nth-of-type(1) > div:nth-of-type(1) > section:nth-of-type(1) > footer:nth-of-type(1) > div:nth-of-type(1) > dcfx1emy3m1:nth-of-type(1) > dct:nth-of-type(93) > dceee825301792721976608:nth-of-type(1)",
+      "label": "浮窗 · 放大查看 › text \"滚轮缩放 · 拖拽平移 · Esc 关闭\"",
+      "detail": "Viewer.dc.html: #92:1/3/2/0 text \"滚轮缩放 · 拖拽平移 · Esc 关闭\"",
+      "location": {
+        "file": "project/Viewer.dc.html",
+        "board": "Viewer.dc.html"
+      },
+      "status": "resolved",
+      "createdAt": "2026-11-14T12:58:32.498Z",
+      "updatedAt": "2026-11-14T12:59:47.798Z",
+      "messages": [
+        {
+          "id": "m_7c9fb44ad8",
+          "author": {
+            "kind": "user",
+            "name": "user"
+          },
+          "text": "去掉说明",
+          "at": "2026-11-14T12:58:32.498Z"
+        },
+        {
+          "id": "m_fb6f3255d6",
+          "author": {
+            "kind": "agent",
+            "name": "agent"
+          },
+          "text": "已去掉。",
+          "at": "2026-11-14T12:59:47.798Z"
+        }
+      ],
+      "resolvedAt": "2026-11-14T12:59:47.798Z"
+    }
+  ]
+}

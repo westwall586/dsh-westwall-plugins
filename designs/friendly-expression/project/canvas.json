@@ -1,0 +1,17 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-14T12:43:10Z" },
+  "title": "友好表达 · 交互草图",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Settings.dc.html": { "x": 0, "y": 0, "w": 1280, "h": 820, "title": "设置 · 友好表达" },
+    "Chat.dc.html": { "x": 1360, "y": 0, "w": 1280, "h": 820, "title": "对话 · 内联 Mermaid" },
+    "Viewer.dc.html": { "x": 2720, "y": 0, "w": 1280, "h": 820, "title": "浮窗 · 放大查看" }
+  },
+  "order": ["Settings.dc.html", "Chat.dc.html", "Viewer.dc.html"],
+  "notes": {
+    "canvas-title": { "x": 0, "y": -300, "text": "友好表达 · 交互草图", "kind": "title1", "maxW": 4000 }
+  },
+  "designSystems": []
+}

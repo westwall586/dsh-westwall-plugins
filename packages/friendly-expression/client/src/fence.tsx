@@ -1,6 +1,6 @@
 /** Mermaid fence layer streams the host code block, then swaps in a rendered diagram card. */
 import * as React from 'react'
-import { detectDiagramType, errorCopyText, errorSummary, titleFromCode } from './core.ts'
+import { detectDiagramType, errorCopyText, errorDetail, errorSummary, titleFromCode } from './core.ts'
 import type { Translate } from './context.ts'
 import { renderMermaid, useResolvedTheme } from './mermaid-engine.ts'
 import { CodeIcon, CopyIcon, ExpandIcon, MermaidIcon, copyText } from './ui.tsx'
@@ -17,7 +17,7 @@ export interface MermaidFenceProps {
 type RenderState =
   | { kind: 'loading' }
   | { kind: 'ready'; svg: string }
-  | { kind: 'error'; message: string }
+  | { kind: 'error'; message: string; detail: string }
 
 export function MermaidFence({ code, streaming, children, meta, t }: MermaidFenceProps): React.ReactElement | null {
   const theme = useResolvedTheme()
@@ -57,7 +57,7 @@ export function MermaidFence({ code, streaming, children, meta, t }: MermaidFenc
       if (!cancelled) setState({ kind: 'ready', svg })
     }).catch((error: unknown) => {
       console.error('[dsh-friendly-expression] Mermaid render failed', error)
-      if (!cancelled) setState({ kind: 'error', message: errorSummary(error) })
+      if (!cancelled) setState({ kind: 'error', message: errorSummary(error), detail: errorDetail(error) })
     })
     return () => { cancelled = true }
   }, [code, streaming, theme, visible])
@@ -132,14 +132,13 @@ export function MermaidFence({ code, streaming, children, meta, t }: MermaidFenc
           React.createElement('button', {
             type: 'button',
             className: 'dfe-btn dfe-btn--primary',
-            onClick: () => { void copyError(state.message) },
+            onClick: () => { void copyError(state.detail) },
           }, t('fence.copyError')),
           React.createElement('button', {
             type: 'button',
             className: 'dfe-btn',
             onClick: () => setSourceView(true),
-          }, t('fence.viewSource')))),
-      React.createElement('div', { className: 'dfe-card-source' }, children))
+          }, t('fence.viewSource')))))
   }
 
   if (state.kind === 'loading') {

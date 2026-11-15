@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
-  cacheKey, clampZoom, detectDiagramType, errorCopyText, fitScale, readPromptValue, titleFromCode,
+  cacheKey, clampZoom, detectDiagramType, errorCopyText, errorDetail, errorSummary, fitScale, readPromptValue, titleFromCode,
 } from '../client/src/core.ts'
 
 test('detectDiagramType 识别常见图形', () => {
@@ -38,6 +38,14 @@ test('titleFromCode 优先 meta，其次 frontmatter，不猜节点标签', () =
 test('errorCopyText 只替换错误信息，不携带源码', () => {
   const template = 'Mermaid 渲染失败，请重新生成。错误信息：\n{message}'
   assert.equal(errorCopyText(template, 'Parse error'), 'Mermaid 渲染失败，请重新生成。错误信息：\nParse error')
+})
+
+test('errorDetail 保留换行和完整错误，errorSummary 只用于展示', () => {
+  const raw = 'Parse error on line 4:\n... -> B[结束 C --> D\n---------------------^\nExpecting \'SQE\', \'DOUBLECIRCLEEND\', \'PE\', \'-\)\', \'STADIUMEND\', \'SUBROUTINEEND\', \'PIPE\', \'CYLINDEREND\', \'TAGEND\', \'TRAPEND\', \'INVTRAPEND\', \'UNICODE_TEXT\', \'TEXT\', \'TAGSTART\', got \'SOS\''
+  assert.equal(errorDetail(new Error(raw)), raw)
+  assert.equal(errorDetail(raw), raw)
+  assert.ok(errorSummary(new Error(raw)).length <= 180)
+  assert.ok(!errorSummary(new Error(raw)).includes('\n'))
 })
 
 test('clampZoom 限制在 20% 到 800%', () => {

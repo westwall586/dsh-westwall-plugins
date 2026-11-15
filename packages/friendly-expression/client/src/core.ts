@@ -119,8 +119,12 @@ export function readPromptValue(value: unknown): string {
   }
 }
 
-/** One-line error summary for the card. Full detail stays in the console. */
+/** Full error text for copying; newlines and token lists stay intact. */
+export function errorDetail(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+/** One-line error summary for the card. Copy uses errorDetail instead. */
 export function errorSummary(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error)
-  return message.replace(/\s+/g, ' ').trim().slice(0, 180)
+  return errorDetail(error).replace(/\s+/g, ' ').trim().slice(0, 180)
 }

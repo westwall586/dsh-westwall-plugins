@@ -5,7 +5,7 @@ import {
   cacheKey, clampZoom, detectDiagramType, errorCopyText, fitScale, readPromptValue, titleFromCode,
 } from '../client/src/core.ts'
 
-test('detectDiagramType 识别白名单图形', () => {
+test('detectDiagramType 识别常见图形', () => {
   assert.equal(detectDiagramType('flowchart TD\n  A --> B'), 'flowchart')
   assert.equal(detectDiagramType('graph LR\n  A --> B'), 'flowchart')
   assert.equal(detectDiagramType('sequenceDiagram\n  A->>B: hi'), 'sequence')

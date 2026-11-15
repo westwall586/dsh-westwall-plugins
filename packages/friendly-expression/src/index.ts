@@ -3,7 +3,9 @@ import type { Context } from '@deepseek-ai/cordis'
 // Type-only import. It loads the agent/* event vocabulary into this Context.
 import type {} from '@deepseek-ai/dsh-agent'
 import z from '@deepseek-ai/schemastery'
-import { DEFAULT_STYLE_PROMPT, MAX_PROMPT_CHARS, SECTION_NAME, SECTION_ORDER } from './prompt.ts'
+import {
+  DEFAULT_STYLE_PROMPT, MAX_PROMPT_CHARS, renderSection, SECTION_NAME, SECTION_ORDER,
+} from './prompt.ts'
 import { openSnapshotStore, shouldCapture } from './snapshot.ts'
 
 export const name = 'friendly-expression'
@@ -89,6 +91,8 @@ export async function apply(ctx: Context, config: FriendlyExpressionConfig): Pro
     if (!hasWebSurface(ctx)) return undefined
     if (agent.session.header.origin === 'subagent') return undefined
 
+    // A stored snapshot registers verbatim. Sections captured before the prefix
+    // existed stay body-only, which keeps their system prompt byte-identical.
     let prompt = store.get(agent.session.id)
     if (prompt === undefined) {
       const fresh = shouldCapture({
@@ -97,7 +101,7 @@ export async function apply(ctx: Context, config: FriendlyExpressionConfig): Pro
         hasMessages: agent.session.surface.nodes.length > 0,
       })
       if (!fresh) return undefined
-      prompt = readStylePrompt(config.stylePrompt)
+      prompt = renderSection(readStylePrompt(config.stylePrompt))
       void store.capture(agent.session.id, prompt).catch((error: unknown) => {
         warn(`failed to capture the prompt snapshot for session ${agent.session.id}`, error)
       })

@@ -1,10 +1,13 @@
 /** Per-session prompt snapshots stay durable when storage is present and in memory otherwise. */
 import { z } from 'zod';
 import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain';
-import { MAX_PROMPT_CHARS } from "./prompt.js";
+import { MAX_SECTION_CHARS } from "./prompt.js";
 const WARNING_PREFIX = '[dsh-friendly-expression]';
+// The cap covers the hidden prefix plus a maximum-length body, so a legacy
+// body-only record still fits. A tighter cap would fail schema validation on
+// the next open, where the domain backs the record up and skips it.
 const promptSnapshotSchema = z.object({
-    prompt: z.string().max(MAX_PROMPT_CHARS),
+    prompt: z.string().max(MAX_SECTION_CHARS),
     capturedAt: z.number().int().nonnegative(),
 }).strict();
 export const promptSnapshotDomain = defineDomain({

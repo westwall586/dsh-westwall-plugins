@@ -22,6 +22,7 @@ dsh plugin --profile <profile> add link:/绝对路径/packages/friendly-expressi
 |---|---|
 | 表达提示词 | 最长 800 字符，默认是一段推荐文案；可修改，可恢复默认 |
 
+- 设置页的 800 字符计数只算可编辑正文。注册时宿主会在正文前加一行固定的英文引导语 `When talking with the user, follow these principles:`；它不出现在设置页，不占这 800 字符额度，也不随「恢复默认」变化。正文为空时不注册这一段。
 - 保存后只影响新会话。已存在会话使用创建时的提示词快照，重启或恢复后也不变。
 - 这样做的原因是 system prompt 的前缀保持稳定，不会因为改设置而破坏模型的前缀缓存。
 - 恢复默认会移除用户覆盖、回落到推荐文案，同样只影响新会话。
@@ -30,7 +31,7 @@ dsh plugin --profile <profile> add link:/绝对路径/packages/friendly-expressi
 ## 日常使用
 
 1. 在「设置」→「友好表达」里按需修改表达提示词。
-2. 新开会话后，Agent 按提示词组织回复；结构、流程、状态、关系用 Mermaid 表达。
+2. 新开会话后，Agent 按提示词组织回复；需要画图时默认用 Mermaid 表达，Mermaid 11.15.0 内置的图表类型都能渲染；ZenUML 等外部插件不在包内。
 3. Mermaid 代码块在消息里渲染成图。流式生成时先显示源码，落定后再显示图。
 4. 图卡片右上角可以切换源码、复制源码、放大查看。
 5. 点击图打开浮窗。浮窗支持滚轮缩放、拖拽平移、适合窗口、1:1、复制源码和下载 SVG。
@@ -62,7 +63,7 @@ dsh plugin --profile <profile> remove @westwall/dsh-friendly-expression
 
 卸载后提示词不再注入，Mermaid 代码块恢复为普通代码块。
 
-每个会话的提示词快照保存在默认 JSON 存储的 `~/.dsh/storages/friendly_expression/`（如果 profile 使用其他存储后端，路径由该后端决定）。快照只有提示词文本和捕获时间，不含凭据。卸载不会自动删除；需要清理时手动删除该目录。删除后，旧会话在下次恢复时不再注入提示词。
+每个会话的提示词快照保存在默认 JSON 存储的 `~/.dsh/storages/friendly_expression/`（如果 profile 使用其他存储后端，路径由该后端决定）。快照保存注册用的完整 section 文本（含固定英文引导语）和捕获时间，不含凭据。卸载不会自动删除；需要清理时手动删除该目录。删除后，旧会话在下次恢复时不再注入提示词。
 
 ## 相关链接
 

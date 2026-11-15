@@ -1,5 +1,5 @@
 import z from '@deepseek-ai/schemastery';
-import { DEFAULT_STYLE_PROMPT, MAX_PROMPT_CHARS, SECTION_NAME, SECTION_ORDER } from "./prompt.js";
+import { DEFAULT_STYLE_PROMPT, MAX_PROMPT_CHARS, renderSection, SECTION_NAME, SECTION_ORDER, } from "./prompt.js";
 import { openSnapshotStore, shouldCapture } from "./snapshot.js";
 export const name = 'friendly-expression';
 export const inject = ['systemPrompt', 'storageDomain'];
@@ -51,6 +51,8 @@ export async function apply(ctx, config) {
             return undefined;
         if (agent.session.header.origin === 'subagent')
             return undefined;
+        // A stored snapshot registers verbatim. Sections captured before the prefix
+        // existed stay body-only, which keeps their system prompt byte-identical.
         let prompt = store.get(agent.session.id);
         if (prompt === undefined) {
             const fresh = shouldCapture({
@@ -60,7 +62,7 @@ export async function apply(ctx, config) {
             });
             if (!fresh)
                 return undefined;
-            prompt = readStylePrompt(config.stylePrompt);
+            prompt = renderSection(readStylePrompt(config.stylePrompt));
             void store.capture(agent.session.id, prompt).catch((error) => {
                 warn(`failed to capture the prompt snapshot for session ${agent.session.id}`, error);
             });

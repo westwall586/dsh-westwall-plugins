@@ -1,4 +1,9 @@
-/** One frozen prompt plus its capture time, stored per session. */
+/**
+ * One frozen section plus its capture time, stored per session. `prompt` holds
+ * the full section text for captures made by this version, prefix included.
+ * Snapshots written before the prefix existed hold the body alone and are
+ * registered exactly as stored.
+ */
 export interface PromptSnapshot {
     prompt: string;
     capturedAt: number;

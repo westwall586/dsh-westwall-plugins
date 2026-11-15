@@ -14,7 +14,7 @@
 
 Host：
 
-- `Config`：`stylePrompt`（≤800 字符，`.volatile()`，默认 282 字文案）。
+- `Config`：`stylePrompt`（≤800 字符，`.volatile()`，默认 164 字正文；注册时另加一行固定英文引导语，不计入这 800 字符）。
 - 按 Agent 注册 system prompt section，仅 Web/桌面注入。
 - 新会话创建时把提示词写入 `storageDomain` 快照；已有会话使用快照，重启/恢复不变。子代理不注入。
 - 设置页：`settings.section` + `settings.section.icon`，用 `ctx.configForms` 读写，自绘 textarea，不加 `ConfigField` 依赖。

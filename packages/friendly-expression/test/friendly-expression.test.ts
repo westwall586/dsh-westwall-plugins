@@ -2,7 +2,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { Config, apply, inject, name, readStylePrompt } from '../src/index.ts'
-import { DEFAULT_STYLE_PROMPT, MAX_PROMPT_CHARS } from '../src/prompt.ts'
+import {
+  DEFAULT_STYLE_PROMPT, MAX_PROMPT_CHARS, MAX_SECTION_CHARS, renderSection, SECTION_PREFIX,
+} from '../src/prompt.ts'
 import {
   createMemorySnapshotStore, openSnapshotStore, promptSnapshotDomain, shouldCapture,
 } from '../src/snapshot.ts'
@@ -22,10 +24,31 @@ test('插件导出形状合法', () => {
   assert.notEqual(Config, undefined)
 })
 
-test('默认提示词是 282 字符且在 800 上限内', () => {
-  assert.equal(DEFAULT_STYLE_PROMPT.length, 282)
+test('默认提示词是 164 字符正文且在 800 上限内', () => {
+  assert.equal(DEFAULT_STYLE_PROMPT.length, 164)
   assert.ok(DEFAULT_STYLE_PROMPT.length <= MAX_PROMPT_CHARS)
   assert.equal(MAX_PROMPT_CHARS, 800)
+})
+
+test('注册文本是隐藏英文前缀加正文', () => {
+  assert.equal(
+    renderSection(DEFAULT_STYLE_PROMPT),
+    'When talking with the user, follow these principles:\n' + DEFAULT_STYLE_PROMPT,
+  )
+  assert.equal(renderSection('先给结论。'), 'When talking with the user, follow these principles:\n先给结论。')
+  assert.equal(SECTION_PREFIX, 'When talking with the user, follow these principles:')
+})
+
+test('空正文不渲染 section，也不带前缀', () => {
+  assert.equal(renderSection(''), '')
+})
+
+test('最长正文的快照仍能通过存储校验', () => {
+  const longest = renderSection('x'.repeat(MAX_PROMPT_CHARS))
+  assert.equal(longest.length, MAX_SECTION_CHARS)
+  const schema = promptSnapshotDomain.tables.sessions.valueSchema
+  assert.doesNotThrow(() => schema.parse({ prompt: longest, capturedAt: 0 }))
+  assert.doesNotThrow(() => schema.parse({ prompt: 'x'.repeat(MAX_PROMPT_CHARS), capturedAt: 0 }))
 })
 
 test('volatile 配置默认值和 getter 都可读取', () => {

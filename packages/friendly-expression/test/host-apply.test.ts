@@ -112,7 +112,13 @@ function createAgent(id: string, options: {
 
 const config = { stylePrompt: { get: () => '当前提示词' } }
 
-test('新建 Web 会话捕获提示词并注册 scoped section', async () => {
+const PREFIX = 'When talking with the user, follow these principles:'
+
+function sectionText(body: string): string {
+  return `${PREFIX}\n${body}`
+}
+
+test('新建 Web 会话捕获完整 section 并注册 scoped section', async () => {
   const harness = createHarness()
   await apply(harness.ctx as never, config)
   const agent = createAgent('s1')
@@ -120,17 +126,36 @@ test('新建 Web 会话捕获提示词并注册 scoped section', async () => {
   assert.equal(agent.sections.length, 1)
   assert.equal(agent.sections[0].name, 'westwall:friendly-expression')
   assert.equal(agent.sections[0].order, 9500)
-  assert.equal(agent.sections[0].text, '当前提示词')
-  assert.equal(harness.stored.get('s1')?.prompt, '当前提示词')
+  assert.equal(agent.sections[0].text, sectionText('当前提示词'))
+  assert.equal(harness.stored.get('s1')?.prompt, agent.sections[0].text)
 })
 
-test('已有快照的会话使用快照且不覆盖存储', async () => {
+test('旧版仅正文快照按原样注册，不加前缀', async () => {
   const harness = createHarness({ records: { s2: { prompt: '旧提示词', capturedAt: 1 } } })
   await apply(harness.ctx as never, config)
   const agent = createAgent('s2', { messages: 3 })
   harness.emit('agent/created', { agent, source: 'resume' })
   assert.equal(agent.sections[0]?.text, '旧提示词')
   assert.equal(harness.puts.length, 0)
+})
+
+test('已冻结的完整 section 恢复时不再重复加前缀', async () => {
+  const harness = createHarness({ records: { s14: { prompt: sectionText('旧正文'), capturedAt: 1 } } })
+  await apply(harness.ctx as never, config)
+  const agent = createAgent('s14', { messages: 2 })
+  harness.emit('agent/created', { agent, source: 'resume' })
+  assert.equal(agent.sections[0]?.text, sectionText('旧正文'))
+  assert.equal(harness.puts.length, 0)
+})
+
+test('空正文的新会话不注册 section，快照也为空', async () => {
+  const harness = createHarness()
+  await apply(harness.ctx as never, { stylePrompt: { get: () => '' } })
+  const agent = createAgent('s15')
+  harness.emit('agent/created', { agent, source: 'startup' })
+  assert.equal(agent.sections.length, 0)
+  assert.equal(harness.puts.length, 1)
+  assert.equal(harness.puts[0][1].prompt, '')
 })
 
 test('没有快照的恢复会话不注册也不捕获', async () => {
@@ -196,13 +221,13 @@ test('配置修改后已有会话仍使用快照，不被新值覆盖', async ()
 
   const first = createAgent('s10')
   harness.emit('agent/created', { agent: first, source: 'startup' })
-  assert.equal(first.sections[0]?.text, '第一版提示词')
+  assert.equal(first.sections[0]?.text, sectionText('第一版提示词'))
 
   current = '第二版提示词'
   const resumed = createAgent('s10', { messages: 2 })
   harness.emit('agent/created', { agent: resumed, source: 'resume' })
   assert.equal(first.sections[0]?.disposed, true)
-  assert.equal(resumed.sections[0]?.text, '第一版提示词')
+  assert.equal(resumed.sections[0]?.text, sectionText('第一版提示词'))
   assert.equal(harness.puts.length, 1)
 })
 
@@ -211,7 +236,7 @@ test('快照写入失败时仍注册本次运行的 section', async () => {
   await apply(harness.ctx as never, config)
   const agent = createAgent('s11')
   harness.emit('agent/created', { agent, source: 'startup' })
-  assert.equal(agent.sections[0]?.text, '当前提示词')
+  assert.equal(agent.sections[0]?.text, sectionText('当前提示词'))
   assert.equal(harness.puts.length, 1)
 })
 
@@ -233,5 +258,5 @@ test('同一会话被新 Agent 替换时重新注册 section', async () => {
   const replacement = createAgent('s13', { messages: 1 })
   harness.emit('agent/created', { agent: replacement, source: 'compact' })
   assert.equal(first.sections[0]?.disposed, true)
-  assert.equal(replacement.sections[0]?.text, '当前提示词')
+  assert.equal(replacement.sections[0]?.text, sectionText('当前提示词'))
 })

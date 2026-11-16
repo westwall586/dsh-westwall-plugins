@@ -2,9 +2,7 @@
 window.__ModuleLoader__.load({ id: '@westwall/dsh-active-markdown', factory(require) {
 "use strict";var DshActiveMarkdownClient=(()=>{var Ar=Object.create;var mu=Object.defineProperty;var Er=Object.getOwnPropertyDescriptor;var vr=Object.getOwnPropertyNames;var wr=Object.getPrototypeOf,Fr=Object.prototype.hasOwnProperty;var xu=(u=>typeof require<"u"?require:typeof Proxy<"u"?new Proxy(u,{get:(e,r)=>(typeof require<"u"?require:e)[r]}):u)(function(u){if(typeof require<"u")return require.apply(this,arguments);throw Error('Dynamic require of "'+u+'" is not supported')});var lu=(u,e)=>{for(var r in e)mu(u,r,{get:e[r],enumerable:!0})},Ke=(u,e,r,n)=>{if(e&&typeof e=="object"||typeof e=="function")for(let t of vr(e))!Fr.call(u,t)&&t!==r&&mu(u,t,{get:()=>e[t],enumerable:!(n=Er(e,t))||n.enumerable});return u};var u0=(u,e,r)=>(r=u!=null?Ar(wr(u)):{},Ke(e||!u||!u.__esModule?mu(r,"default",{value:u,enumerable:!0}):r,u)),Tr=u=>Ke(mu({},"__esModule",{value:!0}),u);var Zn={};lu(Zn,{default:()=>Vn});var e0=`[data-active-markdown] {
   box-sizing: border-box;
-  max-width: 46rem;
-  margin: 0 auto;
-  padding: 20px 24px 72px;
+  padding: 20px clamp(24px, 4%, 56px) 72px;
   color: var(--dsw-alias-label-primary);
   font-size: var(--dsh-content-font-size);
   line-height: 1.7;

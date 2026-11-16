@@ -121,7 +121,7 @@ front matter 被切掉后，正文解析要带上原始行号偏移，块的行�
 
 - 只用 `--dsw-alias-*`：`label-primary/secondary/tertiary`、`bg-base`、`bg-layer-1/2`、`border-l1..l4`、`link`、`markdown-code-block`、`interactive-bg-hover`、`state-*`。
 - 字号用 `--dsh-content-font-size` / `--dsh-code-font-size`；不自定义字体家族，正文继承宿主。
-- 正文 `max-width: 46rem`，行高 1.7，段落间距 0.9em；窄栏与全屏同一套规则，仅调内边距。
+- 正文不设最大宽度，随预览面板宽度自适应；左右内边距 `clamp(24px, 4%, 56px)`，窄栏不小于 24px，全屏封顶 56px。行高 1.7，段落间距 0.9em。
 - 明暗主题靠 token 自动切换，不写 `prefers-color-scheme` 分支。
 
 ### 4.7 链接

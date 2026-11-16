@@ -1,8 +1,6 @@
 [data-active-markdown] {
   box-sizing: border-box;
-  max-width: 46rem;
-  margin: 0 auto;
-  padding: 20px 24px 72px;
+  padding: 20px clamp(24px, 4%, 56px) 72px;
   color: var(--dsw-alias-label-primary);
   font-size: var(--dsh-content-font-size);
   line-height: 1.7;

@@ -7,6 +7,7 @@ import { classifyLink } from './links.ts'
 import { parseDocument } from './markdown/blocks.ts'
 import { MarkdownView } from './markdown/render.tsx'
 import { READ_CAP, loadDocument, sessionFileOf } from './source.ts'
+import { assembleTranslation, countLines, normalize, planTranslation } from './translate/plan.ts'
 
 /** The renderer branch of the owner's content union. */
 export interface RendererContent {
@@ -41,14 +42,10 @@ type View = 'source' | 'translated'
 /** One translation request's lifecycle; the view never recomputes it. */
 type Translation =
   | { status: 'idle' }
-  | { status: 'running' }
+  | { status: 'running', chunk: number, chunks: number }
   | { status: 'ready', text: string, sourceLines: number, translatedLines: number }
+  | { status: 'too-large', lineCount: number }
   | { status: 'failed', message: string }
-
-/** Line count as the two checks see it: CRLF folded, one trailing newline dropped. */
-function countLines(text: string): number {
-  return text.replace(/\r\n/g, '\n').replace(/\n$/, '').split('\n').length
-}
 
 type BodyState =
   | { status: 'loading' }
@@ -107,7 +104,11 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
       setState(result)
       rendererRef.current?.failed()
     })
-    return () => { controller.abort() }
+    return () => {
+      controller.abort()
+      // A new revision or an unmount also ends any chunk loop still in flight.
+      requestToken.current += 1
+    }
   }, [sessionId, path, revision, readBytes, t])
 
   // Report the version only once the content is committed: the owner restores
@@ -151,19 +152,32 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
 
   const translateDocument = useCallback((document: { text: string, absolutePath: string }): void => {
     const token = ++requestToken.current
-    setTranslation({ status: 'running' })
+    const sourceLines = normalize(document.text).split('\n')
+    const plan = planTranslation(document.text, parseDocument(document.text).blocks)
+    if (plan.kind === 'too-large') {
+      setTranslation({ status: 'too-large', lineCount: plan.lineCount })
+      return
+    }
+    const chunks = plan.ranges.length
+    setTranslation({ status: 'running', chunk: 1, chunks })
     void (async () => {
       try {
         const bridge = await host()
         const promptVersion = await bridge.describePrompt().catch(() => FALLBACK_PROMPT_VERSION)
-        const text = await bridge.translate({
-          sessionId: sessionId ?? '',
-          path: path ?? '',
-          text: document.text,
-          lang: TARGET_LANGUAGE,
-          promptVersion,
-        })
-        if (token !== requestToken.current) return
+        const replies: string[] = []
+        for (const [index, range] of plan.ranges.entries()) {
+          if (token !== requestToken.current) return
+          setTranslation({ status: 'running', chunk: index + 1, chunks })
+          replies.push(await bridge.translate({
+            sessionId: sessionId ?? '',
+            path: path ?? '',
+            text: sourceLines.slice(range.start, range.end).join('\n'),
+            lang: TARGET_LANGUAGE,
+            promptVersion,
+          }))
+          if (token !== requestToken.current) return
+        }
+        const text = assembleTranslation(plan.ranges, sourceLines, replies)
         setTranslation({
           status: 'ready',
           text,
@@ -180,7 +194,7 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
   const chooseView = useCallback((next: View) => {
     setView(next)
     if (next !== 'translated' || state.status !== 'ready') return
-    if (translation.status === 'ready' || translation.status === 'running') return
+    if (translation.status === 'ready' || translation.status === 'running' || translation.status === 'too-large') return
     translateDocument({ text: state.text, absolutePath: state.absolutePath })
   }, [state, translation, translateDocument])
 
@@ -218,8 +232,13 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
               {translation.status === 'running' && (
                 <>
                   <span className="am-spinner" aria-hidden="true" />
-                  {t('translate.running')}
+                  {translation.chunks > 1
+                    ? t('translate.progress', { current: translation.chunk, total: translation.chunks })
+                    : t('translate.running')}
                 </>
+              )}
+              {translation.status === 'too-large' && (
+                <span className="am-toolbar-error">{t('translate.tooLarge', { lines: translation.lineCount })}</span>
               )}
               {translation.status === 'ready' && (translation.sourceLines === translation.translatedLines
                 ? t('translate.aligned', { lines: translation.translatedLines })

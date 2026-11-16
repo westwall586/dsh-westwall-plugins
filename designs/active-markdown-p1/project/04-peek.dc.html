@@ -41,9 +41,8 @@ body{margin:0;-webkit-font-smoothing:antialiased;background:#fff}
 .doc th,.doc td{border:.5px solid rgba(0,0,0,.1);padding:7px 10px;text-align:left;vertical-align:top}
 .doc th{background:#f9fafb;font-weight:600;font-size:12.5px}
 
-/* 被点中的行：整行底色，并向左铺进行号列，行号列边上一条强调线 */
-.picked{position:relative;background:rgba(38,49,72,.055);box-shadow:-60px 0 0 rgba(38,49,72,.055)}
-.picked::after{content:'';position:absolute;left:-60px;top:0;bottom:0;width:2px;background:#4176e6}
+/* 被点中的行：只高亮这一行，不整段 */
+.pick{background:rgba(65,118,230,.1);box-shadow:0 0 0 2px rgba(65,118,230,.1);border-radius:3px}
 
 .pop{position:absolute;left:132px;top:346px;width:452px;box-sizing:border-box;border:.5px solid rgba(0,0,0,.08);border-radius:10px;background:#fff;box-shadow:0 12px 32px rgba(0,0,0,.16)}
 .pop .ph{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:.5px solid rgba(0,0,0,.06);font-size:11.5px;color:#81858c;font-family:'SF Mono',Menlo,monospace}
@@ -100,7 +99,7 @@ owner: platform</div>
 
       <h1>检索管线评审</h1>
 
-      <p class="picked">管线把用户的问题转化为一组排序后的片段。本次评审覆盖本季度有改动的两个阶段——入库与排序，并记录了我们决定暂不处理的部分。</p>
+      <p><span class="pick">管线把用户的问题转化为一组排序后的片段。</span>本次评审覆盖本季度有改动的两个阶段——入库与排序，并记录了我们决定暂不处理的部分。</p>
 
       <h2>范围</h2>
       <ul>
@@ -122,9 +121,9 @@ owner: platform</div>
       </table>
     </div>
 
-    <div class="pop">
-      <div class="ph"><b>原文</b> 第 14–16 行</div>
-      <div class="pb"><span class="ln">The pipeline turns a user question into a ranked set of passages.</span> This review covers the two stages that changed this quarter — ingestion and ranking — and records what we decided to leave alone.</div>
+    <div class="pop" style="top:330px;left:150px">
+      <div class="ph"><b>原文</b> 第 14 行</div>
+      <div class="pb">The pipeline turns a user question into a ranked set of passages.</div>
     </div>
   </div>
 </div>

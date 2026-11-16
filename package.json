@@ -37,6 +37,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "dependencies": {
+    "@westwall/dsh-active-markdown": "0.0.1",
     "@westwall/dsh-feed-ultra": "0.1.0",
     "@westwall/dsh-friendly-expression": "0.0.1",
     "@westwall/dsh-jira-worklogs": "0.1.0",

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Active Markdown",
+    "description": "Takes over the body of a Markdown preview in the right sidebar and renders headings, lists, tables, code, and images as interactive blocks. The path, reload, and open-in-app actions stay native, and the viewer menu switches back to native Markdown at any time."
+  }
+}

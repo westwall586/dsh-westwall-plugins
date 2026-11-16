@@ -54,6 +54,7 @@ dsh plugin --profile <profile> add \
 
 | 插件 | 简介 | 状态 |
 |---|---|---|
+| [可交互 Markdown](packages/active-markdown/README.md) | 接管右侧栏的 Markdown 预览正文，按块渲染标题、列表、表格、代码与图片，路径与刷新仍用原生 | **草稿** · 推荐本地安装 |
 | [Jira 工时记录](packages/jira-worklogs/README.md) | 月历查看工时缺口、日详情与 Git 素材，就地起草、确认后写入 Jira | **草稿** · 推荐本地安装 |
 | [资讯工作台](packages/feed-ultra/README.md) | RSS、GitHub 榜单、每日早报与 X 书签收进一个工作区，按天阅读并做 AI 翻译 | **草稿** · 推荐本地安装 |
 | [网页剪藏](packages/web-clipper/README.md) | 把侧栏浏览器当前页作为 Markdown 附件加进会话，并在可配置目录保存可读副本（桌面版） | **草稿** · 推荐本地安装 |

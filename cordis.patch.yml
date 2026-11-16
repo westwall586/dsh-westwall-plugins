@@ -6,6 +6,11 @@
     - id: dsh-plugins
       name: '@westwall/dsh-plugins'
 
+# from packages/active-markdown
+- insert:
+    - id: active-markdown
+      name: '@westwall/dsh-active-markdown'
+
 # from packages/feed-ultra
 - insert:
     - id: dsh-feed-ultra

@@ -3,3 +3,6 @@ node_modules/
 *.tgz
 .DS_Store
 coverage/
+
+# local verification scratch space
+.tmp/

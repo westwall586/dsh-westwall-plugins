@@ -7,6 +7,7 @@
 
 | 目录 | 说明 | 状态 |
 |---|---|---|
+| [active-markdown](active-markdown/README.md) | 可交互 Markdown：接管右侧栏 Markdown 预览正文，按块渲染标题、列表、表格、代码、图片与 front matter | 草稿 · 推荐本地安装 |
 | [jira-worklogs](jira-worklogs/README.md) | Jira 工时记录：月历缺口、日详情、Git 素材，就地起草并确认后写入 Jira | 草稿 · 推荐本地安装 |
 | [feed-ultra](feed-ultra/README.md) | 资讯工作台：RSS、GitHub 榜单、每日早报与 X 书签按天阅读，渠道定时与 AI 翻译 | 草稿 · 推荐本地安装 |
 | [web-clipper](web-clipper/README.md) | 网页剪藏：桌面版侧栏浏览器一键把当前页作为 Markdown 附件加入会话，并在可配置目录保存可读副本 | 草稿 · 推荐本地安装 |

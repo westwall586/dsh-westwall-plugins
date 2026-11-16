@@ -1,0 +1,181 @@
+/** Render the block tree as themed React elements. */
+import * as React from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import type { Inline, Block, ListItem } from './model.ts'
+import { isRemoteSource } from '../images.ts'
+
+/** Copy the labels this view needs. */
+export interface RenderLabels {
+  copy: string
+  copied: string
+  imageFailed: string
+}
+
+/** Side effects the view delegates to the body. */
+export interface RenderActions {
+  openLink(href: string): void
+  resolveImage(src: string): Promise<string | undefined>
+}
+
+export interface MarkdownViewProps {
+  blocks: readonly Block[]
+  labels: RenderLabels
+  actions: RenderActions
+}
+
+/**
+ * Render the whole document body.
+ * @param props - block tree, labels, and link/image behaviour.
+ * @returns the rendered article.
+ */
+export function MarkdownView({ blocks, labels, actions }: MarkdownViewProps): ReactNode {
+  return <article className="am-doc" data-active-markdown-doc>{blocks.map((block, index) => renderBlock(block, `b${index}`, labels, actions))}</article>
+}
+
+function renderBlock(block: Block, key: string, labels: RenderLabels, actions: RenderActions): ReactNode {
+  switch (block.type) {
+    case 'heading': {
+      const Tag = `h${Math.min(Math.max(block.level, 1), 6)}` as 'h1'
+      return <Tag key={key} className="am-heading" data-block-id={block.id} data-block-type="heading" data-source-line={block.sourceStartLine} data-anchor={block.anchor}>{renderInline(block.inline, key, labels, actions)}</Tag>
+    }
+    case 'paragraph': {
+      const content = renderInline(block.inline, key, labels, actions)
+      return block.tight
+        ? <React.Fragment key={key}>{content}</React.Fragment>
+        : <p key={key} className="am-paragraph" data-block-id={block.id} data-block-type="paragraph" data-source-line={block.sourceStartLine}>{content}</p>
+    }
+    case 'code': return <CodeView key={key} block={block} labels={labels} />
+    case 'table': return (
+      <div key={key} className="am-table-wrap" data-block-id={block.id} data-block-type="table" data-source-line={block.sourceStartLine}>
+        <table className="am-table">
+          <thead><tr>{block.header.map((cell, index) => <th key={index} style={cell.align === undefined ? undefined : { textAlign: cell.align }}>{renderInline(cell.inline, `${key}-h${index}`, labels, actions)}</th>)}</tr></thead>
+          <tbody>{block.rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex} style={cell.align === undefined ? undefined : { textAlign: cell.align }}>{renderInline(cell.inline, `${key}-${rowIndex}-${cellIndex}`, labels, actions)}</td>)}</tr>)}</tbody>
+        </table>
+      </div>
+    )
+    case 'list': {
+      const items = block.items.map((item, index) => renderItem(item, `${key}-i${index}`, labels, actions))
+      return block.ordered
+        ? <ol key={key} className="am-list" start={block.start} data-block-id={block.id} data-block-type="list" data-source-line={block.sourceStartLine}>{items}</ol>
+        : <ul key={key} className="am-list" data-block-id={block.id} data-block-type="list" data-source-line={block.sourceStartLine}>{items}</ul>
+    }
+    case 'quote': return (
+      <blockquote key={key} className="am-quote" data-block-id={block.id} data-block-type="quote" data-source-line={block.sourceStartLine}>
+        {block.blocks.map((child, index) => renderBlock(child, `${key}-q${index}`, labels, actions))}
+      </blockquote>
+    )
+    case 'divider': return <hr key={key} className="am-divider" data-block-id={block.id} data-block-type="divider" data-source-line={block.sourceStartLine} />
+  }
+}
+
+function renderItem(item: ListItem, key: string, labels: RenderLabels, actions: RenderActions): ReactNode {
+  return (
+    <li key={key} className={item.task === undefined ? 'am-item' : 'am-item am-item-task'} data-block-id={item.id} data-block-type="list-item" data-source-line={item.sourceStartLine}>
+      {item.task === undefined ? null : <input className="am-checkbox" type="checkbox" checked={item.task === 'done'} readOnly tabIndex={-1} aria-hidden="true" />}
+      {item.blocks.map((block, index) => renderBlock(block, `${key}-${index}`, labels, actions))}
+    </li>
+  )
+}
+
+function renderInline(inlines: readonly Inline[], key: string, labels: RenderLabels, actions: RenderActions): ReactNode[] {
+  return inlines.map((inline, index) => {
+    const itemKey = `${key}-${index}`
+    switch (inline.kind) {
+      case 'text': return <React.Fragment key={itemKey}>{inline.text}</React.Fragment>
+      case 'softbreak': return <React.Fragment key={itemKey}> </React.Fragment>
+      case 'hardbreak': return <br key={itemKey} />
+      case 'code': return <code key={itemKey} className="am-inline-code">{inline.text}</code>
+      case 'strong': return <strong key={itemKey}>{renderInline(inline.children, itemKey, labels, actions)}</strong>
+      case 'em': return <em key={itemKey}>{renderInline(inline.children, itemKey, labels, actions)}</em>
+      case 'del': return <del key={itemKey}>{renderInline(inline.children, itemKey, labels, actions)}</del>
+      case 'link': return (
+        <a
+          key={itemKey}
+          className="am-link"
+          href={inline.href}
+          title={inline.title}
+          rel="noreferrer noopener"
+          onClick={(event) => {
+            event.preventDefault()
+            actions.openLink(inline.href)
+          }}
+        >
+          {renderInline(inline.children, itemKey, labels, actions)}
+        </a>
+      )
+      case 'image': return <InlineImage key={itemKey} src={inline.src} alt={inline.alt} title={inline.title} labels={labels} actions={actions} />
+    }
+  })
+}
+
+interface InlineImageProps {
+  src: string
+  alt: string
+  title?: string
+  labels: RenderLabels
+  actions: RenderActions
+}
+
+/** Resolve a local image only when it approaches the viewport. */
+function InlineImage({ src, alt, title, labels, actions }: InlineImageProps): ReactNode {
+  const remote = isRemoteSource(src)
+  const [url, setUrl] = useState<string | undefined>(remote ? src : undefined)
+  const [visible, setVisible] = useState(remote)
+  const [failed, setFailed] = useState(false)
+  const holder = useRef<HTMLSpanElement | null>(null)
+  useEffect(() => {
+    if (remote || holder.current === null) return
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some(entry => entry.isIntersecting)) return
+      setVisible(true)
+      observer.disconnect()
+    }, { rootMargin: '200px' })
+    observer.observe(holder.current)
+    return () => observer.disconnect()
+  }, [remote])
+  useEffect(() => {
+    if (!visible || url !== undefined) return
+    let alive = true
+    void actions.resolveImage(src).then((next) => {
+      if (!alive) return
+      if (next === undefined) setFailed(true)
+      else setUrl(next)
+    })
+    return () => { alive = false }
+  }, [visible, url, src, actions])
+  if (failed) return <span className="am-image-failed">{alt === '' ? labels.imageFailed : alt}</span>
+  return (
+    <span ref={holder} className="am-image">
+      {url === undefined
+        ? <span className="am-image-pending">{alt}</span>
+        : <img src={url} alt={alt} title={title} loading="lazy" onError={() => setFailed(true)} />}
+    </span>
+  )
+}
+
+interface CodeViewProps {
+  block: Extract<Block, { type: 'code' }>
+  labels: RenderLabels
+}
+
+function CodeView({ block, labels }: CodeViewProps): ReactNode {
+  const [copied, setCopied] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const copy = useCallback(() => {
+    void navigator.clipboard?.writeText(block.content).then(() => {
+      setCopied(true)
+      clearTimeout(timer.current)
+      timer.current = setTimeout(() => setCopied(false), 1600)
+    }).catch(() => {})
+  }, [block.content])
+  useEffect(() => () => clearTimeout(timer.current), [])
+  return (
+    <figure className="am-code" data-block-id={block.id} data-block-type="code" data-source-line={block.sourceStartLine}>
+      <figcaption className="am-code-head">
+        <span className="am-code-lang">{block.lang === '' ? 'text' : block.lang}</span>
+        <button type="button" className="am-code-copy" onClick={copy}>{copied ? labels.copied : labels.copy}</button>
+      </figcaption>
+      <pre className="am-code-body"><code>{block.content}</code></pre>
+    </figure>
+  )
+}

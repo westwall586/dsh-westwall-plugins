@@ -20,7 +20,8 @@
   box-sizing: border-box;
 }
 
-[data-active-markdown] > :first-child {
+/* The top bar keeps its negative top margin so its resting place is the pinned place. */
+[data-active-markdown] > :first-child:not(.am-toolbar) {
   margin-top: 0;
 }
 
@@ -346,11 +347,16 @@
 
 /* The view row bleeds to the pane edges so it reads as chrome, not as content. */
 .am-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: -20px calc(-1 * var(--am-pad-x)) 20px calc(-1 * var(--am-pad-left));
-  padding: 8px var(--am-pad-x) 8px var(--am-pad-left);
+  /* The bar keeps the page inset even when the gutter widens the prose's left padding. */
+  margin: -20px calc(-1 * var(--am-pad-x)) 20px calc(-1 * var(--am-pad-x));
+  padding: 8px var(--am-pad-x);
+  background: var(--dsw-alias-bg-layer-1);
   border-bottom: 0.5px solid var(--dsw-alias-border-l1);
 }
 

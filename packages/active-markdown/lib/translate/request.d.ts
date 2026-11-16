@@ -6,7 +6,7 @@
  */
 import { type LlmLike } from './call.ts';
 export declare const MAX_TEXT_BYTES: number;
-export type TranslateErrorCode = 'invalid-session' | 'invalid-text' | 'text-too-large' | 'invalid-language' | 'no-model' | 'prompt-version' | 'provider-unknown' | 'llm-unavailable' | 'model-failed';
+export type TranslateErrorCode = 'invalid-session' | 'unknown-session' | 'invalid-path' | 'invalid-text' | 'text-too-large' | 'invalid-language' | 'no-model' | 'prompt-version' | 'provider-unknown' | 'llm-unavailable' | 'model-failed' | 'read-failed' | 'write-failed';
 /** A boundary or model refusal; the service maps each code onto one Remote failure code. */
 export declare class TranslateError extends Error {
     readonly code: TranslateErrorCode;

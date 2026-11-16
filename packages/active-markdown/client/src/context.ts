@@ -84,10 +84,74 @@ export interface TranslateRequest {
   extraInstruction?: string
 }
 
+/** What identifies one translation's cached result; an absent instruction and '' are the same on the wire. */
+export interface PromptInput {
+  promptVersion: string
+  extraInstruction?: string
+}
+
+/** An automatic-cache lookup for one run. */
+export interface CacheGetRequest extends PromptInput {
+  text: string
+  lang: string
+  provider?: string
+  model?: string
+}
+
+/** One finished translation, stored under the same key `cacheGet` will use. */
+export interface CachePutRequest extends CacheGetRequest {
+  translated: string
+  aligned: boolean
+  sourceLines: number
+  translatedLines: number
+}
+
+/** The mirrored file pair to write for one finished translation. */
+export interface TranslationSaveRequest extends CacheGetRequest {
+  sessionId: string
+  path: string
+  translated: string
+  aligned: boolean
+}
+
+/** The mirrored file pair to read back for one document. */
+export interface TranslationLoadRequest {
+  sessionId: string
+  path: string
+  lang: string
+}
+
+/** The stored metadata fields this Body reads. */
+export interface TranslationMeta {
+  promptVersion: string
+}
+
+export interface CachedTranslation {
+  text: string
+  meta: TranslationMeta
+}
+
+export interface SavedTranslation {
+  /** Relative to the workspace, `/`-separated: where the Markdown mirror landed. */
+  file: string
+  meta: TranslationMeta
+}
+
+export interface LoadedTranslation {
+  text: string
+  meta: TranslationMeta
+  /** The source moved on since this pair was saved; the text is still readable. */
+  stale: boolean
+}
+
 /** The Host half as the Body sees it. */
 export interface HostBridge {
   translate(request: TranslateRequest): Promise<string>
   describePrompt(): Promise<string>
+  cacheGet(request: CacheGetRequest): Promise<CachedTranslation | null>
+  cachePut(request: CachePutRequest): Promise<void>
+  save(request: TranslationSaveRequest): Promise<SavedTranslation>
+  load(request: TranslationLoadRequest): Promise<LoadedTranslation | null>
 }
 
 /** One captured right-click target; the shared menu resolves actions for its kind. */

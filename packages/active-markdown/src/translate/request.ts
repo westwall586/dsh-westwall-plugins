@@ -11,6 +11,8 @@ export const MAX_TEXT_BYTES = 2 * 1024 * 1024
 
 export type TranslateErrorCode =
   | 'invalid-session'
+  | 'unknown-session'
+  | 'invalid-path'
   | 'invalid-text'
   | 'text-too-large'
   | 'invalid-language'
@@ -19,6 +21,8 @@ export type TranslateErrorCode =
   | 'provider-unknown'
   | 'llm-unavailable'
   | 'model-failed'
+  | 'read-failed'
+  | 'write-failed'
 
 /** A boundary or model refusal; the service maps each code onto one Remote failure code. */
 export class TranslateError extends Error {

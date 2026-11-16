@@ -2,13 +2,23 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import ActiveMarkdown from '../src/index.ts'
-import { CLIENT_CONTRIBUTION, DESCRIPTORS } from '../client/src/host.ts'
+import { CLIENT_CONTRIBUTION, DESCRIPTORS, createBridge, type Namespace } from '../client/src/host.ts'
 
 const DESCRIPTOR_KEY = '@deepseek-ai/dsh-typert-protocol/remote-methods'
 
 const WIRE_PARAMETERS: Record<string, string[]> = {
   describe: [],
   translate: ['sessionId', 'path', 'text', 'lang', 'provider', 'model', 'promptVersion', 'extraInstruction'],
+  cacheGet: ['text', 'lang', 'provider', 'model', 'promptVersion', 'extraInstruction'],
+  cachePut: [
+    'text', 'translated', 'lang', 'provider', 'model', 'promptVersion', 'extraInstruction',
+    'aligned', 'sourceLines', 'translatedLines',
+  ],
+  translationSave: [
+    'sessionId', 'path', 'text', 'translated', 'lang', 'provider', 'model', 'promptVersion',
+    'extraInstruction', 'aligned',
+  ],
+  translationLoad: ['sessionId', 'path', 'lang'],
 }
 
 function parameterNames(method: Function): string[] {
@@ -22,7 +32,7 @@ function parameterNames(method: Function): string[] {
     .filter(Boolean)
 }
 
-test('Host 描述符恰好声明 describe 与 translate 两个直连方法', () => {
+test('Host 描述符声明全部直连方法', () => {
   const property = Object.getOwnPropertyDescriptor(ActiveMarkdown.prototype, DESCRIPTOR_KEY)
   assert.ok(property, '描述符挂在原型上')
   assert.equal(property.configurable, true)
@@ -54,9 +64,12 @@ test('每个声明的方法都是原型实例方法，参数名与线名一致',
 test('客户端描述符与 Host 的线参数逐项一致', () => {
   assert.equal(CLIENT_CONTRIBUTION.package, 'active-markdown')
   assert.equal(CLIENT_CONTRIBUTION.descriptors, DESCRIPTORS)
+  // 客户端要声明 Host 的全部方法，并且按 Host 的方法顺序排列。
   assert.deepEqual(DESCRIPTORS.map(descriptor => descriptor.method), Object.keys(WIRE_PARAMETERS))
 
   for (const descriptor of DESCRIPTORS) {
+    const wire = WIRE_PARAMETERS[descriptor.method]
+    assert.ok(wire, `${descriptor.method} 在 Host 上存在`)
     assert.equal(descriptor.version, 1)
     assert.equal(descriptor.id, `dsh-active-markdown/activeMarkdown.${descriptor.method}`)
     assert.equal(descriptor.service, 'activeMarkdown')
@@ -64,7 +77,7 @@ test('客户端描述符与 Host 的线参数逐项一致', () => {
     assert.deepEqual(descriptor.invocation, { kind: 'direct' })
     assert.deepEqual(
       descriptor.parameters.map(parameter => parameter.wire),
-      WIRE_PARAMETERS[descriptor.method],
+      wire,
       `${descriptor.method} 的线参数名与 Host 一致`,
     )
     for (const parameter of descriptor.parameters) {
@@ -73,4 +86,102 @@ test('客户端描述符与 Host 的线参数逐项一致', () => {
       assert.equal(parameter.codec, descriptor.result)
     }
   }
+})
+
+type Call = { method: string, args: unknown[] }
+
+interface Answers {
+  /** 'missing' omits the value field, the way a null result may arrive. */
+  cacheGet?: 'hit' | 'missing'
+  load?: 'hit' | 'missing'
+}
+
+function recordingNamespace(answers: Answers = {}): { namespace: Namespace, calls: Call[] } {
+  const calls: Call[] = []
+  const record = (method: string, args: unknown[]): void => { calls.push({ method, args }) }
+  const stored = { text: '译文', meta: { promptVersion: 'am.translate.v1' }, stale: true }
+  const namespace: Namespace = {
+    async describe() {
+      return { ok: true, value: { promptVersion: 'am.translate.v1' } }
+    },
+    async translate(...args: unknown[]) {
+      record('translate', args)
+      return { ok: true, value: { text: '译文' } }
+    },
+    async cacheGet(...args: unknown[]) {
+      record('cacheGet', args)
+      return answers.cacheGet === 'hit' ? { ok: true, value: stored } : { ok: true }
+    },
+    async cachePut(...args: unknown[]) {
+      record('cachePut', args)
+      return { ok: true, value: {} }
+    },
+    async translationSave(...args: unknown[]) {
+      record('translationSave', args)
+      return { ok: true, value: { file: '.dsh-active-markdown/translate/a.zh.md', meta: { promptVersion: 'am.translate.v1' } } }
+    },
+    async translationLoad(...args: unknown[]) {
+      record('translationLoad', args)
+      return answers.load === 'hit' ? { ok: true, value: stored } : { ok: true }
+    },
+  }
+  return { namespace, calls }
+}
+
+test('桥接方法按 Host 的线序传参', async () => {
+  const { namespace, calls } = recordingNamespace()
+  const bridge = createBridge(namespace)
+  assert.equal(await bridge.describePrompt(), 'am.translate.v1')
+
+  await bridge.translate({
+    sessionId: 's1', path: 'a.md', text: '原文', lang: 'zh', provider: 'p', model: 'm', promptVersion: 'v1',
+  })
+  assert.deepEqual(calls.at(-1), { method: 'translate', args: ['s1', 'a.md', '原文', 'zh', 'p', 'm', 'v1', ''] })
+
+  await bridge.cacheGet({ text: '原文', lang: 'zh', promptVersion: 'v1' })
+  assert.deepEqual(calls.at(-1), { method: 'cacheGet', args: ['原文', 'zh', '', '', 'v1', ''] })
+
+  await bridge.cachePut({
+    text: '原文', translated: '译文', lang: 'zh', provider: 'p', model: 'm', promptVersion: 'v1',
+    aligned: false, sourceLines: 4, translatedLines: 3,
+  })
+  assert.deepEqual(calls.at(-1), { method: 'cachePut', args: ['原文', '译文', 'zh', 'p', 'm', 'v1', '', false, 4, 3] })
+
+  await bridge.save({ sessionId: 's1', path: 'a.md', text: '原文', translated: '译文', lang: 'zh', promptVersion: 'v1', aligned: false })
+  assert.deepEqual(calls.at(-1), {
+    method: 'translationSave',
+    args: ['s1', 'a.md', '原文', '译文', 'zh', '', '', 'v1', '', false],
+  })
+
+  await bridge.load({ sessionId: 's1', path: 'a.md', lang: 'zh' })
+  assert.deepEqual(calls.at(-1), { method: 'translationLoad', args: ['s1', 'a.md', 'zh'] })
+})
+
+test('补充要求随本次运行上线，缺省的模型与要求以空串上线', async () => {
+  const { namespace, calls } = recordingNamespace()
+  const bridge = createBridge(namespace)
+
+  await bridge.translate({
+    sessionId: 's1', path: 'a.md', text: '原文', lang: 'zh', promptVersion: 'v1', extraInstruction: '术语保留英文',
+  })
+  assert.deepEqual(calls.at(-1), {
+    method: 'translate',
+    args: ['s1', 'a.md', '原文', 'zh', '', '', 'v1', '术语保留英文'],
+  })
+
+  await bridge.cacheGet({ text: '原文', lang: 'zh', promptVersion: 'v1', extraInstruction: '术语保留英文' })
+  assert.deepEqual(calls.at(-1), {
+    method: 'cacheGet',
+    args: ['原文', 'zh', '', '', 'v1', '术语保留英文'],
+  })
+})
+
+test('缓存与保存文件的命中值原样返回，空结果按 null 返回', async () => {
+  const hit = createBridge(recordingNamespace({ cacheGet: 'hit', load: 'hit' }).namespace)
+  assert.equal((await hit.cacheGet({ text: '原文', lang: 'zh', promptVersion: 'v1' }))?.text, '译文')
+  assert.equal((await hit.load({ sessionId: 's1', path: 'a.md', lang: 'zh' }))?.stale, true)
+
+  const empty = createBridge(recordingNamespace().namespace)
+  assert.equal(await empty.cacheGet({ text: '原文', lang: 'zh', promptVersion: 'v1' }), null)
+  assert.equal(await empty.load({ sessionId: 's1', path: 'a.md', lang: 'zh' }), null)
 })

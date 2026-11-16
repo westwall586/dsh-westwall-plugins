@@ -8,7 +8,20 @@ import { parseDocument } from './markdown/blocks.ts'
 import { MarkdownView } from './markdown/render.tsx'
 import { LINE_MENU_KIND, registerLineHandler, type LineMenuValue } from './menus.ts'
 import { READ_CAP, loadDocument, sessionFileOf } from './source.ts'
-import { assembleTranslation, countLines, normalize, planTranslation } from './translate/plan.ts'
+import { InstructionAsk } from './translate/ask.tsx'
+import { assembleTranslation, normalize, planTranslation } from './translate/plan.ts'
+import {
+  dismissStale,
+  lineAligned,
+  markSaved,
+  readyState,
+  saveable,
+  staleNoticeOf,
+  translatedText,
+  type PromptRun,
+  type ReadyTranslation,
+  type TranslationState,
+} from './translate/state.ts'
 
 /** The renderer branch of the owner's content union. */
 export interface RendererContent {
@@ -42,13 +55,14 @@ export interface BodyProps extends BodyInjected {
 
 type View = 'source' | 'translated'
 
-/** One translation request's lifecycle; the view never recomputes it. */
-type Translation =
-  | { status: 'idle' }
-  | { status: 'running', chunk: number, chunks: number, partial?: string }
-  | { status: 'ready', text: string, sourceLines: number, translatedLines: number }
-  | { status: 'too-large', lineCount: number }
-  | { status: 'failed', message: string }
+/** The save action's own lifecycle; a failure shows in the status row, not in the prose. */
+type SaveState = { status: 'idle' } | { status: 'busy' } | { status: 'failed', message: string }
+
+/** Where the 重新翻译 popover hangs, in viewport coordinates. */
+interface Ask {
+  left: number
+  top: number
+}
 
 type BodyState =
   | { status: 'loading' }
@@ -85,16 +99,11 @@ function scrollportOf(element: HTMLElement | null): HTMLElement | null {
   return null
 }
 
-/** While chunks land, the body already shows the translated prefix at full line count. */
-function translatedText(translation: Translation): string | undefined {
-  if (translation.status === 'ready') return translation.text
-  if (translation.status === 'running') return translation.partial
-  return undefined
-}
-
 /** Hard-coded until the settings slice lands; the plugin page will own both. */
 const TARGET_LANGUAGE = '简体中文'
 const FALLBACK_PROMPT_VERSION = 'am.translate.v1'
+/** The popover stays narrower than the peek panel so it never fills a narrow pane. */
+const ASK_WIDTH = 300
 
 /** Human-readable byte size for the fallback copy. */
 function formatBytes(bytes: number | undefined): string {
@@ -114,9 +123,14 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
   const [state, setState] = useState<BodyState>({ status: 'loading' })
   const container = useRef<HTMLDivElement | null>(null)
   const [view, setView] = useState<View>('source')
-  const [translation, setTranslation] = useState<Translation>({ status: 'idle' })
+  const [translation, setTranslation] = useState<TranslationState>({ status: 'idle' })
   const [lineNumbers, setLineNumbers] = useState(false)
   const [peek, setPeek] = useState<Peek | null>(null)
+  /** The instruction the last re-translate ran with; the popover reopens with it. */
+  const [instruction, setInstruction] = useState('')
+  const [ask, setAsk] = useState<Ask | null>(null)
+  const [save, setSave] = useState<SaveState>({ status: 'idle' })
+  const [toast, setToast] = useState<string | null>(null)
   const peekPanel = useRef<HTMLDivElement | null>(null)
   const requestToken = useRef(0)
   const renderer = content.kind === 'renderer' ? content : undefined
@@ -125,6 +139,43 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
   const revision = renderer?.revision ?? 0
   const sessionId = file?.sessionId
   const path = file?.path
+
+  /**
+   * The stored translation a reopened document can show without a model call.
+   * A saved file wins over the automatic cache, and the token drops the answer
+   * once any other run has taken over the document.
+   */
+  const restoreTranslation = useCallback((sourceText: string, token: number): void => {
+    if (sessionId === undefined || path === undefined) return
+    void (async () => {
+      const bridge = await host().catch(() => undefined)
+      if (bridge === undefined) return
+      const lang = TARGET_LANGUAGE
+      const saved = await bridge.load({ sessionId, path, lang }).catch(() => null)
+      const promptVersion = await bridge.describePrompt().catch(() => FALLBACK_PROMPT_VERSION)
+      let restored: ReadyTranslation | undefined
+      if (saved !== null) {
+        restored = readyState({
+          text: saved.text,
+          sourceText,
+          source: { kind: 'saved', stale: saved.stale, dismissed: false },
+          run: { promptVersion: saved.meta.promptVersion || promptVersion, extraInstruction: '' },
+        })
+      } else {
+        const cached = await bridge.cacheGet({ text: sourceText, lang, promptVersion }).catch(() => null)
+        if (cached !== null) {
+          restored = readyState({
+            text: cached.text,
+            sourceText,
+            source: { kind: 'cache' },
+            run: { promptVersion, extraInstruction: '' },
+          })
+        }
+      }
+      if (restored === undefined || token !== requestToken.current) return
+      setTranslation(current => (current.status === 'idle' ? restored : current))
+    })()
+  }, [host, sessionId, path])
 
   useEffect(() => {
     if (sessionId === undefined || path === undefined) {
@@ -135,11 +186,15 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
     requestToken.current += 1
     setView('source')
     setTranslation({ status: 'idle' })
+    setInstruction('')
+    setAsk(null)
+    setSave({ status: 'idle' })
     setState({ status: 'loading' })
     void loadDocument(readBytes, { sessionId, path }, controller.signal).then((result) => {
       if (controller.signal.aborted) return
       if (result.status === 'ready') {
         setState({ status: 'ready', text: result.text, absolutePath: result.absolutePath, version: result.version })
+        restoreTranslation(result.text, requestToken.current)
         return
       }
       setState(result)
@@ -150,7 +205,7 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
       // A new revision or an unmount also ends any chunk loop still in flight.
       requestToken.current += 1
     }
-  }, [sessionId, path, revision, readBytes, t])
+  }, [sessionId, path, revision, readBytes, t, restoreTranslation])
 
   // Report the version only once the content is committed: the owner restores
   // the tab's scroll offset as soon as it has a version, and it needs the
@@ -192,10 +247,7 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
   const reload = useCallback(() => { rendererRef.current?.reload() }, [])
 
   const sourceLines = useMemo(() => state.status === 'ready' ? normalize(state.text).split('\n') : [], [state])
-  const lineAligned = translation.status === 'running'
-    ? translation.partial !== undefined
-    : translation.status === 'ready' && translation.sourceLines === translation.translatedLines
-  const peekable = view === 'translated' && lineAligned
+  const peekable = view === 'translated' && lineAligned(translation)
   const showGutter = lineNumbers && (view === 'source' || peekable)
 
   const showLine = useCallback((line: number): void => {
@@ -286,8 +338,13 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
     }
   }, [peek])
 
-  const translateDocument = useCallback((document: { text: string, absolutePath: string }): void => {
+  const translateDocument = useCallback((
+    document: { text: string, absolutePath: string },
+    extraInstruction: string,
+    reuseStored: boolean,
+  ): void => {
     setPeek(null)
+    setSave({ status: 'idle' })
     const token = ++requestToken.current
     const sourceLines = normalize(document.text).split('\n')
     const plan = planTranslation(document.text, parseDocument(document.text).blocks)
@@ -301,6 +358,23 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
       try {
         const bridge = await host()
         const promptVersion = await bridge.describePrompt().catch(() => FALLBACK_PROMPT_VERSION)
+        const run: PromptRun = { promptVersion, extraInstruction }
+        // The reader asked for a translation that may already exist, so a stored
+        // result answers with no model call. An explicit re-translate must produce
+        // a new one, so it never takes this branch.
+        if (reuseStored) {
+          const cached = await bridge.cacheGet({
+            text: document.text,
+            lang: TARGET_LANGUAGE,
+            promptVersion,
+            extraInstruction,
+          }).catch(() => null)
+          if (token !== requestToken.current) return
+          if (cached !== null) {
+            setTranslation(readyState({ text: cached.text, sourceText: document.text, source: { kind: 'run' }, run }))
+            return
+          }
+        }
         const replies: string[] = []
         let partial: string | undefined
         for (const [index, range] of plan.ranges.entries()) {
@@ -313,6 +387,7 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
             text: sourceLines.slice(range.start, range.end).join('\n'),
             lang: TARGET_LANGUAGE,
             promptVersion,
+            extraInstruction,
           }))
           if (token !== requestToken.current) return
           // Land every finished chunk at once: the unfinished ones keep their source lines,
@@ -322,12 +397,20 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
           setTranslation({ status: 'running', chunk: index + 2 > chunks ? chunks : index + 2, chunks, partial })
         }
         const text = assembleTranslation(plan.ranges, sourceLines, replies)
-        setTranslation({
-          status: 'ready',
-          text,
-          sourceLines: countLines(document.text),
-          translatedLines: countLines(text),
-        })
+        const ready = readyState({ text, sourceText: document.text, source: { kind: 'run' }, run })
+        setTranslation(ready)
+        // Fire and forget: a lost cache write costs one re-translation later, and
+        // must never change what the reader is looking at.
+        void bridge.cachePut({
+          text: document.text,
+          translated: text,
+          lang: TARGET_LANGUAGE,
+          promptVersion,
+          extraInstruction,
+          aligned: ready.sourceLines === ready.translatedLines,
+          sourceLines: ready.sourceLines,
+          translatedLines: ready.translatedLines,
+        }).catch((error: unknown) => console.warn('[active-markdown] cache write failed', error))
       } catch (error) {
         if (token !== requestToken.current) return
         setTranslation({ status: 'failed', message: error instanceof Error ? error.message : String(error) })
@@ -339,8 +422,57 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
     setView(next)
     if (next !== 'translated' || state.status !== 'ready') return
     if (translation.status === 'ready' || translation.status === 'running' || translation.status === 'too-large') return
-    translateDocument({ text: state.text, absolutePath: state.absolutePath })
-  }, [state, translation, translateDocument])
+    translateDocument({ text: state.text, absolutePath: state.absolutePath }, instruction, true)
+  }, [state, translation, translateDocument, instruction])
+
+  /** Hang the instruction popover under whichever button opened it. */
+  const openAsk = useCallback((anchor: HTMLElement) => {
+    const rect = anchor.getBoundingClientRect()
+    setAsk({
+      left: Math.max(8, Math.min(rect.left, window.innerWidth - ASK_WIDTH - 8)),
+      top: rect.bottom + PEEK_GAP,
+    })
+  }, [])
+
+  const retranslate = useCallback((nextInstruction: string) => {
+    if (state.status !== 'ready') return
+    setAsk(null)
+    setInstruction(nextInstruction)
+    setView('translated')
+    translateDocument({ text: state.text, absolutePath: state.absolutePath }, nextInstruction, false)
+  }, [state, translateDocument])
+
+  const saveTranslation = useCallback(() => {
+    const ready = saveable(translation)
+    if (ready === undefined || state.status !== 'ready' || sessionId === undefined || path === undefined) return
+    setSave({ status: 'busy' })
+    void (async () => {
+      try {
+        const bridge = await host()
+        const saved = await bridge.save({
+          sessionId,
+          path,
+          text: state.text,
+          translated: ready.text,
+          lang: TARGET_LANGUAGE,
+          promptVersion: ready.run.promptVersion,
+          extraInstruction: ready.run.extraInstruction,
+          aligned: ready.sourceLines === ready.translatedLines,
+        })
+        setTranslation(current => (current.status === 'ready' && current.text === ready.text ? markSaved(current) : current))
+        setSave({ status: 'idle' })
+        setToast(t('translate.saved', { file: saved.file }))
+      } catch (error) {
+        setSave({ status: 'failed', message: error instanceof Error ? error.message : String(error) })
+      }
+    })()
+  }, [translation, state, sessionId, path, host, t])
+
+  useEffect(() => {
+    if (toast === null) return
+    const timer = setTimeout(() => setToast(null), 4000)
+    return () => clearTimeout(timer)
+  }, [toast])
 
   return (
     <div className={showGutter ? 'am-root am-linenos' : 'am-root'} ref={container} data-active-markdown>
@@ -375,6 +507,16 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
             <button type="button" className="am-toolbar-toggle" aria-pressed={lineNumbers} onClick={() => setLineNumbers(value => !value)}>
               {t('lineNumbers')}
             </button>
+            {saveable(translation) === undefined ? null : (
+              <button type="button" className="am-toolbar-toggle" disabled={save.status === 'busy'} onClick={saveTranslation}>
+                {t('translate.save')}
+              </button>
+            )}
+            {translation.status === 'ready' ? (
+              <button type="button" className="am-toolbar-toggle" onClick={(event) => openAsk(event.currentTarget)}>
+                {t('translate.retranslate')}
+              </button>
+            ) : null}
             <div className="am-toolbar-status" role="status">
               {translation.status === 'running' && (
                 <>
@@ -398,8 +540,22 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
                   </button>
                 </>
               )}
+              {save.status === 'failed' && (
+                <span className="am-toolbar-error">{t('translate.saveFailed', { message: save.message })}</span>
+              )}
             </div>
           </div>
+          {staleNoticeOf(translation) && view === 'translated' && (
+            <div className="am-notice" role="note">
+              <span className="am-notice-text">{t('translate.stale')}</span>
+              <button type="button" className="am-toolbar-action" onClick={(event) => openAsk(event.currentTarget)}>
+                {t('translate.retranslate')}
+              </button>
+              <button type="button" className="am-toolbar-action" onClick={() => setTranslation(current => dismissStale(current))}>
+                {t('translate.stale.dismiss')}
+              </button>
+            </div>
+          )}
           <RenderBoundary
             labels={{ title: t('error.render.title'), body: t('error.render.body'), reload: t('reload') }}
             onReload={reload}
@@ -424,6 +580,22 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
           <div className="am-peek-text">{peek.text}</div>
         </div>
       )}
+      {ask === null ? null : (
+        <InstructionAsk
+          left={ask.left}
+          top={ask.top}
+          initial={instruction}
+          labels={{
+            label: t('translate.ask.label'),
+            placeholder: t('translate.ask.placeholder'),
+            cancel: t('translate.ask.cancel'),
+            confirm: t('translate.retranslate'),
+          }}
+          onCancel={() => setAsk(null)}
+          onConfirm={value => retranslate(value)}
+        />
+      )}
+      {toast === null ? null : <div className="am-toast" role="status">{toast}</div>}
     </div>
   )
 }

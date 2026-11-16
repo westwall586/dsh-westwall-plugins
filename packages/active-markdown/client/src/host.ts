@@ -1,9 +1,21 @@
 /**
  * Hand-written Remote descriptors for this plugin's own Host service, and the
  * lazy bridge that resolves the mounted namespace. 0.2.2's Client Gateway
- * rejects a parameter without a strict codec, so every parameter carries one.
+ * rejects a parameter without a strict codec, so every parameter carries one,
+ * and it installs arguments positionally: a wrong order is a silent wrong call.
  */
-import type { ClientContext, HostBridge, TranslateRequest } from './context.ts'
+import type {
+  CacheGetRequest,
+  CachePutRequest,
+  CachedTranslation,
+  ClientContext,
+  HostBridge,
+  LoadedTranslation,
+  SavedTranslation,
+  TranslateRequest,
+  TranslationLoadRequest,
+  TranslationSaveRequest,
+} from './context.ts'
 
 const JSON_CODEC = {
   mode: 'strict' as const,
@@ -13,31 +25,42 @@ const JSON_CODEC = {
 
 const PARAM = (name: string) => ({ name, wire: name, source: 'json' as const, codec: JSON_CODEC })
 
-const TRANSLATE_PARAMETERS = [
-  'sessionId', 'path', 'text', 'lang', 'provider', 'model', 'promptVersion', 'extraInstruction',
-]
+/** Wire parameter names, in the order the Host declares them. */
+const WIRE = {
+  describe: [],
+  translate: ['sessionId', 'path', 'text', 'lang', 'provider', 'model', 'promptVersion', 'extraInstruction'],
+  cacheGet: ['text', 'lang', 'provider', 'model', 'promptVersion', 'extraInstruction'],
+  cachePut: [
+    'text', 'translated', 'lang', 'provider', 'model', 'promptVersion', 'extraInstruction',
+    'aligned', 'sourceLines', 'translatedLines',
+  ],
+  translationSave: [
+    'sessionId', 'path', 'text', 'translated', 'lang', 'provider', 'model', 'promptVersion',
+    'extraInstruction', 'aligned',
+  ],
+  translationLoad: ['sessionId', 'path', 'lang'],
+} as const
+
+function descriptor(method: keyof typeof WIRE) {
+  return {
+    version: 1,
+    id: `dsh-active-markdown/activeMarkdown.${method}`,
+    service: 'activeMarkdown',
+    namespace: 'activeMarkdown',
+    method,
+    invocation: { kind: 'direct' as const },
+    parameters: WIRE[method].map(PARAM),
+    result: JSON_CODEC,
+  }
+}
 
 export const DESCRIPTORS = [
-  {
-    version: 1,
-    id: 'dsh-active-markdown/activeMarkdown.describe',
-    service: 'activeMarkdown',
-    namespace: 'activeMarkdown',
-    method: 'describe',
-    invocation: { kind: 'direct' as const },
-    parameters: [],
-    result: JSON_CODEC,
-  },
-  {
-    version: 1,
-    id: 'dsh-active-markdown/activeMarkdown.translate',
-    service: 'activeMarkdown',
-    namespace: 'activeMarkdown',
-    method: 'translate',
-    invocation: { kind: 'direct' as const },
-    parameters: TRANSLATE_PARAMETERS.map(PARAM),
-    result: JSON_CODEC,
-  },
+  descriptor('describe'),
+  descriptor('translate'),
+  descriptor('cacheGet'),
+  descriptor('cachePut'),
+  descriptor('translationSave'),
+  descriptor('translationLoad'),
 ]
 
 export const CLIENT_CONTRIBUTION = { package: 'active-markdown', descriptors: DESCRIPTORS }
@@ -47,6 +70,12 @@ export interface RemoteError extends Error {
   code?: string
 }
 
+interface RemoteOutcome<T> {
+  ok: boolean
+  value?: T
+  error?: { code?: string, message?: string }
+}
+
 function unwrap<T>(result: RemoteOutcome<T>): T {
   if (result.ok) return result.value as T
   const error = new Error(result.error?.message ?? 'unknown error') as RemoteError
@@ -54,14 +83,8 @@ function unwrap<T>(result: RemoteOutcome<T>): T {
   throw error
 }
 
-interface RemoteOutcome<T> {
-  ok: boolean
-  value?: T
-  error?: { code?: string, message?: string }
-}
-
 /** The gateway installs remote methods positionally and rejects an arity mismatch. */
-interface Namespace {
+export interface Namespace {
   describe(): Promise<RemoteOutcome<{ promptVersion: string }>>
   translate(
     sessionId: string,
@@ -73,10 +96,47 @@ interface Namespace {
     promptVersion: string,
     extraInstruction: string,
   ): Promise<RemoteOutcome<{ text: string }>>
+  cacheGet(
+    text: string,
+    lang: string,
+    provider: string,
+    model: string,
+    promptVersion: string,
+    extraInstruction: string,
+  ): Promise<RemoteOutcome<CachedTranslation | null>>
+  cachePut(
+    text: string,
+    translated: string,
+    lang: string,
+    provider: string,
+    model: string,
+    promptVersion: string,
+    extraInstruction: string,
+    aligned: boolean,
+    sourceLines: number,
+    translatedLines: number,
+  ): Promise<RemoteOutcome<Record<string, never>>>
+  translationSave(
+    sessionId: string,
+    path: string,
+    text: string,
+    translated: string,
+    lang: string,
+    provider: string,
+    model: string,
+    promptVersion: string,
+    extraInstruction: string,
+    aligned: boolean,
+  ): Promise<RemoteOutcome<SavedTranslation>>
+  translationLoad(
+    sessionId: string,
+    path: string,
+    lang: string,
+  ): Promise<RemoteOutcome<LoadedTranslation | null>>
 }
 
 /** Value-level facade so the Body never touches wire shapes. */
-function createBridge(namespace: Namespace): HostBridge {
+export function createBridge(namespace: Namespace): HostBridge {
   const translate = async (request: TranslateRequest): Promise<string> => {
     const result = await namespace.translate(
       request.sessionId,
@@ -91,7 +151,46 @@ function createBridge(namespace: Namespace): HostBridge {
     return unwrap(result).text
   }
   const describePrompt = async (): Promise<string> => unwrap(await namespace.describe()).promptVersion
-  return { translate, describePrompt }
+  const cacheGet = async (request: CacheGetRequest): Promise<CachedTranslation | null> => {
+    const result = await namespace.cacheGet(
+      request.text,
+      request.lang,
+      request.provider ?? '',
+      request.model ?? '',
+      request.promptVersion,
+      request.extraInstruction ?? '',
+    )
+    return unwrap(result) ?? null
+  }
+  const cachePut = async (request: CachePutRequest): Promise<void> => {
+    unwrap(await namespace.cachePut(
+      request.text,
+      request.translated,
+      request.lang,
+      request.provider ?? '',
+      request.model ?? '',
+      request.promptVersion,
+      request.extraInstruction ?? '',
+      request.aligned,
+      request.sourceLines,
+      request.translatedLines,
+    ))
+  }
+  const save = async (request: TranslationSaveRequest): Promise<SavedTranslation> => unwrap(await namespace.translationSave(
+    request.sessionId,
+    request.path,
+    request.text,
+    request.translated,
+    request.lang,
+    request.provider ?? '',
+    request.model ?? '',
+    request.promptVersion,
+    request.extraInstruction ?? '',
+    request.aligned,
+  ))
+  const load = async (request: TranslationLoadRequest): Promise<LoadedTranslation | null> =>
+    unwrap(await namespace.translationLoad(request.sessionId, request.path, request.lang)) ?? null
+  return { translate, describePrompt, cacheGet, cachePut, save, load }
 }
 
 const MOUNT_TIMEOUT_MS = 4000

@@ -136,6 +136,7 @@ function buildBlocks(tokens: readonly Token[], start: number, end: number, conte
           text: content,
           lang,
           content,
+          fence: token.type === 'fence',
         }
         blocks.push(block)
         index += 1

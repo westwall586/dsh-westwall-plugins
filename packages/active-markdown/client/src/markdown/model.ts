@@ -42,6 +42,8 @@ export interface CodeBlock extends BlockBase {
   type: 'code'
   lang: string
   content: string
+  /** Fenced code starts one source line after `sourceStartLine`; indented code does not. */
+  fence: boolean
 }
 
 export interface TableCell {

@@ -1,7 +1,8 @@
 /** Render the block tree as themed React elements. */
 import * as React from 'react'
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { Inline, Block, ListItem } from './model.ts'
+import { splitSourceLines, type SourceLine } from './lines.ts'
 import { isRemoteSource } from '../images.ts'
 
 /** Copy the labels this view needs. */
@@ -21,35 +22,72 @@ export interface MarkdownViewProps {
   blocks: readonly Block[]
   labels: RenderLabels
   actions: RenderActions
+  lineNumbers: boolean
 }
 
 /**
  * Render the whole document body.
- * @param props - block tree, labels, and link/image behaviour.
+ * @param props - block tree, labels, line-number toggle, and link/image behaviour.
  * @returns the rendered article.
  */
-export function MarkdownView({ blocks, labels, actions }: MarkdownViewProps): ReactNode {
-  return <article className="am-doc" data-active-markdown-doc>{blocks.map((block, index) => renderBlock(block, `b${index}`, labels, actions))}</article>
+export function MarkdownView({ blocks, labels, actions, lineNumbers }: MarkdownViewProps): ReactNode {
+  const doc = useRef<HTMLElement | null>(null)
+  // Gutter numbers are absolutely positioned inside the article, so their tops
+  // have to be measured after layout and again whenever the prose reflows.
+  useLayoutEffect(() => {
+    const element = doc.current
+    if (element === null || !lineNumbers) return
+    const place = (): void => {
+      const top = element.getBoundingClientRect().top
+      for (const line of element.querySelectorAll<HTMLElement>('[data-gutter-line]')) {
+        line.style.setProperty('--am-line-top', `${line.getBoundingClientRect().top - top}px`)
+      }
+    }
+    place()
+    const observer = new ResizeObserver(place)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [blocks, lineNumbers])
+  return (
+    <article ref={doc} className="am-doc" data-active-markdown-doc>
+      {blocks.map((block, index) => renderBlock(block, `b${index}`, labels, actions))}
+    </article>
+  )
 }
 
 function renderBlock(block: Block, key: string, labels: RenderLabels, actions: RenderActions): ReactNode {
   switch (block.type) {
     case 'heading': {
       const Tag = `h${Math.min(Math.max(block.level, 1), 6)}` as 'h1'
-      return <Tag key={key} className="am-heading" data-block-id={block.id} data-block-type="heading" data-source-line={block.sourceStartLine} data-anchor={block.anchor}>{renderInline(block.inline, key, labels, actions)}</Tag>
+      return (
+        <Tag key={key} className="am-heading" data-block-id={block.id} data-block-type="heading" data-source-line={block.sourceStartLine} data-line={block.sourceStartLine} data-gutter-line={block.sourceStartLine} data-anchor={block.anchor}>
+          {renderInline(block.inline, key, labels, actions)}
+        </Tag>
+      )
     }
     case 'paragraph': {
-      const content = renderInline(block.inline, key, labels, actions)
-      return block.tight
-        ? <React.Fragment key={key}>{content}</React.Fragment>
-        : <p key={key} className="am-paragraph" data-block-id={block.id} data-block-type="paragraph" data-source-line={block.sourceStartLine}>{content}</p>
+      const lines = splitSourceLines(block.inline, block.sourceStartLine)
+      if (block.tight) return <React.Fragment key={key}>{renderLineSpans(lines, key, labels, actions, true)}</React.Fragment>
+      const single = lines.length === 1
+      return (
+        <p
+          key={key}
+          className="am-paragraph"
+          data-block-id={block.id}
+          data-block-type="paragraph"
+          data-source-line={block.sourceStartLine}
+          {...(single ? { 'data-line': block.sourceStartLine, 'data-gutter-line': block.sourceStartLine } : {})}
+        >
+          {single ? renderInline(lines[0].inline, key, labels, actions) : renderLineSpans(lines, key, labels, actions, true)}
+        </p>
+      )
     }
     case 'code': return <CodeView key={key} block={block} labels={labels} />
     case 'table': return (
-      <div key={key} className="am-table-wrap" data-block-id={block.id} data-block-type="table" data-source-line={block.sourceStartLine}>
+      <div key={key} className="am-table-wrap" data-block-id={block.id} data-block-type="table" data-source-line={block.sourceStartLine} data-gutter-line={block.sourceStartLine}>
         <table className="am-table">
-          <thead><tr>{block.header.map((cell, index) => <th key={index} style={cell.align === undefined ? undefined : { textAlign: cell.align }}>{renderInline(cell.inline, `${key}-h${index}`, labels, actions)}</th>)}</tr></thead>
-          <tbody>{block.rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex} style={cell.align === undefined ? undefined : { textAlign: cell.align }}>{renderInline(cell.inline, `${key}-${rowIndex}-${cellIndex}`, labels, actions)}</td>)}</tr>)}</tbody>
+          <thead><tr data-line={block.sourceStartLine}>{block.header.map((cell, index) => <th key={index} style={cell.align === undefined ? undefined : { textAlign: cell.align }}>{renderInline(cell.inline, `${key}-h${index}`, labels, actions)}</th>)}</tr></thead>
+          <tbody>{block.rows.map((row, rowIndex) => <tr key={rowIndex} data-line={block.sourceStartLine + 2 + rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex} style={cell.align === undefined ? undefined : { textAlign: cell.align }}>{renderInline(cell.inline, `${key}-${rowIndex}-${cellIndex}`, labels, actions)}</td>)}</tr>)}</tbody>
         </table>
       </div>
     )
@@ -64,17 +102,27 @@ function renderBlock(block: Block, key: string, labels: RenderLabels, actions: R
         {block.blocks.map((child, index) => renderBlock(child, `${key}-q${index}`, labels, actions))}
       </blockquote>
     )
-    case 'divider': return <hr key={key} className="am-divider" data-block-id={block.id} data-block-type="divider" data-source-line={block.sourceStartLine} />
+    case 'divider': return <hr key={key} className="am-divider" data-block-id={block.id} data-block-type="divider" data-source-line={block.sourceStartLine} data-line={block.sourceStartLine} data-gutter-line={block.sourceStartLine} />
   }
 }
 
 function renderItem(item: ListItem, key: string, labels: RenderLabels, actions: RenderActions): ReactNode {
   return (
-    <li key={key} className={item.task === undefined ? 'am-item' : 'am-item am-item-task'} data-block-id={item.id} data-block-type="list-item" data-source-line={item.sourceStartLine}>
+    <li key={key} className={item.task === undefined ? 'am-item' : 'am-item am-item-task'} data-block-id={item.id} data-block-type="list-item" data-source-line={item.sourceStartLine} data-line={item.sourceStartLine}>
       {item.task === undefined ? null : <input className="am-checkbox" type="checkbox" checked={item.task === 'done'} readOnly tabIndex={-1} aria-hidden="true" />}
       {item.blocks.map((block, index) => renderBlock(block, `${key}-${index}`, labels, actions))}
     </li>
   )
+}
+
+/** One element per rendered source line; the first may anchor a gutter number. */
+function renderLineSpans(lines: readonly SourceLine[], key: string, labels: RenderLabels, actions: RenderActions, gutter: boolean): ReactNode[] {
+  return lines.map((line, index) => (
+    <span key={`${key}-l${index}`} data-line={line.line} {...(gutter && index === 0 ? { 'data-gutter-line': line.line } : {})}>
+      {renderInline(line.inline, `${key}-l${index}`, labels, actions)}
+      {line.break === undefined ? null : line.break === 'hard' ? <br /> : ' '}
+    </span>
+  ))
 }
 
 function renderInline(inlines: readonly Inline[], key: string, labels: RenderLabels, actions: RenderActions): ReactNode[] {
@@ -169,13 +217,22 @@ function CodeView({ block, labels }: CodeViewProps): ReactNode {
     }).catch(() => {})
   }, [block.content])
   useEffect(() => () => clearTimeout(timer.current), [])
+  const lines = block.content.split('\n')
+  const firstLine = block.sourceStartLine + (block.fence ? 1 : 0)
   return (
-    <figure className="am-code" data-block-id={block.id} data-block-type="code" data-source-line={block.sourceStartLine}>
+    <figure className="am-code" data-block-id={block.id} data-block-type="code" data-source-line={block.sourceStartLine} data-gutter-line={block.sourceStartLine}>
       <figcaption className="am-code-head">
         <span className="am-code-lang">{block.lang === '' ? 'text' : block.lang}</span>
         <button type="button" className="am-code-copy" onClick={copy}>{copied ? labels.copied : labels.copy}</button>
       </figcaption>
-      <pre className="am-code-body"><code>{block.content}</code></pre>
+      <pre className="am-code-body"><code>
+        {lines.map((line, index) => (
+          <React.Fragment key={index}>
+            <span className="am-code-line" data-line={firstLine + index}>{line}</span>
+            {index === lines.length - 1 ? null : '\n'}
+          </React.Fragment>
+        ))}
+      </code></pre>
     </figure>
   )
 }

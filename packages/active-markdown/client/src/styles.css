@@ -1,10 +1,17 @@
 [data-active-markdown] {
+  --am-pad-x: clamp(24px, 4%, 56px);
+  --am-gutter: 46px;
+  --am-pad-left: var(--am-pad-x);
   box-sizing: border-box;
-  padding: 20px clamp(24px, 4%, 56px) 72px;
+  padding: 20px var(--am-pad-x) 72px var(--am-pad-left);
   color: var(--dsw-alias-label-primary);
   font-size: var(--dsh-content-font-size);
   line-height: 1.7;
   overflow-wrap: break-word;
+}
+
+[data-active-markdown].am-linenos {
+  --am-pad-left: calc(var(--am-pad-x) + var(--am-gutter));
 }
 
 [data-active-markdown] *,
@@ -19,6 +26,39 @@
 
 [data-active-markdown] .am-doc > :first-child {
   margin-top: 0;
+}
+
+/* One stripe at the pane edge, one measured number per block start. */
+.am-doc {
+  position: relative;
+}
+
+[data-active-markdown].am-linenos .am-doc::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(-1 * var(--am-pad-left));
+  width: var(--am-gutter);
+  background: var(--dsw-alias-bg-layer-2);
+  border-right: 0.5px solid var(--dsw-alias-border-l1);
+  pointer-events: none;
+}
+
+[data-active-markdown].am-linenos [data-gutter-line]::before {
+  content: attr(data-gutter-line);
+  position: absolute;
+  top: var(--am-line-top, 0px);
+  left: calc(-1 * var(--am-pad-left));
+  width: var(--am-gutter);
+  padding-right: 8px;
+  box-sizing: border-box;
+  color: var(--dsw-alias-label-tertiary);
+  font-family: var(--dsh-font-family-code);
+  font-size: 11px;
+  line-height: inherit;
+  text-align: right;
+  pointer-events: none;
 }
 
 .am-heading {
@@ -309,8 +349,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: -20px calc(-1 * clamp(24px, 4%, 56px)) 20px;
-  padding: 8px clamp(24px, 4%, 56px);
+  margin: -20px calc(-1 * var(--am-pad-x)) 20px calc(-1 * var(--am-pad-left));
+  padding: 8px var(--am-pad-x) 8px var(--am-pad-left);
   border-bottom: 0.5px solid var(--dsw-alias-border-l1);
 }
 
@@ -371,4 +411,50 @@
 
 .am-toolbar-action:hover {
   background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.am-toolbar-toggle {
+  flex: none;
+  height: 24px;
+  padding: 0 8px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 0.92em;
+  cursor: pointer;
+}
+
+.am-toolbar-toggle[aria-pressed='true'] {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+/* Fixed, so the panel is placed by viewport coordinates and escapes the prose. */
+.am-peek {
+  position: fixed;
+  z-index: 30;
+  width: 340px;
+  max-width: calc(100vw - 16px);
+  padding: 8px 10px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-2);
+  box-shadow: 0 6px 20px var(--dsw-alias-border-l2);
+  color: var(--dsw-alias-label-primary);
+  font-family: var(--dsh-font-family-code);
+  line-height: 1.5;
+}
+
+.am-peek-head {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+}
+
+.am-peek-text {
+  margin-top: 2px;
+  font-size: var(--dsh-code-font-size);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }

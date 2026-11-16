@@ -111,13 +111,34 @@ export function assembleTranslation(
   const assembled: string[] = []
   for (const [index, range] of ranges.entries()) {
     const source = sourceLines.slice(range.start, range.end)
-    const reply = normalize(replies[index]).split('\n')
-    // A chunk ending on a blank line arrives one line short when the model omits the trailing
-    // newline that carried that blank line. Restore it only then, so real drift stays visible.
-    if (source[source.length - 1] === '' && reply.length === source.length - 1 && reply[reply.length - 1] !== '') reply.push('')
-    assembled.push(...reply)
+    // The model trims blank lines at a fragment's edges, so blanks are restored from the
+    // source instead of trusted to the reply. What it does to the content lines still shows up.
+    const lead = leadingBlanks(source)
+    const trail = trailingBlanks(source, lead)
+    const reply = stripEdgeBlanks(normalize(replies[index]).split('\n'))
+    assembled.push(...source.slice(0, lead), ...reply, ...source.slice(source.length - trail))
   }
   const text = assembled.join('\n')
   // A source whose last line is blank normalises one newline away; keep it so the counts match.
   return sourceLines[sourceLines.length - 1] === '' ? `${text}\n` : text
+}
+
+function leadingBlanks(lines: readonly string[]): number {
+  let count = 0
+  while (count < lines.length && lines[count].trim() === '') count += 1
+  return count
+}
+
+function trailingBlanks(lines: readonly string[], lead: number): number {
+  let count = 0
+  while (count < lines.length - lead && lines[lines.length - 1 - count].trim() === '') count += 1
+  return count
+}
+
+function stripEdgeBlanks(lines: string[]): string[] {
+  let start = 0
+  let end = lines.length
+  while (start < end && lines[start].trim() === '') start += 1
+  while (end > start && lines[end - 1].trim() === '') end -= 1
+  return lines.slice(start, end)
 }

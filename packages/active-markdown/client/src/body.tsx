@@ -1,6 +1,6 @@
 /** The document body: read, fallbacks, and the rendered Markdown. */
 import * as React from 'react'
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { HostBridge, Translate, WorkspaceFilesRemote } from './context.ts'
 import { createImageResolver, type ImageResolver } from './images.ts'
 import { classifyLink } from './links.ts'
@@ -54,6 +54,34 @@ type BodyState =
   | { status: 'not-text' }
   | { status: 'failed', code: string, message: string }
 
+/** The source line shown beside a clicked translation line. */
+interface Peek {
+  line: number
+  text: string
+  left: number
+  /** Viewport offset used when the panel sits below the clicked line. */
+  top: number
+  /** Viewport offset used when the panel flips above the clicked line. */
+  bottom: number
+  above: boolean
+}
+
+const PEEK_GAP = 6
+/** Room below the clicked line needed before the panel goes underneath it. */
+const PEEK_HEIGHT = 64
+const PEEK_WIDTH = 340
+
+/** Nearest ancestor that scrolls the preview, or null when the document scrolls. */
+function scrollportOf(element: HTMLElement | null): HTMLElement | null {
+  let node = element?.parentElement ?? null
+  while (node !== null) {
+    const overflow = getComputedStyle(node).overflowY
+    if (overflow === 'auto' || overflow === 'scroll') return node
+    node = node.parentElement
+  }
+  return null
+}
+
 /** While chunks land, the body already shows the translated prefix at full line count. */
 function translatedText(translation: Translation): string | undefined {
   if (translation.status === 'ready') return translation.text
@@ -84,6 +112,9 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
   const container = useRef<HTMLDivElement | null>(null)
   const [view, setView] = useState<View>('source')
   const [translation, setTranslation] = useState<Translation>({ status: 'idle' })
+  const [lineNumbers, setLineNumbers] = useState(false)
+  const [peek, setPeek] = useState<Peek | null>(null)
+  const peekPanel = useRef<HTMLDivElement | null>(null)
   const requestToken = useRef(0)
   const renderer = content.kind === 'renderer' ? content : undefined
   const rendererRef = useRef(renderer)
@@ -157,7 +188,87 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
 
   const reload = useCallback(() => { rendererRef.current?.reload() }, [])
 
+  const sourceLines = useMemo(() => state.status === 'ready' ? normalize(state.text).split('\n') : [], [state])
+  const lineAligned = translation.status === 'running'
+    ? translation.partial !== undefined
+    : translation.status === 'ready' && translation.sourceLines === translation.translatedLines
+  const peekable = view === 'translated' && lineAligned
+  const showGutter = lineNumbers && (view === 'source' || peekable)
+
+  useEffect(() => {
+    const root = container.current
+    if (root === null || !peekable) return
+    const onClick = (event: MouseEvent): void => {
+      const target = event.target
+      if (!(target instanceof Element)) return
+      const element = target.closest('[data-line]')
+      if (element === null || !root.contains(element)) return
+      const line = Number(element.getAttribute('data-line'))
+      const text = sourceLines[line - 1]
+      if (!Number.isInteger(line) || text === undefined) return
+      const rect = element.getBoundingClientRect()
+      setPeek({
+        line,
+        text,
+        left: Math.max(8, Math.min(rect.left, window.innerWidth - PEEK_WIDTH - 8)),
+        top: rect.bottom + PEEK_GAP,
+        bottom: window.innerHeight - rect.top + PEEK_GAP,
+        above: rect.bottom + PEEK_GAP + PEEK_HEIGHT > window.innerHeight,
+      })
+    }
+    root.addEventListener('click', onClick)
+    return () => root.removeEventListener('click', onClick)
+  }, [peekable, sourceLines])
+
+  // A long source line can make the panel taller than the estimate; flip it once
+  // the measured height says it would leave the viewport.
+  useLayoutEffect(() => {
+    if (peek === null || peek.above) return
+    const panel = peekPanel.current
+    if (panel === null) return
+    const rect = panel.getBoundingClientRect()
+    if (rect.bottom <= window.innerHeight - 8) return
+    if (peek.top - PEEK_GAP - rect.height < 8) return
+    setPeek({ ...peek, above: true })
+  }, [peek])
+
+  useEffect(() => {
+    if (!peekable) setPeek(null)
+  }, [peekable])
+
+  useEffect(() => {
+    if (peek === null) return
+    const root = container.current
+    const onMouseDown = (event: MouseEvent): void => {
+      const target = event.target
+      if (!(target instanceof Element)) {
+        setPeek(null)
+        return
+      }
+      if (target.closest('.am-peek') !== null) return
+      const line = target.closest('[data-line]')
+      if (line !== null && root !== null && root.contains(line)) return
+      setPeek(null)
+    }
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setPeek(null)
+    }
+    const onScroll = (): void => { setPeek(null) }
+    const scrollport = scrollportOf(root)
+    scrollport?.addEventListener('scroll', onScroll)
+    if (scrollport === null) window.addEventListener('scroll', onScroll)
+    document.addEventListener('mousedown', onMouseDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown)
+      document.removeEventListener('keydown', onKeyDown)
+      scrollport?.removeEventListener('scroll', onScroll)
+      if (scrollport === null) window.removeEventListener('scroll', onScroll)
+    }
+  }, [peek])
+
   const translateDocument = useCallback((document: { text: string, absolutePath: string }): void => {
+    setPeek(null)
     const token = ++requestToken.current
     const sourceLines = normalize(document.text).split('\n')
     const plan = planTranslation(document.text, parseDocument(document.text).blocks)
@@ -172,9 +283,11 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
         const bridge = await host()
         const promptVersion = await bridge.describePrompt().catch(() => FALLBACK_PROMPT_VERSION)
         const replies: string[] = []
+        let partial: string | undefined
         for (const [index, range] of plan.ranges.entries()) {
           if (token !== requestToken.current) return
-          setTranslation({ status: 'running', chunk: index + 1, chunks })
+          // Keep the chunks that already landed visible while this one runs.
+          setTranslation({ status: 'running', chunk: index + 1, chunks, ...(partial === undefined ? {} : { partial }) })
           replies.push(await bridge.translate({
             sessionId: sessionId ?? '',
             path: path ?? '',
@@ -186,12 +299,8 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
           // Land every finished chunk at once: the unfinished ones keep their source lines,
           // so the page shows a growing Chinese document at constant line count.
           const pending = plan.ranges.slice(index + 1).map(next => sourceLines.slice(next.start, next.end).join('\n'))
-          setTranslation({
-            status: 'running',
-            chunk: index + 2 > chunks ? chunks : index + 2,
-            chunks,
-            partial: assembleTranslation(plan.ranges, sourceLines, [...replies, ...pending]),
-          })
+          partial = assembleTranslation(plan.ranges, sourceLines, [...replies, ...pending])
+          setTranslation({ status: 'running', chunk: index + 2 > chunks ? chunks : index + 2, chunks, partial })
         }
         const text = assembleTranslation(plan.ranges, sourceLines, replies)
         setTranslation({
@@ -215,7 +324,7 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
   }, [state, translation, translateDocument])
 
   return (
-    <div className="am-root" ref={container} data-active-markdown>
+    <div className={showGutter ? 'am-root am-linenos' : 'am-root'} ref={container} data-active-markdown>
       {state.status === 'loading' && <div className="am-status" role="status"><span className="am-spinner" aria-hidden="true" />{t('loading')}</div>}
       {state.status === 'too-large' && (
         <EmptyState
@@ -244,6 +353,9 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
                 {t('view.translated')}
               </button>
             </div>
+            <button type="button" className="am-toolbar-toggle" aria-pressed={lineNumbers} onClick={() => setLineNumbers(value => !value)}>
+              {t('lineNumbers')}
+            </button>
             <div className="am-toolbar-status" role="status">
               {translation.status === 'running' && (
                 <>
@@ -277,10 +389,21 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
               text={view === 'translated' ? translatedText(translation) ?? state.text : state.text}
               labels={labels}
               actions={actions}
+              lineNumbers={showGutter}
               t={t}
             />
           </RenderBoundary>
         </>
+      )}
+      {peek === null ? null : (
+        <div
+          ref={peekPanel}
+          className="am-peek"
+          style={peek.above ? { left: peek.left, bottom: peek.bottom } : { left: peek.left, top: peek.top }}
+        >
+          <div className="am-peek-head">{t('peek.line', { line: peek.line })}</div>
+          <div className="am-peek-text">{peek.text}</div>
+        </div>
       )}
     </div>
   )
@@ -290,11 +413,12 @@ interface DocumentViewProps {
   text: string
   labels: { copy: string, copied: string, imageFailed: string }
   actions: { openLink(href: string): void, resolveImage(src: string): Promise<string | undefined> }
+  lineNumbers: boolean
   t: Translate
 }
 
 /** Parse inside the boundary so a parser failure stays recoverable. */
-function DocumentView({ text, labels, actions, t }: DocumentViewProps): ReactNode {
+function DocumentView({ text, labels, actions, lineNumbers, t }: DocumentViewProps): ReactNode {
   const parsed = useMemo(() => parseDocument(text), [text])
   return (
     <>
@@ -304,7 +428,7 @@ function DocumentView({ text, labels, actions, t }: DocumentViewProps): ReactNod
           <pre className="am-frontmatter-source">{parsed.frontmatter.source}</pre>
         </section>
       )}
-      <MarkdownView blocks={parsed.blocks} labels={labels} actions={actions} />
+      <MarkdownView blocks={parsed.blocks} labels={labels} actions={actions} lineNumbers={lineNumbers} />
     </>
   )
 }

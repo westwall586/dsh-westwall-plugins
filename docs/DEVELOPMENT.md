@@ -37,13 +37,24 @@ CI 会自动拦住常见错误（聚合清单过期、产物没入库、类型�
 `deepseek-harness/` 是 DSH 上游仓库的 submodule，浅克隆，只用来读实现、查 API；
 它不参与 `packages/*` 的构建与发布，CI 也不初始化它。**不要修改它，也不要在子模块里提交。**
 
-首次检出：
+源码版本跟本机安装的 DSH 保持一致，不追上游最新：上游 tag 形如 `dsh-v<version>`，
+`<version>` 直接取自 `dsh --version`（如 `0.2.2-rc.3` → `dsh-v0.2.2-rc.3`）。
+
+首次检出（按 tag 浅克隆，只拉这一版）：
 
 ```sh
-git submodule update --init
+V=$(dsh --version)
+git submodule init                            # 只登记 url，不拉对象
+git clone --depth 1 --branch "dsh-v$V" \
+  git@github.com:deepseek-ai/deepseek-harness.git deepseek-harness
+git submodule absorbgitdirs deepseek-harness  # 内嵌 .git 收进 .git/modules
 ```
 
-把源码切到与本机 DSH 一致的版本（上游 tag 形如 `dsh-v0.2.2-rc.3`，与 `dsh --version` 对应）：
+**不要用 `git submodule update --init` 做首次检出**：父仓库钉的 commit 是 tag tip，不是默认分支 tip，
+`.gitmodules` 的 `shallow = true` 对这次补拉不生效，git 会按 SHA 拉全量历史（200MB+），
+既慢又违背“只读参考”。检出后 `git submodule status` 不应带 `+` 前缀（指针与 tag 一致）。
+
+本机 DSH 升级后，只切 tag、不 unshallow：
 
 ```sh
 cd deepseek-harness

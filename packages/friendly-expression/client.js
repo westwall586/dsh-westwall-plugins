@@ -3628,8 +3628,8 @@ Expecting `+ue.join(", ")+", got '"+(this.terminals_[Y]||Y)+"'":Ie="Parse error 
 .dfe-viewer-panel {
   display: flex;
   flex-direction: column;
-  width: min(940px, 100%);
-  height: min(656px, 100%);
+  width: min(100%, clamp(940px, 72vw, 1600px));
+  height: min(100%, clamp(656px, 78vh, 1000px));
   overflow: hidden;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 14px;

@@ -142,6 +142,7 @@ ctx.slots.inject('conversation.chat.markdown.fence', () => ctx.slots.register({
 ### 4.3 浮窗
 
 - 注册在根 `shell.overlay` 槽位，覆盖整个窗口；组件用 `position: fixed` 自己撑满视口，带 `role="dialog"`、`aria-modal`、焦点陷阱、Esc 关闭、点遮罩关闭，关闭后焦点回到触发卡片。
+- 面板尺寸跟窗口走：宽 72vw、高 78vh，最小保持旧的 940×656（小窗口不缩），最大 1600×1000，并且永远不超出遮罩内容盒。大屏上同一张图因此能按更大的倍率显示。
 - 标题：围栏本身没有标题。优先取 Mermaid frontmatter 的 `title:` 或围栏 `meta`（如 ` ```mermaid 加载流程 `）；都没有时，用 `mermaid.detectType(code)` 识别图类型并显示本地化名称（流程图、时序图、状态图、ER 图等），失败则显示「Mermaid 图表」。**不**从节点标签猜测标题。
 - 头部操作：复制源码、下载 SVG、关闭。
 - 底部缩放条：`−`、当前百分比、`+`、`适合窗口`、`1:1`；滚轮缩放以指针为中心，拖拽平移，缩放范围约 20%–800%；打开时默认「适合窗口」。

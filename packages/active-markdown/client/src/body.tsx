@@ -42,7 +42,7 @@ type View = 'source' | 'translated'
 /** One translation request's lifecycle; the view never recomputes it. */
 type Translation =
   | { status: 'idle' }
-  | { status: 'running', chunk: number, chunks: number }
+  | { status: 'running', chunk: number, chunks: number, partial?: string }
   | { status: 'ready', text: string, sourceLines: number, translatedLines: number }
   | { status: 'too-large', lineCount: number }
   | { status: 'failed', message: string }
@@ -53,6 +53,13 @@ type BodyState =
   | { status: 'too-large', limit: number }
   | { status: 'not-text' }
   | { status: 'failed', code: string, message: string }
+
+/** While chunks land, the body already shows the translated prefix at full line count. */
+function translatedText(translation: Translation): string | undefined {
+  if (translation.status === 'ready') return translation.text
+  if (translation.status === 'running') return translation.partial
+  return undefined
+}
 
 /** Hard-coded until the settings slice lands; the plugin page will own both. */
 const TARGET_LANGUAGE = '简体中文'
@@ -176,6 +183,15 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
             promptVersion,
           }))
           if (token !== requestToken.current) return
+          // Land every finished chunk at once: the unfinished ones keep their source lines,
+          // so the page shows a growing Chinese document at constant line count.
+          const pending = plan.ranges.slice(index + 1).map(next => sourceLines.slice(next.start, next.end).join('\n'))
+          setTranslation({
+            status: 'running',
+            chunk: index + 2 > chunks ? chunks : index + 2,
+            chunks,
+            partial: assembleTranslation(plan.ranges, sourceLines, [...replies, ...pending]),
+          })
         }
         const text = assembleTranslation(plan.ranges, sourceLines, replies)
         setTranslation({
@@ -258,7 +274,7 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
             onReload={reload}
           >
             <DocumentView
-              text={view === 'translated' && translation.status === 'ready' ? translation.text : state.text}
+              text={view === 'translated' ? translatedText(translation) ?? state.text : state.text}
               labels={labels}
               actions={actions}
               t={t}

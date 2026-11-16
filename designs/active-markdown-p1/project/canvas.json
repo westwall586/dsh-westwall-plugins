@@ -1,0 +1,97 @@
+{
+  "v": 3,
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-11-16T06:50:00Z"
+  },
+  "title": "Active Markdown P1 · 翻译交互线稿",
+  "launch": {
+    "view": "canvas"
+  },
+  "pages": [],
+  "boards": {
+    "01-original.dc.html": {
+      "x": 0,
+      "y": 280,
+      "w": 880,
+      "h": 980,
+      "title": "01 原文 · 入口"
+    },
+    "02-translating.dc.html": {
+      "x": 960,
+      "y": 280,
+      "w": 880,
+      "h": 980,
+      "title": "02 翻译中 · 流式"
+    },
+    "03-translated.dc.html": {
+      "x": 1920,
+      "y": 280,
+      "w": 880,
+      "h": 980,
+      "title": "03 译文 · 行号列"
+    },
+    "05-unaligned.dc.html": {
+      "x": 0,
+      "y": 1540,
+      "w": 880,
+      "h": 980,
+      "title": "05 校验降级 · 不对齐"
+    },
+    "06-retranslate.dc.html": {
+      "x": 960,
+      "y": 1540,
+      "w": 880,
+      "h": 980,
+      "title": "06 重新翻译 · 补充要求"
+    },
+    "07-saved.dc.html": {
+      "x": 1920,
+      "y": 1540,
+      "w": 880,
+      "h": 980,
+      "title": "07 保存 · 原文已更新"
+    },
+    "08-settings.dc.html": {
+      "x": 2880,
+      "y": 1540,
+      "w": 880,
+      "h": 620,
+      "title": "08 插件页设置"
+    },
+    "04-peek.dc.html": {
+      "x": 2880,
+      "y": 280,
+      "w": 880,
+      "h": 980,
+      "title": "04 译文 · 点行看原文"
+    }
+  },
+  "order": [
+    "01-original.dc.html",
+    "02-translating.dc.html",
+    "03-translated.dc.html",
+    "04-peek.dc.html",
+    "05-unaligned.dc.html",
+    "06-retranslate.dc.html",
+    "07-saved.dc.html",
+    "08-settings.dc.html"
+  ],
+  "notes": {
+    "flow-a": {
+      "x": 0,
+      "y": 40,
+      "text": "① 翻译主流程",
+      "kind": "title1",
+      "maxW": 3760
+    },
+    "flow-b": {
+      "x": 0,
+      "y": 1300,
+      "text": "② 降级、重翻与保存",
+      "kind": "title1",
+      "maxW": 3760
+    }
+  },
+  "designSystems": []
+}

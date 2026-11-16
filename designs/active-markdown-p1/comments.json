@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "threads": [
+    {
+      "id": "c_ad27729667",
+      "anchor": "#dc-root > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(1) > button:nth-of-type(3) > dcfx1pc7q8d:nth-of-type(1) > dct:nth-of-type(30) > dceb8a15ea8a20243498723:nth-of-type(1)",
+      "label": "04 对照 · 交错 › text \"对照\"",
+      "detail": "04-paired.dc.html: #29:1/2/0/2 text \"对照\"",
+      "location": {
+        "file": "project/04-paired.dc.html",
+        "board": "04-paired.dc.html"
+      },
+      "status": "open",
+      "createdAt": "2026-11-16T06:58:37.155Z",
+      "updatedAt": "2026-11-16T06:58:37.155Z",
+      "messages": [
+        {
+          "id": "m_31d5de3758",
+          "author": {
+            "kind": "user",
+            "name": "johnxi"
+          },
+          "text": "这里的对照，我想的不是提供全局层面的对照。这样可能有点麻烦。在译文上，点击某一行,显示这一行的原文作为对照，可以是浮窗显示。再点击其他空白处，或者点击其他行，上一个浮窗就消失。做这种小范围的对照，我觉得可能更合适一些。",
+          "at": "2026-11-16T06:58:37.155Z"
+        }
+      ]
+    },
+    {
+      "id": "c_42ac69bfc0",
+      "anchor": "#dc-root > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(6) > dcfx05nkswd:nth-of-type(1) > dct:nth-of-type(44) > dce13d350ba0b3002721217:nth-of-type(1)",
+      "label": "08 翻译设置 › shape \"翻译设置 翻译模型 deepseek-v4-flash 默认跟随会话模型 目标…\"",
+      "detail": "08-settings.dc.html: #43:1/5 shape \"翻译设置 翻译模型 deepseek-v4-flash 默认跟随会话模型 目标…\"",
+      "location": {
+        "file": "project/08-settings.dc.html",
+        "board": "08-settings.dc.html"
+      },
+      "status": "open",
+      "createdAt": "2026-11-16T06:59:41.531Z",
+      "updatedAt": "2026-11-16T06:59:41.531Z",
+      "messages": [
+        {
+          "id": "m_96048b3e08",
+          "author": {
+            "kind": "user",
+            "name": "johnxi"
+          },
+          "text": "翻译设置不用提供在页面上，放在插件页的设置里。这些属于低频设置项。",
+          "at": "2026-11-16T06:59:41.531Z"
+        }
+      ]
+    },
+    {
+      "id": "c_a989fc8eb0",
+      "anchor": "#dc-root > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > button:nth-of-type(1) > dcfx01gi1f4:nth-of-type(1) > dct:nth-of-type(32) > dce4aaa61327d7042889290:nth-of-type(1)",
+      "label": "03 译文 · 已对齐 › text \"行号\"",
+      "detail": "03-translated.dc.html: #31:1/2/2 text \"行号\"",
+      "location": {
+        "file": "project/03-translated.dc.html",
+        "board": "03-translated.dc.html"
+      },
+      "status": "open",
+      "createdAt": "2026-11-16T07:00:27.653Z",
+      "updatedAt": "2026-11-16T07:00:27.653Z",
+      "messages": [
+        {
+          "id": "m_c6f71b715e",
+          "author": {
+            "kind": "user",
+            "name": "johnxi"
+          },
+          "text": "现在的行号从页面上看，和正文挨得有点近。就像 VS Code 这样的编辑器一样，把行号独立于正文，做一些样式上的区分，我觉得会好一些。",
+          "at": "2026-11-16T07:00:27.653Z"
+        }
+      ]
+    }
+  ]
+}

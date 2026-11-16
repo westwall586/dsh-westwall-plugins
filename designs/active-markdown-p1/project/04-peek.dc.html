@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>04 译文 · 点行看原文</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;-webkit-font-smoothing:antialiased;background:#fff}
+.pane{position:relative;width:880px;height:980px;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden;background:#fff;color:#0f1115;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;font-size:13px}
+.tabs{flex:none;display:flex;align-items:center;gap:4px;height:38px;padding:0 8px;background:#f9fafb;border-bottom:.5px solid rgba(0,0,0,.08)}
+.tab{display:inline-flex;align-items:center;gap:8px;height:26px;padding:0 10px;border:.5px solid rgba(0,0,0,.1);border-radius:8px;background:#fff;font-size:12.5px}
+.tab i{font-style:normal;color:#a9aeb5;font-size:13px;line-height:1}
+.hdr{flex:none;display:flex;align-items:center;gap:2px;height:38px;padding:0 6px 0 16px;border-bottom:.5px solid rgba(0,0,0,.12)}
+.path{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-right:12px}
+.sp{flex:1 1 auto}
+.ib{display:inline-flex;align-items:center;justify-content:center;height:26px;min-width:26px;padding:0 6px;border:0;border-radius:6px;background:transparent;color:#61666b;font:inherit;font-size:12.5px;cursor:pointer}
+.ib:hover{background:rgba(38,49,72,.06)}
+.sel{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 8px;border:.5px solid transparent;border-radius:6px;background:rgba(38,49,72,.06);color:#0f1115;font:inherit;font-size:12.5px;cursor:pointer}
+.am{flex:none;display:flex;align-items:center;gap:8px;height:44px;padding:0 12px;border-bottom:.5px solid rgba(0,0,0,.08)}
+.seg{display:inline-flex;gap:2px;padding:2px;border-radius:8px;background:#f1f3f5}
+.seg button{height:24px;padding:0 12px;border:0;border-radius:6px;background:transparent;color:#61666b;font:inherit;font-size:12.5px;cursor:pointer}
+.seg button[aria-pressed=true]{background:#fff;color:#0f1115;box-shadow:0 .5px 2px rgba(0,0,0,.14)}
+.btn{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border:.5px solid rgba(0,0,0,.12);border-radius:6px;background:#fff;color:#0f1115;font:inherit;font-size:12.5px;cursor:pointer}
+.btn:hover{background:rgba(38,49,72,.04)}
+.btn--on{border-color:rgba(65,118,230,.3);color:#3a63c8;background:rgba(65,118,230,.07)}
+.status{flex:none;display:flex;align-items:center;gap:10px;padding:7px 12px;font-size:12px;color:#61666b;background:#f9fafb;border-bottom:.5px solid rgba(0,0,0,.04)}
+.body{position:relative;flex:1 1 auto;min-height:0;overflow:hidden}
+.gutter{position:absolute;left:0;top:0;bottom:0;width:46px;background:#f9fafb;border-right:.5px solid rgba(0,0,0,.08)}
+.doc{position:relative;padding:20px 34px 40px;font-size:15px;line-height:1.7}
+.doc h1{font-size:25px;line-height:1.4;font-weight:600;margin:0 0 10px;padding-left:60px}
+.doc h2{font-size:19px;line-height:1.5;font-weight:600;margin:24px 0 8px;padding-left:60px}
+.doc p{margin:0 0 12px;padding-left:60px}
+.doc ul{margin:0 0 12px;padding-left:80px}
+.doc li{margin:1px 0}
+.fm{margin:0 0 18px;padding:10px 12px 10px 0;border:.5px solid rgba(0,0,0,.1);border-radius:12px;font-family:'SF Mono','JetBrains Mono',Menlo,monospace;font-size:12px;line-height:1.65;white-space:pre;overflow:hidden;color:#61666b}
+.doc table{width:100%;border-collapse:collapse;font-size:13.5px;margin:0 0 14px}
+.doc th,.doc td{border:.5px solid rgba(0,0,0,.1);padding:7px 10px;text-align:left;vertical-align:top}
+.doc th{background:#f9fafb;font-weight:600;font-size:12.5px}
+
+/* 被点中的行：整行底色，并向左铺进行号列，行号列边上一条强调线 */
+.picked{position:relative;background:rgba(38,49,72,.055);box-shadow:-60px 0 0 rgba(38,49,72,.055)}
+.picked::after{content:'';position:absolute;left:-60px;top:0;bottom:0;width:2px;background:#4176e6}
+
+.pop{position:absolute;left:132px;top:346px;width:452px;box-sizing:border-box;border:.5px solid rgba(0,0,0,.08);border-radius:10px;background:#fff;box-shadow:0 12px 32px rgba(0,0,0,.16)}
+.pop .ph{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:.5px solid rgba(0,0,0,.06);font-size:11.5px;color:#81858c;font-family:'SF Mono',Menlo,monospace}
+.pop .ph b{font-weight:600;color:#61666b}
+.pop .pb{padding:11px 13px;font-size:13px;line-height:1.62;color:#0f1115}
+.pop .pb .ln{background:rgba(65,118,230,.1);border-radius:3px;box-shadow:0 0 0 2px rgba(65,118,230,.1)}
+</style>
+</helmet>
+<div class="pane">
+  <div class="tabs">
+    <span class="tab">REVIEW.md <i>✕</i></span>
+  </div>
+
+  <div class="hdr">
+    <span class="path">docs/designs/active-markdown/REVIEW.md</span>
+    <span class="sp"></span>
+    <button class="sel" type="button">可交互 Markdown
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5"/></svg>
+    </button>
+    <button class="ib" type="button" aria-label="刷新">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.6-3.7"/><path d="M13 2.5V5h-2.5"/></svg>
+    </button>
+    <button class="ib" type="button" aria-label="在应用中打开">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M9 3h4v4"/><path d="M13 3 7.5 8.5"/><path d="M12 10.5V12a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 12V5.5A1.5 1.5 0 0 1 4 4h1.5"/></svg>
+    </button>
+    <button class="ib" type="button" aria-label="全屏">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M6 2.5H2.5V6"/><path d="M10 13.5h3.5V10"/></svg>
+    </button>
+  </div>
+
+  <div class="am">
+    <div class="seg" role="group" aria-label="视图">
+      <button type="button" aria-pressed="false">原文</button>
+      <button type="button" aria-pressed="true">译文</button>
+    </div>
+    <span class="sp"></span>
+    <button class="btn btn--on" type="button" aria-pressed="true">行号</button>
+    <button class="btn" type="button">重新翻译</button>
+    <button class="btn" type="button">保存</button>
+  </div>
+
+  <div class="status">
+    <span>已对齐 · 64 行</span>
+    <span class="sp"></span>
+    <span>deepseek-v4-flash · 1,842 tokens</span>
+  </div>
+
+  <div class="body">
+    <div class="gutter"></div>
+    <div class="doc">
+      <div class="fm">title: Retrieval Pipeline Review
+status: draft
+owner: platform</div>
+
+      <h1>检索管线评审</h1>
+
+      <p class="picked">管线把用户的问题转化为一组排序后的片段。本次评审覆盖本季度有改动的两个阶段——入库与排序，并记录了我们决定暂不处理的部分。</p>
+
+      <h2>范围</h2>
+      <ul>
+        <li>入库：一个工作区文件如何变成一个片段</li>
+        <li>排序：针对给定问题，片段如何排序</li>
+        <li>第一次回答之后的一切：不在范围内</li>
+      </ul>
+
+      <h2>已知缺口</h2>
+      <table>
+        <thead>
+          <tr><th>领域</th><th>当前行为</th><th>建议</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>分片</td><td>只按空行切分</td><td>暂不调整</td></tr>
+          <tr><td>排序</td><td>新近度只作为并列时的次序</td><td>下一轮运行后再评审</td></tr>
+          <tr><td>删除</td><td>整文件重建索引</td><td>文件变大后再处理</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pop">
+      <div class="ph"><b>原文</b> 第 14–16 行</div>
+      <div class="pb"><span class="ln">The pipeline turns a user question into a ranked set of passages.</span> This review covers the two stages that changed this quarter — ingestion and ranking — and records what we decided to leave alone.</div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":880,"height":980}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

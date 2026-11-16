@@ -290,27 +290,32 @@ lines(text) = normalize(text).split('\n').length
 <工作区>/.dsh-active-markdown/
   .gitignore                       # 内容为 "*" 与 "!.gitignore"
   translate/
-    docs/
-      designs/
-        active-markdown/
-          P1-TECH.zh.md            # 译文 Markdown
-          P1-TECH.zh.json          # 元数据
-    _external/                     # 工作区外的会话文件，没有相对路径可镜像
-      7f3c1a92/
-        REVIEW.zh.md
-        REVIEW.zh.json
+    zh/
+      docs/designs/active-markdown/P1-TECH.md     # 译文；文件名与源文件完全一致
+    en/
+      docs/designs/active-markdown/P1-TECH.md
+  index/
+    translate/
+      zh/docs/designs/active-markdown/P1-TECH.md.json   # 元数据，平行树
 ```
 
-**镜像源文件的相对路径。** 只在 `translate/` 下平铺文件名会撞车：一个多目录项目里到处都有 `README.md`，都会落到同一个 `README.zh.md`。镜像之后，机器能从源路径直接算出产物路径，人也能顺着目录结构找到译文，两边都不需要额外的映射表。
+**语言是目录，不是后缀。** 源文件的相对路径原样搬进 `translate/<语言代码>/`，文件名一个字符都不改。这样「用自己的相对路径就能找到译文」是字面成立的，也不需要拆扩展名、拼后缀；两种目标语言各占一个目录，永远不会互相覆盖。
+
+**元数据放在平行的 `index/` 树**，不贴在译文旁边：`translate/` 里只有译文，扫一眼就是一棵和仓库同构的树；`index/` 以后还能放 P2 的审阅基线。派生路径的规则只有一条：`translate/<code>/<相对路径>`，元数据把同一段落进 `index/translate/<code>/` 并加 `.json`。
+
+**镜像源文件的相对路径。** 只在 `translate/` 下平铺文件名会撞车：一个多目录项目里到处都有 `README.md`。镜像之后，机器能从源路径直接算出产物路径，人也能顺着目录结构找到译文，两边都不需要额外的映射表。
 
 规则：
 
-- `<源目录>/<文件名去扩展名>.<lang>.<原扩展名>`；语言后缀放在扩展名之前，`README.md` → `README.zh.md`。
+- 语言代码：`zh`（简体）、`zh-TW`（繁体）、`en`（英文）。只有代码进路径和缓存键；给人看的「简体中文」只拼进提示词。两者一一对应，各有各的消费者。
+- 源路径每一段原样保留，只在写盘前拒绝 `..` 与绝对路径。
 - 路径每一段原样保留，只在写盘前拒绝 `..` 与绝对路径。文件名里已有的 `.zh` 不做特殊处理，最坏是 `foo.zh.zh.md`，无害。
-- 工作区外的文档（绝对路径的会话文件）进 `_external/<路径 sha1 前 8 位>/`，basename 保留，完整路径记在元数据里。
+- 工作区外的文档（绝对路径的会话文件）进 `translate/<code>/_external/<路径 sha1 前 8 位>/`，basename 保留，完整路径记在元数据里。
 - 保存时递归建目录；同一份文档换语言是两个文件，互不覆盖。
 
 不用 UUID 加中央清单：那样每个译文都要两张表才能定位，人工翻目录看不到东西，而且中央清单是并发写的热点。镜像方案的复杂度只是多一次 `mkdir -p` 和一次路径拼接。
+
+不用语言后缀（`README.zh.md`）：中性后缀在两种目标语言之间会互相覆盖，带代码的后缀又要拆扩展名再拼回去。语言进目录一步解决两件事，代码也更短。
 
 以后加产物只加子目录，不再动根目录这一层，用户清理时也能按目录决定删什么。
 

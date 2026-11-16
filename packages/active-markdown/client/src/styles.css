@@ -564,3 +564,134 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* The plugin page mounts this section outside the preview, so it carries its own layout. */
+.am-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  color: var(--dsw-alias-label-primary);
+  font-size: var(--dsh-content-font-size);
+  line-height: 1.6;
+}
+
+.am-settings-title {
+  margin: 0;
+  font-size: 1.05em;
+  font-weight: 600;
+}
+
+.am-settings-intro {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.am-settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.am-settings-label {
+  font-weight: 600;
+}
+
+.am-settings-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.am-settings-check input {
+  accent-color: var(--dsw-alias-link);
+}
+
+.am-settings-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.am-settings-subfield {
+  display: flex;
+  flex: 1 1 160px;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.am-settings-sublabel {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 0.88em;
+}
+
+.am-settings-input,
+.am-settings-select {
+  box-sizing: border-box;
+  width: 100%;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+}
+
+.am-settings-hint {
+  margin: 0;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 0.88em;
+}
+
+.am-settings-error {
+  margin: 0;
+  color: var(--dsw-alias-label-error, var(--dsw-alias-label-primary));
+  font-size: 0.88em;
+}
+
+.am-settings-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.am-settings-button {
+  height: 28px;
+  padding: 0 12px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.am-settings-button:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.am-settings-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.am-settings-button--primary {
+  border-color: var(--dsw-alias-link);
+  color: var(--dsw-alias-link);
+}
+
+.am-settings-status {
+  font-size: 0.88em;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.am-settings-status--ok {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.am-settings-status--error {
+  color: var(--dsw-alias-label-error, var(--dsw-alias-label-primary));
+}

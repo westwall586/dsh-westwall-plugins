@@ -5,6 +5,7 @@
  * The Cordis service only maps typed failures onto Remote codes.
  */
 import { callTranslation, resolveMaxTokens, type LlmLike } from './call.ts'
+import type { LanguageOption } from './language.ts'
 import { buildSystemPrompt, PROMPT_VERSION } from './prompt.ts'
 
 export const MAX_TEXT_BYTES = 2 * 1024 * 1024
@@ -45,10 +46,12 @@ export interface TranslateInput {
   readonly sessionId: string
   readonly path: string
   readonly text: string
+  /** The target language code; the prompt maps it to a label. */
   readonly lang: string
   readonly provider?: string
   readonly model?: string
   readonly promptVersion: string
+  readonly translateComments: boolean
   readonly extraInstruction?: string
 }
 
@@ -56,8 +59,19 @@ export interface TranslateView {
   readonly text: string
 }
 
+/** What the client reads before a run and what the settings page lists. */
 export interface DescribeView {
   readonly promptVersion: string
+  readonly settings: EffectiveSettings
+  readonly languages: readonly LanguageOption[]
+}
+
+export interface EffectiveSettings {
+  /** The language code the wire, cache keys, and saved paths carry. */
+  readonly lang: string
+  /** null means the Host resolves the session default. */
+  readonly model: ModelSelection | null
+  readonly translateComments: boolean
 }
 
 export interface ValidatedInput {
@@ -67,6 +81,7 @@ export interface ValidatedInput {
   readonly lang: string
   readonly provider?: string
   readonly model?: string
+  readonly translateComments: boolean
   readonly extraInstruction?: string
 }
 
@@ -111,6 +126,7 @@ export function validateInput(input: TranslateInput): ValidatedInput {
     lang,
     ...(provider === '' ? {} : { provider }),
     ...(model === '' ? {} : { model }),
+    translateComments: input.translateComments === true,
     ...(extraInstruction === '' ? {} : { extraInstruction }),
   }
 }
@@ -167,6 +183,7 @@ export async function translateRequest(input: {
   const maxTokens = await maxTokensFor(input.llm, provider, model)
   const system = buildSystemPrompt({
     lang: request.lang,
+    translateComments: request.translateComments,
     ...(request.extraInstruction === undefined ? {} : { extraInstruction: request.extraInstruction }),
   })
 

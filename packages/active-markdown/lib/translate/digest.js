@@ -28,6 +28,7 @@ export function cacheKeyOf(input) {
         input.provider,
         input.model,
         input.promptVersion,
+        input.translateComments ? 'comments' : 'plain-code',
         extraInstructionHash(input.extraInstruction),
     ].join(':');
 }

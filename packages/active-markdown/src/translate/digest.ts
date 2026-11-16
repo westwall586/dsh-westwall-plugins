@@ -33,6 +33,8 @@ export interface CacheKeyInput {
   readonly provider: string
   readonly model: string
   readonly promptVersion: string
+  /** Comments on and comments off produce different translations, so they never share a key. */
+  readonly translateComments: boolean
   readonly extraInstruction?: string
 }
 
@@ -43,6 +45,7 @@ export function cacheKeyOf(input: CacheKeyInput): string {
     input.provider,
     input.model,
     input.promptVersion,
+    input.translateComments ? 'comments' : 'plain-code',
     extraInstructionHash(input.extraInstruction),
   ].join(':')
 }

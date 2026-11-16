@@ -46,8 +46,9 @@ function request(overrides: Partial<TranslateInput> = {}): TranslateInput {
     sessionId: 'session-1',
     path: 'docs/README.md',
     text: SOURCE,
-    lang: '简体中文',
+    lang: 'zh',
     promptVersion: PROMPT_VERSION,
+    translateComments: true,
     ...overrides,
   }
 }
@@ -79,6 +80,18 @@ test('一次调用返回整篇译文，行数与原文一致', async () => {
   assert.equal(calls[0].model, 'deepseek-chat')
   assert.match(calls[0].system ?? '', /- 目标语言：简体中文/)
   assert.deepEqual(calls[0].messages, [{ role: 'user', content: [{ type: 'text', text: SOURCE }] }])
+})
+
+test('目标语言 code 映射成 label，注释策略进入 system prompt', async () => {
+  const { llm, calls } = fakeLlm({ chunks: ['译文'] })
+  await translateRequest({
+    llm,
+    readDefault: () => DEFAULT_SELECTION,
+    request: request({ lang: 'en', translateComments: false }),
+  })
+  assert.match(calls[0].system ?? '', /- 目标语言：English/)
+  assert.doesNotMatch(calls[0].system ?? '', /- 目标语言：en/)
+  assert.match(calls[0].system ?? '', /注释也不翻译/)
 })
 
 test('模型未声明输出上限时回落到 8192', async () => {

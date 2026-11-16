@@ -1,6 +1,7 @@
 import { type ModelSelection } from './request.ts';
 export declare const STORE_ROOT = ".dsh-active-markdown";
 export declare const TRANSLATE_ROOT = ".dsh-active-markdown/translate";
+export declare const INDEX_ROOT = ".dsh-active-markdown/index";
 export declare const EXTERNAL_ROOT = "_external";
 export declare const STORE_GITIGNORE = "*\n!.gitignore\n";
 export interface TranslationMeta {
@@ -60,18 +61,17 @@ export interface TranslationStore {
     load(input: TranslationLoadInput): Promise<TranslationLoadView | null>;
 }
 export interface MirrorPath {
-    /** 相对 `.dsh-active-markdown/translate/`、以 `/` 分隔的目标路径。 */
+    /** 相对 `translate/<code>/`、以 `/` 分隔的目标路径；文件名与源文件一致。 */
     readonly relative: string;
     /** 元数据里的源路径：工作区内是相对路径，工作区外是绝对路径。 */
     readonly sourcePath: string;
 }
 /**
- * 纯路径计算：源路径 → 镜像路径。`..` 与指向工作区内的绝对路径在这里拒绝，
- * 保证写盘目标永远是 `translate/` 之下的相对路径。
+ * 纯路径计算：源路径 → `translate/<code>/` 之下的镜像路径。`..` 与指向工作区
+ * 内的绝对路径在这里拒绝，保证写盘目标永远在 `translate/` 下。
  */
 export declare function mirrorOf(input: {
     readonly path: string;
-    readonly lang: string;
     readonly workspace: string;
 }): MirrorPath;
 export declare function createTranslationStore(deps: StoreDeps): TranslationStore;

@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import { en, zh } from '../client/src/locales.ts'
 
 const CLIENT = new URL('../client/src/', import.meta.url)
-const SOURCES = ['body.tsx', 'main.tsx', 'menus.ts', 'translate/ask.tsx']
+const SOURCES = ['body.tsx', 'main.tsx', 'menus.ts', 'settings.tsx', 'translate/ask.tsx']
 
 /** Every key the Body and the menu ask the locale service for. */
 function keysUsed(): Set<string> {

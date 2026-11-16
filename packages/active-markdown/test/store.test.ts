@@ -70,6 +70,7 @@ function cacheGet(cache: TranslationCache, overrides: Partial<CacheGetInput> = {
     provider: MODEL.provider,
     model: MODEL.model,
     promptVersion: PROMPT_VERSION,
+    translateComments: true,
     extraInstruction: '',
     ...overrides,
   })
@@ -83,6 +84,7 @@ function cachePut(cache: TranslationCache, overrides: Partial<CachePutInput> = {
     provider: MODEL.provider,
     model: MODEL.model,
     promptVersion: PROMPT_VERSION,
+    translateComments: true,
     extraInstruction: '',
     aligned: true,
     sourceLines: 3,
@@ -159,6 +161,14 @@ test('源文改动后错过缓存', async (t) => {
   assert.notEqual(await cacheGet(h.cache, { text: SOURCE }), null)
 })
 
+test('换注释策略会错过缓存', async (t) => {
+  const h = await harness(t)
+  await cachePut(h.cache)
+
+  assert.equal(await cacheGet(h.cache, { translateComments: false }), null)
+  assert.notEqual(await cacheGet(h.cache, { translateComments: true }), null)
+})
+
 test('补充要求的 hash 把特调结果与普通结果分开', async (t) => {
   const h = await harness(t)
   await cachePut(h.cache)
@@ -176,7 +186,7 @@ test('保存镜像源路径，绝对的外部路径收进 _external', async (t) 
   const h = await harness(t)
   const saved = (await save(h.store)) as { file: string }
 
-  assert.equal(saved.file, '.dsh-active-markdown/translate/docs/a/README.zh.md')
+  assert.equal(saved.file, '.dsh-active-markdown/translate/zh/docs/a/README.md')
   assert.equal(await readFile(join(h.workspace, saved.file), 'utf8'), TRANSLATED)
   assert.equal(await readFile(join(h.workspace, '.dsh-active-markdown/.gitignore'), 'utf8'), STORE_GITIGNORE)
 
@@ -187,8 +197,20 @@ test('保存镜像源路径，绝对的外部路径收进 _external', async (t) 
     meta: { sourcePath: string }
   }
   const digest = createHash('sha1').update(resolve(externalSource)).digest('hex').slice(0, 8)
-  assert.equal(external.file, `.dsh-active-markdown/translate/_external/${digest}/REVIEW.zh.md`)
+  assert.equal(external.file, `.dsh-active-markdown/translate/zh/_external/${digest}/REVIEW.md`)
   assert.equal(external.meta.sourcePath, resolve(externalSource))
+})
+
+test('同一份文档换语言写到不同语言目录，互不覆盖', async (t) => {
+  const h = await harness(t)
+  const chinese = (await save(h.store, { lang: 'zh' })) as { file: string }
+  const english = (await save(h.store, { lang: 'en', translated: '# Title\n\nBody.\n' })) as { file: string }
+
+  assert.equal(chinese.file, '.dsh-active-markdown/translate/zh/docs/a/README.md')
+  assert.equal(english.file, '.dsh-active-markdown/translate/en/docs/a/README.md')
+  assert.equal(await readFile(join(h.workspace, chinese.file), 'utf8'), TRANSLATED)
+  assert.equal(await readFile(join(h.workspace, english.file), 'utf8'), '# Title\n\nBody.\n')
+  assert.equal((await h.store.load({ sessionId: SESSION, path: 'docs/a/README.md', lang: 'zh' }))?.text, TRANSLATED)
 })
 
 test('不同目录的同名文档各自镜像，互不覆盖', async (t) => {
@@ -201,10 +223,19 @@ test('不同目录的同名文档各自镜像，互不覆盖', async (t) => {
   assert.equal((await h.store.load({ sessionId: SESSION, path: 'docs/b/README.md', lang: LANG }))?.text, '# B\n')
 })
 
-test('元数据写出 8.1 表里的全部字段', async (t) => {
+function metadataFileOf(file: string): string {
+  const rest = file.slice('.dsh-active-markdown/translate/'.length)
+  const slash = rest.indexOf('/')
+  const lang = rest.slice(0, slash)
+  const relative = rest.slice(slash + 1)
+  const dot = relative.lastIndexOf('.')
+  return `.dsh-active-markdown/index/translate/${lang}/${dot === -1 ? relative : relative.slice(0, dot)}.json`
+}
+
+test('元数据写出 8.1 表里的全部字段，落在平行的 index 树', async (t) => {
   const h = await harness(t)
   const saved = (await save(h.store)) as { file: string }
-  const raw = JSON.parse(await readFile(join(h.workspace, saved.file.replace(/\.md$/, '.json')), 'utf8')) as Record<string, unknown>
+  const raw = JSON.parse(await readFile(join(h.workspace, metadataFileOf(saved.file)), 'utf8')) as Record<string, unknown>
 
   assert.deepEqual(Object.keys(raw).sort(), [
     'aligned',
@@ -321,7 +352,7 @@ test('服务层：没有模型服务时也能命中缓存，保存与读取共�
   const saved = await h.service.translationSave(
     SESSION, 'docs/a/README.md', SOURCE, TRANSLATED, LANG, '', '', PROMPT_VERSION, '', true,
   )
-  assert.equal(saved.file, '.dsh-active-markdown/translate/docs/a/README.zh.md')
+  assert.equal(saved.file, '.dsh-active-markdown/translate/zh/docs/a/README.md')
 
   const loaded = await h.service.translationLoad(SESSION, 'docs/a/README.md', LANG)
   assert.equal(loaded?.text, TRANSLATED)

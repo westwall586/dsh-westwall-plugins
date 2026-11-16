@@ -5,9 +5,11 @@ import type { ClientContext, HostBridge, SidebarRight } from './context.ts'
 import { mountHostBridge } from './host.ts'
 import { LINE_MENU_KIND, lookUpSource, type LineMenuValue } from './menus.ts'
 import { en, zh } from './locales.ts'
+import { createSettingsPage } from './settings.tsx'
 
 const NS = 'active-markdown'
 const ID = 'active-markdown'
+const PACKAGE_ID = '@westwall/dsh-active-markdown'
 const STYLE_ATTRIBUTE = 'data-dsh-active-markdown'
 
 export default {
@@ -46,6 +48,25 @@ export default {
     })
     let bridge: Promise<HostBridge> | undefined
     const host = (): Promise<HostBridge> => (bridge ??= mountHostBridge(ctx))
+
+    // The plugin page owns the three settings; the preview only reads them.
+    ctx.inject(['configForms'], (scoped) => {
+      const forms = scoped.configForms
+      if (forms === undefined) return
+      const SettingsPage = createSettingsPage({ form: forms.get(ID), host, t })
+      const register = (): (() => void) => scoped.slots.inject('plugins.bundle.config', () => scoped.slots.register({
+        name: 'plugins.bundle.config',
+        key: PACKAGE_ID,
+        locale: NS,
+      }, SettingsPage))
+      const whileServed = forms.whileServed?.bind(forms)
+      if (whileServed !== undefined) {
+        scoped.effect(() => whileServed([ID], register), 'active-markdown settings')
+      } else {
+        scoped.effect(register, 'active-markdown settings')
+      }
+    })
+
     ctx.inject(['documentPreviews', 'remote.workspaceFiles'], (scoped) => {
       scoped.effect(() => scoped.documentPreviews.register({
         id: ID,

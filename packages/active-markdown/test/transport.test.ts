@@ -8,11 +8,14 @@ const DESCRIPTOR_KEY = '@deepseek-ai/dsh-typert-protocol/remote-methods'
 
 const WIRE_PARAMETERS: Record<string, string[]> = {
   describe: [],
-  translate: ['sessionId', 'path', 'text', 'lang', 'provider', 'model', 'promptVersion', 'extraInstruction'],
-  cacheGet: ['text', 'lang', 'provider', 'model', 'promptVersion', 'extraInstruction'],
+  translate: [
+    'sessionId', 'path', 'text', 'lang', 'provider', 'model', 'promptVersion', 'extraInstruction',
+    'translateComments',
+  ],
+  cacheGet: ['text', 'lang', 'provider', 'model', 'promptVersion', 'extraInstruction', 'translateComments'],
   cachePut: [
     'text', 'translated', 'lang', 'provider', 'model', 'promptVersion', 'extraInstruction',
-    'aligned', 'sourceLines', 'translatedLines',
+    'aligned', 'sourceLines', 'translatedLines', 'translateComments',
   ],
   translationSave: [
     'sessionId', 'path', 'text', 'translated', 'lang', 'provider', 'model', 'promptVersion',
@@ -96,13 +99,22 @@ interface Answers {
   load?: 'hit' | 'missing'
 }
 
+const META = { promptVersion: 'am.translate.v1', lang: 'zh', provider: 'p', model: 'm' }
+
 function recordingNamespace(answers: Answers = {}): { namespace: Namespace, calls: Call[] } {
   const calls: Call[] = []
   const record = (method: string, args: unknown[]): void => { calls.push({ method, args }) }
-  const stored = { text: '译文', meta: { promptVersion: 'am.translate.v1' }, stale: true }
+  const stored = { text: '译文', meta: META, stale: true }
   const namespace: Namespace = {
     async describe() {
-      return { ok: true, value: { promptVersion: 'am.translate.v1' } }
+      return {
+        ok: true,
+        value: {
+          promptVersion: 'am.translate.v1',
+          settings: { lang: 'zh', model: null, translateComments: true },
+          languages: [{ code: 'zh', label: '简体中文' }],
+        },
+      }
     },
     async translate(...args: unknown[]) {
       record('translate', args)
@@ -118,7 +130,7 @@ function recordingNamespace(answers: Answers = {}): { namespace: Namespace, call
     },
     async translationSave(...args: unknown[]) {
       record('translationSave', args)
-      return { ok: true, value: { file: '.dsh-active-markdown/translate/a.zh.md', meta: { promptVersion: 'am.translate.v1' } } }
+      return { ok: true, value: { file: '.dsh-active-markdown/translate/zh/a.md', meta: META } }
     },
     async translationLoad(...args: unknown[]) {
       record('translationLoad', args)
@@ -131,21 +143,30 @@ function recordingNamespace(answers: Answers = {}): { namespace: Namespace, call
 test('桥接方法按 Host 的线序传参', async () => {
   const { namespace, calls } = recordingNamespace()
   const bridge = createBridge(namespace)
-  assert.equal(await bridge.describePrompt(), 'am.translate.v1')
+  const described = await bridge.describe()
+  assert.equal(described.promptVersion, 'am.translate.v1')
+  assert.equal(described.settings.lang, 'zh')
 
   await bridge.translate({
     sessionId: 's1', path: 'a.md', text: '原文', lang: 'zh', provider: 'p', model: 'm', promptVersion: 'v1',
+    translateComments: true,
   })
-  assert.deepEqual(calls.at(-1), { method: 'translate', args: ['s1', 'a.md', '原文', 'zh', 'p', 'm', 'v1', ''] })
+  assert.deepEqual(calls.at(-1), {
+    method: 'translate',
+    args: ['s1', 'a.md', '原文', 'zh', 'p', 'm', 'v1', '', true],
+  })
 
-  await bridge.cacheGet({ text: '原文', lang: 'zh', promptVersion: 'v1' })
-  assert.deepEqual(calls.at(-1), { method: 'cacheGet', args: ['原文', 'zh', '', '', 'v1', ''] })
+  await bridge.cacheGet({ text: '原文', lang: 'zh', promptVersion: 'v1', translateComments: false })
+  assert.deepEqual(calls.at(-1), { method: 'cacheGet', args: ['原文', 'zh', '', '', 'v1', '', false] })
 
   await bridge.cachePut({
     text: '原文', translated: '译文', lang: 'zh', provider: 'p', model: 'm', promptVersion: 'v1',
-    aligned: false, sourceLines: 4, translatedLines: 3,
+    translateComments: true, aligned: false, sourceLines: 4, translatedLines: 3,
   })
-  assert.deepEqual(calls.at(-1), { method: 'cachePut', args: ['原文', '译文', 'zh', 'p', 'm', 'v1', '', false, 4, 3] })
+  assert.deepEqual(calls.at(-1), {
+    method: 'cachePut',
+    args: ['原文', '译文', 'zh', 'p', 'm', 'v1', '', false, 4, 3, true],
+  })
 
   await bridge.save({ sessionId: 's1', path: 'a.md', text: '原文', translated: '译文', lang: 'zh', promptVersion: 'v1', aligned: false })
   assert.deepEqual(calls.at(-1), {
@@ -162,26 +183,29 @@ test('补充要求随本次运行上线，缺省的模型与要求以空串上�
   const bridge = createBridge(namespace)
 
   await bridge.translate({
-    sessionId: 's1', path: 'a.md', text: '原文', lang: 'zh', promptVersion: 'v1', extraInstruction: '术语保留英文',
+    sessionId: 's1', path: 'a.md', text: '原文', lang: 'zh', promptVersion: 'v1',
+    extraInstruction: '术语保留英文', translateComments: false,
   })
   assert.deepEqual(calls.at(-1), {
     method: 'translate',
-    args: ['s1', 'a.md', '原文', 'zh', '', '', 'v1', '术语保留英文'],
+    args: ['s1', 'a.md', '原文', 'zh', '', '', 'v1', '术语保留英文', false],
   })
 
-  await bridge.cacheGet({ text: '原文', lang: 'zh', promptVersion: 'v1', extraInstruction: '术语保留英文' })
+  await bridge.cacheGet({
+    text: '原文', lang: 'zh', promptVersion: 'v1', extraInstruction: '术语保留英文', translateComments: true,
+  })
   assert.deepEqual(calls.at(-1), {
     method: 'cacheGet',
-    args: ['原文', 'zh', '', '', 'v1', '术语保留英文'],
+    args: ['原文', 'zh', '', '', 'v1', '术语保留英文', true],
   })
 })
 
 test('缓存与保存文件的命中值原样返回，空结果按 null 返回', async () => {
   const hit = createBridge(recordingNamespace({ cacheGet: 'hit', load: 'hit' }).namespace)
-  assert.equal((await hit.cacheGet({ text: '原文', lang: 'zh', promptVersion: 'v1' }))?.text, '译文')
+  assert.equal((await hit.cacheGet({ text: '原文', lang: 'zh', promptVersion: 'v1', translateComments: true }))?.text, '译文')
   assert.equal((await hit.load({ sessionId: 's1', path: 'a.md', lang: 'zh' }))?.stale, true)
 
   const empty = createBridge(recordingNamespace().namespace)
-  assert.equal(await empty.cacheGet({ text: '原文', lang: 'zh', promptVersion: 'v1' }), null)
+  assert.equal(await empty.cacheGet({ text: '原文', lang: 'zh', promptVersion: 'v1', translateComments: true }), null)
   assert.equal(await empty.load({ sessionId: 's1', path: 'a.md', lang: 'zh' }), null)
 })

@@ -72,6 +72,33 @@ export interface WorkspaceFilesRemote {
   ): Promise<RemoteResult<WorkspaceFileBytes>>
 }
 
+/** One provider/model pair the Host resolved from the plugin settings. */
+export interface ModelChoice {
+  provider: string
+  model: string
+}
+
+/** The target language as a code for paths and the wire, with a label for the prompt. */
+export interface LanguageOption {
+  code: string
+  label: string
+}
+
+/** What the Host's settings resolve to for the next run. */
+export interface TranslationSettings {
+  lang: string
+  /** null means the Host resolves the session default. */
+  model: ModelChoice | null
+  translateComments: boolean
+}
+
+/** The Host's prompt identity plus the effective settings the client must use. */
+export interface DescribeView {
+  promptVersion: string
+  settings: TranslationSettings
+  languages: readonly LanguageOption[]
+}
+
 /** One translation request the Body hands to the Host half. */
 export interface TranslateRequest {
   sessionId: string
@@ -82,6 +109,7 @@ export interface TranslateRequest {
   model?: string
   promptVersion: string
   extraInstruction?: string
+  translateComments: boolean
 }
 
 /** What identifies one translation's cached result; an absent instruction and '' are the same on the wire. */
@@ -96,6 +124,7 @@ export interface CacheGetRequest extends PromptInput {
   lang: string
   provider?: string
   model?: string
+  translateComments: boolean
 }
 
 /** One finished translation, stored under the same key `cacheGet` will use. */
@@ -107,10 +136,14 @@ export interface CachePutRequest extends CacheGetRequest {
 }
 
 /** The mirrored file pair to write for one finished translation. */
-export interface TranslationSaveRequest extends CacheGetRequest {
+export interface TranslationSaveRequest extends PromptInput {
   sessionId: string
   path: string
+  text: string
   translated: string
+  lang: string
+  provider?: string
+  model?: string
   aligned: boolean
 }
 
@@ -124,6 +157,9 @@ export interface TranslationLoadRequest {
 /** The stored metadata fields this Body reads. */
 export interface TranslationMeta {
   promptVersion: string
+  lang: string
+  provider: string
+  model: string
 }
 
 export interface CachedTranslation {
@@ -147,11 +183,35 @@ export interface LoadedTranslation {
 /** The Host half as the Body sees it. */
 export interface HostBridge {
   translate(request: TranslateRequest): Promise<string>
-  describePrompt(): Promise<string>
+  describe(): Promise<DescribeView>
   cacheGet(request: CacheGetRequest): Promise<CachedTranslation | null>
   cachePut(request: CachePutRequest): Promise<void>
   save(request: TranslationSaveRequest): Promise<SavedTranslation>
   load(request: TranslationLoadRequest): Promise<LoadedTranslation | null>
+}
+
+/** The plugin-page config form surface, declared structurally. */
+export type SettingsOp =
+  | { op: 'set'; path: string[]; value: unknown }
+  | { op: 'unset'; path: string[] }
+
+export interface ConfigFormSnapshotLike {
+  status: 'loading' | 'ready' | 'unavailable'
+  value: Record<string, unknown> | undefined
+  user?: unknown
+  revision?: number
+  writable: boolean
+}
+
+export interface ConfigFormLike {
+  getSnapshot(): ConfigFormSnapshotLike
+  subscribe(listener: () => void): () => void
+  mutate(ops: readonly SettingsOp[], revision?: number): Promise<boolean>
+}
+
+export interface ConfigFormsService {
+  get(entryId: string): ConfigFormLike
+  whileServed?(ids: readonly string[], register: () => () => void): () => void
 }
 
 /** One captured right-click target; the shared menu resolves actions for its kind. */
@@ -195,4 +255,5 @@ export interface ClientContext {
   documentPreviews: DocumentPreviews
   remote: { workspaceFiles: WorkspaceFilesRemote }
   contextMenus: ContextMenusService
+  configForms?: ConfigFormsService
 }

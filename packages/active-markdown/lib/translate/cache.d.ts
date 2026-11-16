@@ -23,6 +23,7 @@ export interface CacheGetInput {
     readonly provider?: string;
     readonly model?: string;
     readonly promptVersion: string;
+    readonly translateComments: boolean;
     readonly extraInstruction?: string;
 }
 export interface CachePutInput extends CacheGetInput {

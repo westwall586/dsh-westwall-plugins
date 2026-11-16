@@ -1,7 +1,9 @@
 import { RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
 import { createTranslationCache, openCacheStore, } from "./translate/cache.js";
+import { LANGUAGES } from "./translate/language.js";
 import { PROMPT_VERSION } from "./translate/prompt.js";
 import { translateRequest, TranslateError, } from "./translate/request.js";
+import { Config, configSnapshot } from "./settings.js";
 import { createTranslationStore, nodeFiles, } from "./translate/store.js";
 const REMOTE_CODES = {
     'invalid-session': 'activeMarkdown/invalid-request',
@@ -19,10 +21,11 @@ const REMOTE_CODES = {
     'write-failed': 'activeMarkdown/write-failed',
 };
 export default class ActiveMarkdown extends TypertRemoteService {
+    static Config = Config;
     constructor(ctx) {
         super(ctx, 'activeMarkdown');
     }
-    async translate(sessionId, path, text, lang, provider, model, promptVersion, extraInstruction) {
+    async translate(sessionId, path, text, lang, provider, model, promptVersion, extraInstruction, translateComments) {
         const request = {
             sessionId,
             path,
@@ -31,6 +34,7 @@ export default class ActiveMarkdown extends TypertRemoteService {
             ...(provider === undefined ? {} : { provider }),
             ...(model === undefined ? {} : { model }),
             promptVersion: textField(promptVersion),
+            translateComments: this.commentsFor(translateComments),
             ...(extraInstruction === undefined ? {} : { extraInstruction }),
         };
         return this.call(() => translateRequest({
@@ -40,10 +44,19 @@ export default class ActiveMarkdown extends TypertRemoteService {
         }));
     }
     describe() {
-        return { promptVersion: PROMPT_VERSION };
+        const settings = this.settings();
+        return {
+            promptVersion: PROMPT_VERSION,
+            settings: {
+                lang: settings.lang,
+                model: settings.model,
+                translateComments: settings.translateComments,
+            },
+            languages: LANGUAGES,
+        };
     }
     /** Read an automatic cache entry without touching the model. */
-    async cacheGet(text, lang, provider, model, promptVersion, extraInstruction) {
+    async cacheGet(text, lang, provider, model, promptVersion, extraInstruction, translateComments) {
         return this.call(async () => {
             const cache = await this.cache();
             return cache.cacheGet({
@@ -52,12 +65,13 @@ export default class ActiveMarkdown extends TypertRemoteService {
                 ...(provider === undefined ? {} : { provider }),
                 ...(model === undefined ? {} : { model }),
                 promptVersion: textField(promptVersion),
+                translateComments: this.commentsFor(translateComments),
                 ...(extraInstruction === undefined ? {} : { extraInstruction }),
             });
         });
     }
     /** Store a successful translation under the same key `cacheGet` will use. */
-    async cachePut(text, translated, lang, provider, model, promptVersion, extraInstruction, aligned, sourceLines, translatedLines) {
+    async cachePut(text, translated, lang, provider, model, promptVersion, extraInstruction, aligned, sourceLines, translatedLines, translateComments) {
         return this.call(async () => {
             const cache = await this.cache();
             return cache.cachePut({
@@ -67,6 +81,7 @@ export default class ActiveMarkdown extends TypertRemoteService {
                 ...(provider === undefined ? {} : { provider }),
                 ...(model === undefined ? {} : { model }),
                 promptVersion: textField(promptVersion),
+                translateComments: this.commentsFor(translateComments),
                 ...(extraInstruction === undefined ? {} : { extraInstruction }),
                 aligned: aligned === true,
                 sourceLines: sourceLines ?? 0,
@@ -102,6 +117,22 @@ export default class ActiveMarkdown extends TypertRemoteService {
                 throw new RemoteError(REMOTE_CODES[error.code], error.message, {});
             throw error;
         }
+    }
+    /**
+     * The effective settings, read fresh so a plugin-page write applies to the
+     * next run. A client that sends its own comment policy still wins, because
+     * that run's cache key must match the prompt that produced it.
+     */
+    settings() {
+        try {
+            return configSnapshot(this.ctx.fiber?.rawConfig);
+        }
+        catch {
+            return configSnapshot(undefined);
+        }
+    }
+    commentsFor(explicit) {
+        return typeof explicit === 'boolean' ? explicit : this.settings().translateComments;
     }
     fileStoreValue;
     cacheValue;

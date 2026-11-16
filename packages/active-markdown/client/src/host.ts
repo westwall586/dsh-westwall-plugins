@@ -9,6 +9,7 @@ import type {
   CachePutRequest,
   CachedTranslation,
   ClientContext,
+  DescribeView,
   HostBridge,
   LoadedTranslation,
   SavedTranslation,
@@ -28,11 +29,14 @@ const PARAM = (name: string) => ({ name, wire: name, source: 'json' as const, co
 /** Wire parameter names, in the order the Host declares them. */
 const WIRE = {
   describe: [],
-  translate: ['sessionId', 'path', 'text', 'lang', 'provider', 'model', 'promptVersion', 'extraInstruction'],
-  cacheGet: ['text', 'lang', 'provider', 'model', 'promptVersion', 'extraInstruction'],
+  translate: [
+    'sessionId', 'path', 'text', 'lang', 'provider', 'model', 'promptVersion', 'extraInstruction',
+    'translateComments',
+  ],
+  cacheGet: ['text', 'lang', 'provider', 'model', 'promptVersion', 'extraInstruction', 'translateComments'],
   cachePut: [
     'text', 'translated', 'lang', 'provider', 'model', 'promptVersion', 'extraInstruction',
-    'aligned', 'sourceLines', 'translatedLines',
+    'aligned', 'sourceLines', 'translatedLines', 'translateComments',
   ],
   translationSave: [
     'sessionId', 'path', 'text', 'translated', 'lang', 'provider', 'model', 'promptVersion',
@@ -85,7 +89,7 @@ function unwrap<T>(result: RemoteOutcome<T>): T {
 
 /** The gateway installs remote methods positionally and rejects an arity mismatch. */
 export interface Namespace {
-  describe(): Promise<RemoteOutcome<{ promptVersion: string }>>
+  describe(): Promise<RemoteOutcome<DescribeView>>
   translate(
     sessionId: string,
     path: string,
@@ -95,6 +99,7 @@ export interface Namespace {
     model: string,
     promptVersion: string,
     extraInstruction: string,
+    translateComments: boolean,
   ): Promise<RemoteOutcome<{ text: string }>>
   cacheGet(
     text: string,
@@ -103,6 +108,7 @@ export interface Namespace {
     model: string,
     promptVersion: string,
     extraInstruction: string,
+    translateComments: boolean,
   ): Promise<RemoteOutcome<CachedTranslation | null>>
   cachePut(
     text: string,
@@ -115,6 +121,7 @@ export interface Namespace {
     aligned: boolean,
     sourceLines: number,
     translatedLines: number,
+    translateComments: boolean,
   ): Promise<RemoteOutcome<Record<string, never>>>
   translationSave(
     sessionId: string,
@@ -147,10 +154,11 @@ export function createBridge(namespace: Namespace): HostBridge {
       request.model ?? '',
       request.promptVersion,
       request.extraInstruction ?? '',
+      request.translateComments,
     )
     return unwrap(result).text
   }
-  const describePrompt = async (): Promise<string> => unwrap(await namespace.describe()).promptVersion
+  const describe = async (): Promise<DescribeView> => unwrap(await namespace.describe())
   const cacheGet = async (request: CacheGetRequest): Promise<CachedTranslation | null> => {
     const result = await namespace.cacheGet(
       request.text,
@@ -159,6 +167,7 @@ export function createBridge(namespace: Namespace): HostBridge {
       request.model ?? '',
       request.promptVersion,
       request.extraInstruction ?? '',
+      request.translateComments,
     )
     return unwrap(result) ?? null
   }
@@ -174,6 +183,7 @@ export function createBridge(namespace: Namespace): HostBridge {
       request.aligned,
       request.sourceLines,
       request.translatedLines,
+      request.translateComments,
     ))
   }
   const save = async (request: TranslationSaveRequest): Promise<SavedTranslation> => unwrap(await namespace.translationSave(
@@ -190,7 +200,7 @@ export function createBridge(namespace: Namespace): HostBridge {
   ))
   const load = async (request: TranslationLoadRequest): Promise<LoadedTranslation | null> =>
     unwrap(await namespace.translationLoad(request.sessionId, request.path, request.lang)) ?? null
-  return { translate, describePrompt, cacheGet, cachePut, save, load }
+  return { translate, describe, cacheGet, cachePut, save, load }
 }
 
 const MOUNT_TIMEOUT_MS = 4000

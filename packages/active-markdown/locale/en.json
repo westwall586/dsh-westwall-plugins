@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Active Markdown",
-    "description": "Takes over the body of a Markdown preview in the right sidebar and renders headings, lists, tables, code, and images as interactive blocks. The path, reload, and open-in-app actions stay native, and the viewer menu switches back to native Markdown at any time."
+    "description": "Long Markdown previews read as one page, and English docs have no Chinese view. Takes over the sidebar body and renders blocks, translates line-aligned from Translated, looks up a source line from the context menu, and saves to the workspace; set the model, target language, and code comments on the plugin page."
   }
 }

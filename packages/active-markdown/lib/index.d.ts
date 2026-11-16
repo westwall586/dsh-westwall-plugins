@@ -28,18 +28,26 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     }
 }
 export default class ActiveMarkdown extends TypertRemoteService {
+    static Config: unknown;
     constructor(ctx: Context);
-    translate(sessionId: string, path: string, text: string, lang: string, provider?: string, model?: string, promptVersion?: string, extraInstruction?: string): Promise<TranslateView>;
+    translate(sessionId: string, path: string, text: string, lang: string, provider?: string, model?: string, promptVersion?: string, extraInstruction?: string, translateComments?: boolean): Promise<TranslateView>;
     describe(): DescribeView;
     /** Read an automatic cache entry without touching the model. */
-    cacheGet(text: string, lang: string, provider?: string, model?: string, promptVersion?: string, extraInstruction?: string): Promise<CachedTranslation | null>;
+    cacheGet(text: string, lang: string, provider?: string, model?: string, promptVersion?: string, extraInstruction?: string, translateComments?: boolean): Promise<CachedTranslation | null>;
     /** Store a successful translation under the same key `cacheGet` will use. */
-    cachePut(text: string, translated: string, lang: string, provider?: string, model?: string, promptVersion?: string, extraInstruction?: string, aligned?: boolean, sourceLines?: number, translatedLines?: number): Promise<CachePutView>;
+    cachePut(text: string, translated: string, lang: string, provider?: string, model?: string, promptVersion?: string, extraInstruction?: string, aligned?: boolean, sourceLines?: number, translatedLines?: number, translateComments?: boolean): Promise<CachePutView>;
     /** Write the mirrored Markdown + JSON pair under `.dsh-active-markdown/translate/`. */
     translationSave(sessionId: string, path: string, text: string, translated: string, lang: string, provider?: string, model?: string, promptVersion?: string, extraInstruction?: string, aligned?: boolean): Promise<TranslationSaveView>;
     /** Read a saved pair from the workspace and say whether the source moved on. */
     translationLoad(sessionId: string, path: string, lang: string): Promise<TranslationLoadView | null>;
     private call;
+    /**
+     * The effective settings, read fresh so a plugin-page write applies to the
+     * next run. A client that sends its own comment policy still wins, because
+     * that run's cache key must match the prompt that produced it.
+     */
+    private settings;
+    private commentsFor;
     private fileStoreValue?;
     private cacheValue?;
     private fileStore;

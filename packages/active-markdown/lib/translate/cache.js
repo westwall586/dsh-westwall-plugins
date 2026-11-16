@@ -1,7 +1,7 @@
 /**
  * 自动缓存：一次成功翻译的整篇译文按内容身份存进插件存储，读者看不到它。
- * 键含源 hash、语言、实际用到的 provider/model、提示词版本与补充要求 hash；
- * 任何一项不同都是一次新翻译，绝不拿旧结果冒充。缓存在一次会话结束后仍可
+ * 键含源 hash、语言、实际用到的 provider/model、提示词版本、代码注释策略与
+ * 补充要求 hash；任何一项不同都是一次新翻译，绝不拿旧结果冒充。缓存在一次会话结束后仍可
  * 复用，删掉它最多是重翻一次，所以落盘失败只警告、不打断翻译。
  */
 import { z } from 'zod';
@@ -85,6 +85,7 @@ function parseInput(input) {
         ...(provider === '' ? {} : { provider }),
         ...(model === '' ? {} : { model }),
         promptVersion: textField(input.promptVersion),
+        translateComments: input.translateComments === true,
         ...(extraInstruction === '' ? {} : { extraInstruction }),
     };
 }
@@ -102,6 +103,7 @@ function keyFor(request, selection) {
         provider: selection.provider,
         model: selection.model,
         promptVersion: request.promptVersion,
+        translateComments: request.translateComments,
         ...(request.extraInstruction === undefined ? {} : { extraInstruction: request.extraInstruction }),
     });
 }

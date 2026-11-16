@@ -14,7 +14,12 @@ import {
 
 const SOURCE = '# Title\n\nLine one.\nLine two.\n'
 const TRANSLATED = '# 标题\n\n第一行。\n第二行。\n'
-const RUN: PromptRun = { promptVersion: 'am.translate.v1', extraInstruction: '' }
+const RUN: PromptRun = {
+  promptVersion: 'am.translate.v1',
+  extraInstruction: '',
+  lang: 'zh',
+  translateComments: true,
+}
 
 test('缓存里的译文能看，但没有可保存的副本', () => {
   const restored = readyState({ text: TRANSLATED, sourceText: SOURCE, source: { kind: 'cache' }, run: RUN })

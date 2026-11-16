@@ -1,9 +1,11 @@
 /**
  * 用户保存：把一份译文写成工作区里的镜像文件对，Markdown 给读，JSON 给机器。
- * 路径从源路径直接算出，不维护中央清单：`docs/a/README.md` 落到
- * `.dsh-active-markdown/translate/docs/a/README.<lang>.md`，不同目录的同名文档
- * 因此不会互相覆盖。工作区外的文档没有相对路径可镜像，按路径 sha1 收进
- * `_external/<前 8 位>/`，完整路径记在元数据里。
+ * 路径从源路径直接算出，不维护中央清单：语言是目录，正文保持源文件名，元数据
+ * 在平行的 index 树里。`docs/a/README.md` + `zh` 落到
+ * `.dsh-active-markdown/translate/zh/docs/a/README.md`，元数据落到
+ * `.dsh-active-markdown/index/translate/zh/docs/a/README.json`。不同目录的同名
+ * 文档、同一文档的不同语言因此都不会互相覆盖。工作区外的文档没有相对路径可
+ * 镜像，按路径 sha1 收进 `_external/<前 8 位>/`，完整路径记在元数据里。
  */
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, isAbsolute, relative, resolve, sep } from 'node:path';
@@ -13,6 +15,7 @@ import { errorText, requireLanguage, requireSessionId, requireText } from "./bou
 import { resolveModel, TranslateError } from "./request.js";
 export const STORE_ROOT = '.dsh-active-markdown';
 export const TRANSLATE_ROOT = `${STORE_ROOT}/translate`;
+export const INDEX_ROOT = `${STORE_ROOT}/index`;
 export const EXTERNAL_ROOT = '_external';
 export const STORE_GITIGNORE = '*\n!.gitignore\n';
 const translationMetaSchema = z.object({
@@ -57,18 +60,14 @@ function isInside(root, candidate) {
     const path = relative(root, candidate);
     return path === '' || (!path.startsWith(`..${sep}`) && path !== '..' && !isAbsolute(path));
 }
-/** 去掉扩展名，把语言后缀放在原扩展名之前：`README.md` → `README.zh.md`。 */
-function languageName(name, lang) {
-    const ext = extname(name);
-    const stem = ext === '' ? name : name.slice(0, name.length - ext.length);
-    if (stem === '' || stem === '.' || stem === '..') {
+function requireFileName(name) {
+    if (name === '' || name === '.' || name === '..') {
         throw new TranslateError('invalid-path', `不是有效的文档文件名：${name}`);
     }
-    return `${stem}.${lang}${ext}`;
 }
 /**
- * 纯路径计算：源路径 → 镜像路径。`..` 与指向工作区内的绝对路径在这里拒绝，
- * 保证写盘目标永远是 `translate/` 之下的相对路径。
+ * 纯路径计算：源路径 → `translate/<code>/` 之下的镜像路径。`..` 与指向工作区
+ * 内的绝对路径在这里拒绝，保证写盘目标永远在 `translate/` 下。
  */
 export function mirrorOf(input) {
     const source = typeof input.path === 'string' ? input.path.trim() : '';
@@ -78,24 +77,22 @@ export function mirrorOf(input) {
     if (slash.split('/').includes('..')) {
         throw new TranslateError('invalid-path', `路径不能包含 ..：${source}`);
     }
-    const lang = requireLanguage(input.lang);
     if (isAbsolute(source)) {
         const absolute = resolve(source);
         if (isInside(resolve(input.workspace), absolute)) {
             throw new TranslateError('invalid-path', `工作区内的文档请使用会话相对路径：${source}`);
         }
-        const name = languageName(basename(absolute), lang);
+        const name = basename(absolute);
+        requireFileName(name);
         return { relative: `${EXTERNAL_ROOT}/${sha1Hex(absolute).slice(0, 8)}/${name}`, sourcePath: absolute };
     }
     const segments = slash.split('/').filter(segment => segment !== '' && segment !== '.');
     if (segments.length === 0)
         throw new TranslateError('invalid-path', `文档路径为空：${source}`);
-    const name = languageName(segments[segments.length - 1], lang);
-    return {
-        relative: [...segments.slice(0, -1), name].join('/'),
-        sourcePath: segments.join('/'),
-    };
+    requireFileName(segments[segments.length - 1]);
+    return { relative: segments.join('/'), sourcePath: segments.join('/') };
 }
+/** 正文镜像路径 → 平行 index 树里的元数据路径：换掉最后一个扩展名。 */
 function metadataPathOf(mirrorRelative) {
     const ext = extname(mirrorRelative);
     return `${mirrorRelative.slice(0, mirrorRelative.length - ext.length)}.json`;
@@ -127,7 +124,7 @@ export function createTranslationStore(deps) {
                 ...(input.model === undefined ? {} : { model: input.model }),
                 readDefault: deps.readDefault,
             });
-            const mirror = mirrorOf({ path: input.path, lang, workspace });
+            const mirror = mirrorOf({ path: input.path, workspace });
             const meta = {
                 sourcePath: mirror.sourcePath,
                 sourceHash: sha256Hex(normalizeSource(text)),
@@ -140,9 +137,11 @@ export function createTranslationStore(deps) {
                 aligned: input.aligned === true,
                 savedAt: now().toISOString(),
             };
-            const translateRoot = resolve(workspace, TRANSLATE_ROOT);
+            const translateRoot = resolve(workspace, TRANSLATE_ROOT, lang);
+            const indexRoot = resolve(workspace, INDEX_ROOT, 'translate', lang);
             const markdownPath = resolve(translateRoot, mirror.relative);
-            if (!isInside(translateRoot, markdownPath)) {
+            const metadataPath = resolve(indexRoot, metadataPathOf(mirror.relative));
+            if (!isInside(translateRoot, markdownPath) || !isInside(indexRoot, metadataPath)) {
                 throw new TranslateError('invalid-path', `镜像路径越出保存目录：${mirror.relative}`);
             }
             try {
@@ -151,12 +150,12 @@ export function createTranslationStore(deps) {
                     await deps.files.write(gitignorePath, STORE_GITIGNORE);
                 }
                 await deps.files.write(markdownPath, translated);
-                await deps.files.write(resolve(translateRoot, metadataPathOf(mirror.relative)), `${JSON.stringify(meta, null, 2)}\n`);
+                await deps.files.write(metadataPath, `${JSON.stringify(meta, null, 2)}\n`);
             }
             catch (error) {
                 throw new TranslateError('write-failed', `保存译文失败（${mirror.relative}）：${errorText(error)}`);
             }
-            return { file: `${TRANSLATE_ROOT}/${mirror.relative}`, meta };
+            return { file: `${TRANSLATE_ROOT}/${lang}/${mirror.relative}`, meta };
         },
         async load(input) {
             const sessionId = requireSessionId(input.sessionId);
@@ -164,10 +163,11 @@ export function createTranslationStore(deps) {
             const workspace = await deps.workspaceOf(sessionId);
             if (workspace === null)
                 throw new TranslateError('unknown-session', `未知会话：${sessionId}`);
-            const mirror = mirrorOf({ path: input.path, lang, workspace });
-            const translateRoot = resolve(workspace, TRANSLATE_ROOT);
+            const mirror = mirrorOf({ path: input.path, workspace });
+            const translateRoot = resolve(workspace, TRANSLATE_ROOT, lang);
+            const indexRoot = resolve(workspace, INDEX_ROOT, 'translate', lang);
             const markdownPath = resolve(translateRoot, mirror.relative);
-            const metadataPath = resolve(translateRoot, metadataPathOf(mirror.relative));
+            const metadataPath = resolve(indexRoot, metadataPathOf(mirror.relative));
             try {
                 const [text, rawMeta] = await Promise.all([deps.files.read(markdownPath), deps.files.read(metadataPath)]);
                 if (text === null || rawMeta === null)

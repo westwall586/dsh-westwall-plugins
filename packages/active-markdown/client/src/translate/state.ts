@@ -7,10 +7,18 @@
  */
 import { countLines } from './plan.ts'
 
-/** The prompt identity of one run; '' means the run carried no instruction. */
+/**
+ * The identity of the run that produced a translation. It travels with the
+ * ready state so 保存 and the cache use the same language, model, and prompt
+ * that produced the text, even after the plugin-page settings change.
+ */
 export interface PromptRun {
   readonly promptVersion: string
   readonly extraInstruction: string
+  readonly lang: string
+  readonly provider?: string
+  readonly model?: string
+  readonly translateComments: boolean
 }
 
 /**

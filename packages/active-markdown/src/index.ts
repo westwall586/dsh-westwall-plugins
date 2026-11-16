@@ -18,6 +18,7 @@ import {
   type StorageDomainFacility,
   type TranslationCache,
 } from './translate/cache.ts'
+import { LANGUAGES } from './translate/language.ts'
 import { PROMPT_VERSION } from './translate/prompt.ts'
 import {
   translateRequest,
@@ -28,6 +29,7 @@ import {
   type TranslateInput,
   type TranslateView,
 } from './translate/request.ts'
+import { Config, configSnapshot, type ActiveMarkdownConfig } from './settings.ts'
 import {
   createTranslationStore,
   nodeFiles,
@@ -104,6 +106,8 @@ interface SessionPersistenceLike {
 }
 
 export default class ActiveMarkdown extends TypertRemoteService {
+  static Config = Config
+
   constructor(ctx: Context) {
     super(ctx, 'activeMarkdown')
   }
@@ -117,6 +121,7 @@ export default class ActiveMarkdown extends TypertRemoteService {
     model?: string,
     promptVersion?: string,
     extraInstruction?: string,
+    translateComments?: boolean,
   ): Promise<TranslateView> {
     const request: TranslateInput = {
       sessionId,
@@ -126,6 +131,7 @@ export default class ActiveMarkdown extends TypertRemoteService {
       ...(provider === undefined ? {} : { provider }),
       ...(model === undefined ? {} : { model }),
       promptVersion: textField(promptVersion),
+      translateComments: this.commentsFor(translateComments),
       ...(extraInstruction === undefined ? {} : { extraInstruction }),
     }
     return this.call(() =>
@@ -138,7 +144,16 @@ export default class ActiveMarkdown extends TypertRemoteService {
   }
 
   describe(): DescribeView {
-    return { promptVersion: PROMPT_VERSION }
+    const settings = this.settings()
+    return {
+      promptVersion: PROMPT_VERSION,
+      settings: {
+        lang: settings.lang,
+        model: settings.model,
+        translateComments: settings.translateComments,
+      },
+      languages: LANGUAGES,
+    }
   }
 
   /** Read an automatic cache entry without touching the model. */
@@ -149,6 +164,7 @@ export default class ActiveMarkdown extends TypertRemoteService {
     model?: string,
     promptVersion?: string,
     extraInstruction?: string,
+    translateComments?: boolean,
   ): Promise<CachedTranslation | null> {
     return this.call(async () => {
       const cache = await this.cache()
@@ -158,6 +174,7 @@ export default class ActiveMarkdown extends TypertRemoteService {
         ...(provider === undefined ? {} : { provider }),
         ...(model === undefined ? {} : { model }),
         promptVersion: textField(promptVersion),
+        translateComments: this.commentsFor(translateComments),
         ...(extraInstruction === undefined ? {} : { extraInstruction }),
       })
     })
@@ -175,6 +192,7 @@ export default class ActiveMarkdown extends TypertRemoteService {
     aligned?: boolean,
     sourceLines?: number,
     translatedLines?: number,
+    translateComments?: boolean,
   ): Promise<CachePutView> {
     return this.call(async () => {
       const cache = await this.cache()
@@ -185,6 +203,7 @@ export default class ActiveMarkdown extends TypertRemoteService {
         ...(provider === undefined ? {} : { provider }),
         ...(model === undefined ? {} : { model }),
         promptVersion: textField(promptVersion),
+        translateComments: this.commentsFor(translateComments),
         ...(extraInstruction === undefined ? {} : { extraInstruction }),
         aligned: aligned === true,
         sourceLines: sourceLines ?? 0,
@@ -234,6 +253,23 @@ export default class ActiveMarkdown extends TypertRemoteService {
       if (error instanceof TranslateError) throw new RemoteError(REMOTE_CODES[error.code], error.message, {})
       throw error
     }
+  }
+
+  /**
+   * The effective settings, read fresh so a plugin-page write applies to the
+   * next run. A client that sends its own comment policy still wins, because
+   * that run's cache key must match the prompt that produced it.
+   */
+  private settings(): ActiveMarkdownConfig {
+    try {
+      return configSnapshot((this.ctx as unknown as { fiber?: { rawConfig?: unknown } }).fiber?.rawConfig)
+    } catch {
+      return configSnapshot(undefined)
+    }
+  }
+
+  private commentsFor(explicit: boolean | undefined): boolean {
+    return typeof explicit === 'boolean' ? explicit : this.settings().translateComments
   }
 
   private fileStoreValue?: TranslationStore

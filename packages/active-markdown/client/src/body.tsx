@@ -1,7 +1,7 @@
 /** The document body: read, fallbacks, and the rendered Markdown. */
 import * as React from 'react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { ContextMenuTarget, HostBridge, Translate, WorkspaceFilesRemote } from './context.ts'
+import type { ContextMenuTarget, DescribeView, HostBridge, Translate, WorkspaceFilesRemote } from './context.ts'
 import { createImageResolver, type ImageResolver } from './images.ts'
 import { classifyLink } from './links.ts'
 import { parseDocument } from './markdown/blocks.ts'
@@ -99,9 +99,15 @@ function scrollportOf(element: HTMLElement | null): HTMLElement | null {
   return null
 }
 
-/** Hard-coded until the settings slice lands; the plugin page will own both. */
-const TARGET_LANGUAGE = '简体中文'
-const FALLBACK_PROMPT_VERSION = 'am.translate.v1'
+/**
+ * Only for a failed describe call: the default language code and prompt
+ * version keep a run possible, and the next run reads the Host again.
+ */
+const FALLBACK_DESCRIBE: DescribeView = {
+  promptVersion: 'am.translate.v1',
+  settings: { lang: 'zh', model: null, translateComments: true },
+  languages: [],
+}
 /** The popover stays narrower than the peek panel so it never fills a narrow pane. */
 const ASK_WIDTH = 300
 
@@ -150,25 +156,45 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
     void (async () => {
       const bridge = await host().catch(() => undefined)
       if (bridge === undefined) return
-      const lang = TARGET_LANGUAGE
-      const saved = await bridge.load({ sessionId, path, lang }).catch(() => null)
-      const promptVersion = await bridge.describePrompt().catch(() => FALLBACK_PROMPT_VERSION)
+      const described = await bridge.describe().catch(() => FALLBACK_DESCRIBE)
+      const settings = described.settings
+      const saved = await bridge.load({ sessionId, path, lang: settings.lang }).catch(() => null)
       let restored: ReadyTranslation | undefined
       if (saved !== null) {
         restored = readyState({
           text: saved.text,
           sourceText,
           source: { kind: 'saved', stale: saved.stale, dismissed: false },
-          run: { promptVersion: saved.meta.promptVersion || promptVersion, extraInstruction: '' },
+          run: {
+            promptVersion: saved.meta.promptVersion || described.promptVersion,
+            extraInstruction: '',
+            lang: saved.meta.lang || settings.lang,
+            provider: saved.meta.provider,
+            model: saved.meta.model,
+            translateComments: settings.translateComments,
+          },
         })
       } else {
-        const cached = await bridge.cacheGet({ text: sourceText, lang, promptVersion }).catch(() => null)
+        const cached = await bridge.cacheGet({
+          text: sourceText,
+          lang: settings.lang,
+          ...(settings.model === null ? {} : settings.model),
+          promptVersion: described.promptVersion,
+          translateComments: settings.translateComments,
+        }).catch(() => null)
         if (cached !== null) {
           restored = readyState({
             text: cached.text,
             sourceText,
             source: { kind: 'cache' },
-            run: { promptVersion, extraInstruction: '' },
+            run: {
+              promptVersion: described.promptVersion,
+              extraInstruction: '',
+              lang: cached.meta.lang || settings.lang,
+              provider: cached.meta.provider,
+              model: cached.meta.model,
+              translateComments: settings.translateComments,
+            },
           })
         }
       }
@@ -357,16 +383,25 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
     void (async () => {
       try {
         const bridge = await host()
-        const promptVersion = await bridge.describePrompt().catch(() => FALLBACK_PROMPT_VERSION)
-        const run: PromptRun = { promptVersion, extraInstruction }
+        const described = await bridge.describe().catch(() => FALLBACK_DESCRIBE)
+        const settings = described.settings
+        const run: PromptRun = {
+          promptVersion: described.promptVersion,
+          extraInstruction,
+          lang: settings.lang,
+          ...(settings.model === null ? {} : settings.model),
+          translateComments: settings.translateComments,
+        }
         // The reader asked for a translation that may already exist, so a stored
         // result answers with no model call. An explicit re-translate must produce
         // a new one, so it never takes this branch.
         if (reuseStored) {
           const cached = await bridge.cacheGet({
             text: document.text,
-            lang: TARGET_LANGUAGE,
-            promptVersion,
+            lang: settings.lang,
+            ...(settings.model === null ? {} : settings.model),
+            promptVersion: described.promptVersion,
+            translateComments: settings.translateComments,
             extraInstruction,
           }).catch(() => null)
           if (token !== requestToken.current) return
@@ -385,9 +420,11 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
             sessionId: sessionId ?? '',
             path: path ?? '',
             text: sourceLines.slice(range.start, range.end).join('\n'),
-            lang: TARGET_LANGUAGE,
-            promptVersion,
+            lang: settings.lang,
+            ...(settings.model === null ? {} : settings.model),
+            promptVersion: described.promptVersion,
             extraInstruction,
+            translateComments: settings.translateComments,
           }))
           if (token !== requestToken.current) return
           // Land every finished chunk at once: the unfinished ones keep their source lines,
@@ -404,9 +441,12 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
         void bridge.cachePut({
           text: document.text,
           translated: text,
-          lang: TARGET_LANGUAGE,
-          promptVersion,
-          extraInstruction,
+          lang: run.lang,
+          ...(run.provider === undefined ? {} : { provider: run.provider }),
+          ...(run.model === undefined ? {} : { model: run.model }),
+          promptVersion: run.promptVersion,
+          translateComments: run.translateComments,
+          extraInstruction: run.extraInstruction,
           aligned: ready.sourceLines === ready.translatedLines,
           sourceLines: ready.sourceLines,
           translatedLines: ready.translatedLines,
@@ -454,7 +494,9 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
           path,
           text: state.text,
           translated: ready.text,
-          lang: TARGET_LANGUAGE,
+          lang: ready.run.lang,
+          ...(ready.run.provider === undefined ? {} : { provider: ready.run.provider }),
+          ...(ready.run.model === undefined ? {} : { model: ready.run.model }),
           promptVersion: ready.run.promptVersion,
           extraInstruction: ready.run.extraInstruction,
           aligned: ready.sourceLines === ready.translatedLines,
@@ -531,7 +573,9 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
               )}
               {translation.status === 'ready' && (translation.sourceLines === translation.translatedLines
                 ? t('translate.aligned', { lines: translation.translatedLines })
-                : t('translate.unaligned', { translated: translation.translatedLines, source: translation.sourceLines }))}
+                : staleNoticeOf(translation)
+                  ? null
+                  : t('translate.unaligned', { translated: translation.translatedLines, source: translation.sourceLines }))}
               {translation.status === 'failed' && (
                 <>
                   <span className="am-toolbar-error">{t('translate.failed', { message: translation.message })}</span>

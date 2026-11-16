@@ -50,6 +50,7 @@ export function validateInput(input) {
         lang,
         ...(provider === '' ? {} : { provider }),
         ...(model === '' ? {} : { model }),
+        translateComments: input.translateComments === true,
         ...(extraInstruction === '' ? {} : { extraInstruction }),
     };
 }
@@ -92,6 +93,7 @@ export async function translateRequest(input) {
     const maxTokens = await maxTokensFor(input.llm, provider, model);
     const system = buildSystemPrompt({
         lang: request.lang,
+        translateComments: request.translateComments,
         ...(request.extraInstruction === undefined ? {} : { extraInstruction: request.extraInstruction }),
     });
     const result = await callTranslation({

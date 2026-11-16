@@ -5,6 +5,7 @@
  * The Cordis service only maps typed failures onto Remote codes.
  */
 import { type LlmLike } from './call.ts';
+import type { LanguageOption } from './language.ts';
 export declare const MAX_TEXT_BYTES: number;
 export type TranslateErrorCode = 'invalid-session' | 'unknown-session' | 'invalid-path' | 'invalid-text' | 'text-too-large' | 'invalid-language' | 'no-model' | 'prompt-version' | 'provider-unknown' | 'llm-unavailable' | 'model-failed' | 'read-failed' | 'write-failed';
 /** A boundary or model refusal; the service maps each code onto one Remote failure code. */
@@ -21,17 +22,29 @@ export interface TranslateInput {
     readonly sessionId: string;
     readonly path: string;
     readonly text: string;
+    /** The target language code; the prompt maps it to a label. */
     readonly lang: string;
     readonly provider?: string;
     readonly model?: string;
     readonly promptVersion: string;
+    readonly translateComments: boolean;
     readonly extraInstruction?: string;
 }
 export interface TranslateView {
     readonly text: string;
 }
+/** What the client reads before a run and what the settings page lists. */
 export interface DescribeView {
     readonly promptVersion: string;
+    readonly settings: EffectiveSettings;
+    readonly languages: readonly LanguageOption[];
+}
+export interface EffectiveSettings {
+    /** The language code the wire, cache keys, and saved paths carry. */
+    readonly lang: string;
+    /** null means the Host resolves the session default. */
+    readonly model: ModelSelection | null;
+    readonly translateComments: boolean;
 }
 export interface ValidatedInput {
     readonly sessionId: string;
@@ -40,6 +53,7 @@ export interface ValidatedInput {
     readonly lang: string;
     readonly provider?: string;
     readonly model?: string;
+    readonly translateComments: boolean;
     readonly extraInstruction?: string;
 }
 /** Parse raw wire fields into the typed request, or refuse with a typed code. */

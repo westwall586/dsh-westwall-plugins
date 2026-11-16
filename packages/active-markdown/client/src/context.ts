@@ -90,6 +90,33 @@ export interface HostBridge {
   describePrompt(): Promise<string>
 }
 
+/** One captured right-click target; the shared menu resolves actions for its kind. */
+export interface ContextMenuTarget {
+  readonly kind: string
+  readonly value: unknown
+}
+
+/** One action the shared menu can show for our target family. */
+export interface MenuAction {
+  readonly id: string
+  readonly label: string
+  readonly disabled?: boolean
+  readonly danger?: boolean
+  readonly separatorBefore?: boolean
+  readonly run?: () => void | Promise<void>
+}
+
+/** The shared context menu, declared structurally: the plugin imports no DSH client package. */
+export interface ContextMenusService {
+  open(target: ContextMenuTarget, point: { x: number, y: number }): void
+  register(contribution: {
+    id: string
+    target: string
+    order: number
+    resolve(target: any, signal: AbortSignal): readonly MenuAction[] | Promise<readonly MenuAction[]>
+  }): () => void
+}
+
 /** The sidebar service used to open an addressed file. */
 export interface SidebarRight {
   openResource(address: string): void
@@ -103,4 +130,5 @@ export interface ClientContext {
   slots: SlotService
   documentPreviews: DocumentPreviews
   remote: { workspaceFiles: WorkspaceFilesRemote }
+  contextMenus: ContextMenusService
 }

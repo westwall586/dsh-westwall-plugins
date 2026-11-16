@@ -1,11 +1,12 @@
 /** The document body: read, fallbacks, and the rendered Markdown. */
 import * as React from 'react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { HostBridge, Translate, WorkspaceFilesRemote } from './context.ts'
+import type { ContextMenuTarget, HostBridge, Translate, WorkspaceFilesRemote } from './context.ts'
 import { createImageResolver, type ImageResolver } from './images.ts'
 import { classifyLink } from './links.ts'
 import { parseDocument } from './markdown/blocks.ts'
 import { MarkdownView } from './markdown/render.tsx'
+import { LINE_MENU_KIND, registerLineHandler, type LineMenuValue } from './menus.ts'
 import { READ_CAP, loadDocument, sessionFileOf } from './source.ts'
 import { assembleTranslation, countLines, normalize, planTranslation } from './translate/plan.ts'
 
@@ -29,6 +30,8 @@ export interface BodyInjected {
   readBytes: WorkspaceFilesRemote['readBytes']
   openResource(address: string): void
   host(): Promise<HostBridge>
+  /** Opens the shared menu; false when the service is absent, so the native menu stays. */
+  openMenu(target: ContextMenuTarget, point: { x: number, y: number }): boolean
 }
 
 export interface BodyProps extends BodyInjected {
@@ -106,7 +109,7 @@ function formatBytes(bytes: number | undefined): string {
  * @param props - owner supplies the address, content protocol state, and locale.
  * @returns the document or its fixed fallback.
  */
-export function Body({ resourceAddress, content, readBytes, openResource, host, t }: BodyProps): ReactNode {
+export function Body({ resourceAddress, content, readBytes, openResource, host, openMenu, t }: BodyProps): ReactNode {
   const file = useMemo(() => sessionFileOf(resourceAddress), [resourceAddress])
   const [state, setState] = useState<BodyState>({ status: 'loading' })
   const container = useRef<HTMLDivElement | null>(null)
@@ -195,30 +198,46 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
   const peekable = view === 'translated' && lineAligned
   const showGutter = lineNumbers && (view === 'source' || peekable)
 
+  const showLine = useCallback((line: number): void => {
+    const root = container.current
+    if (root === null) return
+    const element = root.querySelector(`[data-line="${line}"]`)
+    if (element === null) return
+    const text = normalize(state.status === 'ready' ? state.text : '').split('\n')[line - 1]
+    if (text === undefined) return
+    const rect = element.getBoundingClientRect()
+    setPeek({
+      line,
+      text,
+      left: Math.max(8, Math.min(rect.left, window.innerWidth - PEEK_WIDTH - 8)),
+      top: rect.bottom + PEEK_GAP,
+      bottom: window.innerHeight - rect.top + PEEK_GAP,
+      above: rect.bottom + PEEK_GAP + PEEK_HEIGHT > window.innerHeight,
+    })
+  }, [state])
+
+  const docId = `${sessionId ?? ''}:${path ?? ''}`
+
+  // The menu action runs against the body that owns the document, not the one that is mounted last.
+  useEffect(() => registerLineHandler(docId, showLine), [docId, showLine])
+
   useEffect(() => {
     const root = container.current
     if (root === null || !peekable) return
-    const onClick = (event: MouseEvent): void => {
+    const onContextMenu = (event: MouseEvent): void => {
       const target = event.target
       if (!(target instanceof Element)) return
       const element = target.closest('[data-line]')
       if (element === null || !root.contains(element)) return
       const line = Number(element.getAttribute('data-line'))
-      const text = sourceLines[line - 1]
-      if (!Number.isInteger(line) || text === undefined) return
-      const rect = element.getBoundingClientRect()
-      setPeek({
-        line,
-        text,
-        left: Math.max(8, Math.min(rect.left, window.innerWidth - PEEK_WIDTH - 8)),
-        top: rect.bottom + PEEK_GAP,
-        bottom: window.innerHeight - rect.top + PEEK_GAP,
-        above: rect.bottom + PEEK_GAP + PEEK_HEIGHT > window.innerHeight,
-      })
+      if (!Number.isInteger(line)) return
+      const value: LineMenuValue = { docId, line }
+      if (!openMenu({ kind: LINE_MENU_KIND, value }, { x: event.clientX, y: event.clientY })) return
+      event.preventDefault()
     }
-    root.addEventListener('click', onClick)
-    return () => root.removeEventListener('click', onClick)
-  }, [peekable, sourceLines])
+    root.addEventListener('contextmenu', onContextMenu)
+    return () => root.removeEventListener('contextmenu', onContextMenu)
+  }, [peekable, docId, openMenu])
 
   // A long source line can make the panel taller than the estimate; flip it once
   // the measured height says it would leave the viewport.

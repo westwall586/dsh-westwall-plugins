@@ -28,7 +28,10 @@
       "dsh": ">=0.2.2-rc.2"
     },
     "client": {
-      "platform": "web"
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-context-menu"
+      ]
     }
   },
   "scripts": {

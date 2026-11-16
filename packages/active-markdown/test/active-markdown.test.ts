@@ -1,10 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { apply, inject, name } from '../src/index.ts'
+import ActiveMarkdown from '../src/index.ts'
 
-test('插件导出形状合法', () => {
-  assert.equal(name, 'active-markdown')
-  assert.ok(Array.isArray(inject))
-  assert.equal(typeof apply, 'function')
+test('插件默认导出 Host 服务类', () => {
+  assert.equal(typeof ActiveMarkdown, 'function')
+  assert.equal(ActiveMarkdown.name, 'ActiveMarkdown')
+  assert.equal(typeof ActiveMarkdown.prototype.translate, 'function')
+  assert.equal(typeof ActiveMarkdown.prototype.describe, 'function')
 })

@@ -1,7 +1,7 @@
 /** The document body: read, fallbacks, and the rendered Markdown. */
 import * as React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { Translate, WorkspaceFilesRemote } from './context.ts'
+import type { HostBridge, Translate, WorkspaceFilesRemote } from './context.ts'
 import { createImageResolver, type ImageResolver } from './images.ts'
 import { classifyLink } from './links.ts'
 import { parseDocument } from './markdown/blocks.ts'
@@ -27,6 +27,7 @@ export type BodyContent =
 export interface BodyInjected {
   readBytes: WorkspaceFilesRemote['readBytes']
   openResource(address: string): void
+  host(): Promise<HostBridge>
 }
 
 export interface BodyProps extends BodyInjected {
@@ -35,12 +36,30 @@ export interface BodyProps extends BodyInjected {
   t: Translate
 }
 
+type View = 'source' | 'translated'
+
+/** One translation request's lifecycle; the view never recomputes it. */
+type Translation =
+  | { status: 'idle' }
+  | { status: 'running' }
+  | { status: 'ready', text: string, sourceLines: number, translatedLines: number }
+  | { status: 'failed', message: string }
+
+/** Line count as the two checks see it: CRLF folded, one trailing newline dropped. */
+function countLines(text: string): number {
+  return text.replace(/\r\n/g, '\n').replace(/\n$/, '').split('\n').length
+}
+
 type BodyState =
   | { status: 'loading' }
   | { status: 'ready', text: string, absolutePath: string, version: string }
   | { status: 'too-large', limit: number }
   | { status: 'not-text' }
   | { status: 'failed', code: string, message: string }
+
+/** Hard-coded until the settings slice lands; the plugin page will own both. */
+const TARGET_LANGUAGE = '简体中文'
+const FALLBACK_PROMPT_VERSION = 'am.translate.v1'
 
 /** Human-readable byte size for the fallback copy. */
 function formatBytes(bytes: number | undefined): string {
@@ -55,10 +74,13 @@ function formatBytes(bytes: number | undefined): string {
  * @param props - owner supplies the address, content protocol state, and locale.
  * @returns the document or its fixed fallback.
  */
-export function Body({ resourceAddress, content, readBytes, openResource, t }: BodyProps): ReactNode {
+export function Body({ resourceAddress, content, readBytes, openResource, host, t }: BodyProps): ReactNode {
   const file = useMemo(() => sessionFileOf(resourceAddress), [resourceAddress])
   const [state, setState] = useState<BodyState>({ status: 'loading' })
   const container = useRef<HTMLDivElement | null>(null)
+  const [view, setView] = useState<View>('source')
+  const [translation, setTranslation] = useState<Translation>({ status: 'idle' })
+  const requestToken = useRef(0)
   const renderer = content.kind === 'renderer' ? content : undefined
   const rendererRef = useRef(renderer)
   rendererRef.current = renderer
@@ -72,6 +94,9 @@ export function Body({ resourceAddress, content, readBytes, openResource, t }: B
       return
     }
     const controller = new AbortController()
+    requestToken.current += 1
+    setView('source')
+    setTranslation({ status: 'idle' })
     setState({ status: 'loading' })
     void loadDocument(readBytes, { sessionId, path }, controller.signal).then((result) => {
       if (controller.signal.aborted) return
@@ -124,6 +149,41 @@ export function Body({ resourceAddress, content, readBytes, openResource, t }: B
 
   const reload = useCallback(() => { rendererRef.current?.reload() }, [])
 
+  const translateDocument = useCallback((document: { text: string, absolutePath: string }): void => {
+    const token = ++requestToken.current
+    setTranslation({ status: 'running' })
+    void (async () => {
+      try {
+        const bridge = await host()
+        const promptVersion = await bridge.describePrompt().catch(() => FALLBACK_PROMPT_VERSION)
+        const text = await bridge.translate({
+          sessionId: sessionId ?? '',
+          path: path ?? '',
+          text: document.text,
+          lang: TARGET_LANGUAGE,
+          promptVersion,
+        })
+        if (token !== requestToken.current) return
+        setTranslation({
+          status: 'ready',
+          text,
+          sourceLines: countLines(document.text),
+          translatedLines: countLines(text),
+        })
+      } catch (error) {
+        if (token !== requestToken.current) return
+        setTranslation({ status: 'failed', message: error instanceof Error ? error.message : String(error) })
+      }
+    })()
+  }, [host, sessionId, path])
+
+  const chooseView = useCallback((next: View) => {
+    setView(next)
+    if (next !== 'translated' || state.status !== 'ready') return
+    if (translation.status === 'ready' || translation.status === 'running') return
+    translateDocument({ text: state.text, absolutePath: state.absolutePath })
+  }, [state, translation, translateDocument])
+
   return (
     <div className="am-root" ref={container} data-active-markdown>
       {state.status === 'loading' && <div className="am-status" role="status"><span className="am-spinner" aria-hidden="true" />{t('loading')}</div>}
@@ -144,12 +204,48 @@ export function Body({ resourceAddress, content, readBytes, openResource, t }: B
         />
       )}
       {state.status === 'ready' && (
-        <RenderBoundary
-          labels={{ title: t('error.render.title'), body: t('error.render.body'), reload: t('reload') }}
-          onReload={reload}
-        >
-          <DocumentView text={state.text} labels={labels} actions={actions} t={t} />
-        </RenderBoundary>
+        <>
+          <div className="am-toolbar">
+            <div className="am-seg" role="group" aria-label={t('view.label')}>
+              <button type="button" className="am-seg-button" aria-pressed={view === 'source'} onClick={() => chooseView('source')}>
+                {t('view.source')}
+              </button>
+              <button type="button" className="am-seg-button" aria-pressed={view === 'translated'} onClick={() => chooseView('translated')}>
+                {t('view.translated')}
+              </button>
+            </div>
+            <div className="am-toolbar-status" role="status">
+              {translation.status === 'running' && (
+                <>
+                  <span className="am-spinner" aria-hidden="true" />
+                  {t('translate.running')}
+                </>
+              )}
+              {translation.status === 'ready' && (translation.sourceLines === translation.translatedLines
+                ? t('translate.aligned', { lines: translation.translatedLines })
+                : t('translate.unaligned', { translated: translation.translatedLines, source: translation.sourceLines }))}
+              {translation.status === 'failed' && (
+                <>
+                  <span className="am-toolbar-error">{t('translate.failed', { message: translation.message })}</span>
+                  <button type="button" className="am-toolbar-action" onClick={() => chooseView('translated')}>
+                    {t('translate.retry')}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+          <RenderBoundary
+            labels={{ title: t('error.render.title'), body: t('error.render.body'), reload: t('reload') }}
+            onReload={reload}
+          >
+            <DocumentView
+              text={view === 'translated' && translation.status === 'ready' ? translation.text : state.text}
+              labels={labels}
+              actions={actions}
+              t={t}
+            />
+          </RenderBoundary>
+        </>
       )}
     </div>
   )

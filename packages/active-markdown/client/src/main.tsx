@@ -1,7 +1,8 @@
 /** Browser half: locale, the Markdown renderer registration, and its body. */
 import CSS from './styles.css'
 import { Body, type BodyInjected } from './body.tsx'
-import type { ClientContext, SidebarRight } from './context.ts'
+import type { ClientContext, HostBridge, SidebarRight } from './context.ts'
+import { mountHostBridge } from './host.ts'
 import { en, zh } from './locales.ts'
 
 const NS = 'active-markdown'
@@ -28,6 +29,8 @@ export default {
     }, 'active-markdown styles')
 
     const t = ctx.locale.bind(NS)
+    let bridge: Promise<HostBridge> | undefined
+    const host = (): Promise<HostBridge> => (bridge ??= mountHostBridge(ctx))
     ctx.inject(['documentPreviews', 'remote.workspaceFiles'], (scoped) => {
       scoped.effect(() => scoped.documentPreviews.register({
         id: ID,
@@ -45,6 +48,7 @@ export default {
         inject: (): BodyInjected => ({
           readBytes: (sessionId, path, options, signal) => scoped.remote.workspaceFiles.readBytes(sessionId, path, options, signal),
           openResource: (address) => (scoped.get('sidebarRight') as SidebarRight | undefined)?.openResource(address),
+          host,
         }),
       }, Body)), 'active-markdown body')
     })

@@ -72,6 +72,24 @@ export interface WorkspaceFilesRemote {
   ): Promise<RemoteResult<WorkspaceFileBytes>>
 }
 
+/** One translation request the Body hands to the Host half. */
+export interface TranslateRequest {
+  sessionId: string
+  path: string
+  text: string
+  lang: string
+  provider?: string
+  model?: string
+  promptVersion: string
+  extraInstruction?: string
+}
+
+/** The Host half as the Body sees it. */
+export interface HostBridge {
+  translate(request: TranslateRequest): Promise<string>
+  describePrompt(): Promise<string>
+}
+
 /** The sidebar service used to open an addressed file. */
 export interface SidebarRight {
   openResource(address: string): void

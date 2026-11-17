@@ -112,6 +112,7 @@ dsh plugin --profile <profile> add \
 - 定位与路线：[docs/designs/active-markdown](../../docs/designs/active-markdown/POSITIONING.md)
 - P0 技术方案：[docs/designs/active-markdown/P0-TECH.md](../../docs/designs/active-markdown/P0-TECH.md)
 - P1 技术方案：[docs/designs/active-markdown/P1-TECH.md](../../docs/designs/active-markdown/P1-TECH.md)
+- P2 批注技术方案：[docs/designs/active-markdown/P2-ANNOTATION-TECH.md](../../docs/designs/active-markdown/P2-ANNOTATION-TECH.md)
 
 ### 许可
 

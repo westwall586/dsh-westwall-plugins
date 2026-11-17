@@ -23,6 +23,7 @@ import {
   joinLineAtoms,
   locateAnchor,
   locateBlockAnchor,
+  type JoinedLines,
   type TextLineAtom,
 } from './annotate/selection.ts'
 import type { AnnotationStore, DraftKey } from './annotate/store.ts'
@@ -224,6 +225,20 @@ function atomAtOffset(
   return undefined
 }
 
+/** Where a text annotation starts in the current revision, after any relocation. */
+function currentTextStart(
+  annotation: Annotation,
+  atoms: readonly TextLineAtom[],
+  joined: JoinedLines,
+): { line: number, blockId: string } | undefined {
+  const location = locateAnchor(annotation, joined)
+  if (location.status !== 'located') return undefined
+  const point = atomAtOffset(atoms, joined.starts, location.startOffset)
+  if (point === undefined) return undefined
+  const atom = atoms[point.index]
+  return atom === undefined ? undefined : { line: atom.line, blockId: atom.blockId }
+}
+
 /** Rebuild a DOM range from the joined line offsets an anchor stores. */
 function rangeForOffsets(
   root: HTMLElement,
@@ -387,6 +402,12 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
     setInstruction('')
     setAsk(null)
     setSave({ status: 'idle' })
+    setEditor(null)
+    setDrawerOpen(false)
+    setUndo(null)
+    setNotice(null)
+    setPinTops({})
+    setPeek(null)
     setState({ status: 'loading' })
     void loadDocument(readBytes, { sessionId, path }, controller.signal).then((result) => {
       if (controller.signal.aborted) return
@@ -684,14 +705,15 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
   const openBlockEditor = useCallback((block: Block): void => {
     const element = container.current?.querySelector<HTMLElement>(`[data-component][data-block-id="${block.id}"]`)
     const rect = element?.getBoundingClientRect()
-    const existing = blockAnnotationOf(annotationList, block.id)
+    const latest = draftKey === null ? annotationList : annotations.getSnapshot(draftKey).annotations
+    const existing = blockAnnotationOf(latest, block.id)
     const left = rect === undefined
       ? Math.max(8, window.innerWidth - ANNOTATION_POPOVER_WIDTH - 24)
       : Math.max(8, Math.min(rect.right - ANNOTATION_POPOVER_WIDTH, window.innerWidth - ANNOTATION_POPOVER_WIDTH - 8))
     const top = rect === undefined ? 72 : rect.top + 36
     if (existing !== undefined) setEditor({ mode: 'edit', annotation: existing, left, top })
     else setEditor({ mode: 'new-block', block, left, top })
-  }, [annotationList])
+  }, [annotationList, annotations, draftKey])
 
   const componentContext = useMemo<ComponentContext>(() => ({
     labelOf: (block) => {
@@ -707,41 +729,56 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
     const current = editor
     const text = body.trim()
     if (target === null || current === null || text === '') return
+    const latest = annotations.getSnapshot(target)
+    if (latest.status !== 'ready') {
+      setEditor(null)
+      setNotice({ text: t('annotate.loading'), undo: false })
+      return
+    }
+    const base = latest.annotations
     const options = {
       id: newAnnotationId(),
-      seq: nextSeq(annotationList, snapshot.nextSeq),
+      seq: nextSeq(base, latest.nextSeq),
       createdAt: new Date().toISOString(),
     }
     const next = current.mode === 'edit'
-      ? editAnnotation(annotationList, current.annotation.id, text)
+      ? editAnnotation(base, current.annotation.id, text)
       : current.mode === 'new-block'
-        ? annotateBlock(annotationList, current.block, text, options, componentContext.labelOf(current.block))
-        : addAnnotation(annotationList, { ...current.anchor, kind: 'text', body: text }, options)
+        ? annotateBlock(base, current.block, text, options, componentContext.labelOf(current.block))
+        : addAnnotation(base, { ...current.anchor, kind: 'text', body: text }, options)
     setEditor(null)
     void annotations.write(target, next).then((result) => {
       if (result.status === 'too-large') setNotice({ text: t('annotate.tooLarge'), undo: false })
       else if (result.status === 'failed') setNotice({ text: result.message, undo: false })
     })
-  }, [draftKey, editor, annotationList, snapshot.nextSeq, annotations, componentContext, t])
+  }, [draftKey, editor, annotations, componentContext, t])
 
   const deleteAnnotation = useCallback((annotation: Annotation): void => {
     const target = draftKey
     if (target === null) return
     if (undo !== null) clearTimeout(undo.timer)
-    void annotations.write(target, removeAnnotation(annotationList, annotation.id))
+    const latest = annotations.getSnapshot(target).annotations
+    if (!latest.some(entry => entry.id === annotation.id)) return
+    void annotations.write(target, removeAnnotation(latest, annotation.id)).then((result) => {
+      if (result.status === 'too-large') setNotice({ text: t('annotate.tooLarge'), undo: true })
+      else if (result.status === 'failed') setNotice({ text: result.message, undo: true })
+    })
     const timer = setTimeout(() => setUndo(current => (current?.annotation.id === annotation.id ? null : current)), UNDO_WINDOW_MS)
     setUndo({ annotation, key: target, timer })
     setNotice({ text: t('annotate.deleted'), undo: true })
-  }, [draftKey, annotationList, annotations, undo, t])
+  }, [draftKey, annotations, undo, t])
 
   const undoDelete = useCallback((): void => {
     if (undo === null) return
     clearTimeout(undo.timer)
     const current = annotations.getSnapshot(undo.key).annotations
-    void annotations.write(undo.key, restoreAnnotation(current, undo.annotation))
+    void annotations.write(undo.key, restoreAnnotation(current, undo.annotation)).then((result) => {
+      if (result.status === 'too-large') setNotice({ text: t('annotate.tooLarge'), undo: false })
+      else if (result.status === 'failed') setNotice({ text: result.message, undo: false })
+    })
     setUndo(null)
     setNotice(null)
-  }, [undo, annotations])
+  }, [undo, annotations, t])
 
   const clearAnnotations = useCallback((): void => {
     if (draftKey === null) return
@@ -754,12 +791,14 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
   }, [draftKey, annotations, undo])
 
   const locateAnnotation = useCallback((annotation: Annotation): void => {
-    if (annotation.kind === 'text') {
-      if (locateAnchor(annotation, sourceJoined).status !== 'located') {
-        setNotice({ text: t('annotate.missing'), undo: false })
-        return
-      }
-    } else if (locateBlockAnchor(annotation, parsed.blocks).status !== 'located') {
+    const textStart = annotation.kind === 'text'
+      ? currentTextStart(annotation, sourceAtoms, sourceJoined)
+      : undefined
+    if (annotation.kind === 'text' && textStart === undefined) {
+      setNotice({ text: t('annotate.missing'), undo: false })
+      return
+    }
+    if (annotation.kind === 'block' && locateBlockAnchor(annotation, parsed.blocks).status !== 'located') {
       setNotice({ text: t('annotate.blockMissing'), undo: false })
       return
     }
@@ -769,10 +808,10 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
     requestAnimationFrame(() => {
       const element = annotation.kind === 'block'
         ? container.current?.querySelector<HTMLElement>(`[data-component][data-block-id="${annotation.blockStartId}"]`)
-        : lineElement(container.current, annotation.lineStart, annotation.blockStartId)
+        : textStart === undefined ? null : lineElement(container.current, textStart.line, textStart.blockId)
       element?.scrollIntoView({ block: 'center' })
     })
-  }, [parsed, sourceJoined, t])
+  }, [parsed, sourceAtoms, sourceJoined, t])
 
   useEffect(() => {
     if (undo === null) return
@@ -795,10 +834,12 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
       const counts = new Map<number, number>()
       for (const annotation of annotationList) {
         if (annotation.kind !== 'text') continue
-        const element = lineElement(root, annotation.lineStart, annotation.blockStartId)
+        const start = currentTextStart(annotation, sourceAtoms, sourceJoined)
+        if (start === undefined) continue
+        const element = lineElement(root, start.line, start.blockId)
         if (element === null) continue
-        const stacked = counts.get(annotation.lineStart) ?? 0
-        counts.set(annotation.lineStart, stacked + 1)
+        const stacked = counts.get(start.line) ?? 0
+        counts.set(start.line, stacked + 1)
         tops[annotation.id] = element.getBoundingClientRect().top - rootTop + stacked * PIN_STEP
       }
       setPinTops(tops)
@@ -807,7 +848,7 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
     const observer = new ResizeObserver(place)
     observer.observe(doc)
     return () => observer.disconnect()
-  }, [annotationList, view, state.status])
+  }, [annotationList, sourceAtoms, sourceJoined, view, state.status])
 
   useEffect(() => {
     if (typeof CSS === 'undefined' || CSS.highlights === undefined || typeof Highlight === 'undefined') return

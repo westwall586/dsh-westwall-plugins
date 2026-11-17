@@ -604,3 +604,4 @@ Host：
 ## 17. 变更记录
 
 - 2026-11-17：P2a 设计定稿。批注只做文本选区与组件整块，不设标签；反馈改为 Markdown 文件附件，用 `roundId` + `fileHash` + `draftAttachmentId` + 草稿存在性四重绑定；发送判定从文档 Body 提到 session 级 committer，解决两个文档/未激活 tab 的清理；草稿按 session + 文档存，20 份 / 30 天；发送成功写全文旧版快照，保留 5 轮 / 30 天 / 50 MiB；译文不允许批注。
+- 2026-11-17：P2a 实现完成。落库时记录几个实现偏差：草稿键使用 `sha1(sessionId + '\0' + 规范绝对路径)`（`per-record` 后端不接受原始路径，绝对路径也不会随工作目录漂移）；`AnnotationDraft.nextSeq` 保留编号高水位，删掉的编号不回收；`annotationSave` 返回 `saved` / `too-large` 区分视图而不是抛错；组件标签走 locale 键；原文在加入附件后变化时拒绝同轮次 regenerate，先移除再重新加入；attach 失败在 pending 记录落盘前会清掉已写的 pending 快照；committer 的 `FileBlock` 兜底同时读 legacy 节点的顶层 `content` 与 keyed 节点的 `data.content`；发送成功后只清掉冻结进 `pending.annotations` 的批注，发送后才新增的批注作为下一轮草稿保留。

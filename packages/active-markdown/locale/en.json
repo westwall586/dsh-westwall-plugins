@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Active Markdown",
-    "description": "Long Markdown previews read as one page, and English docs have no Chinese view. Takes over the sidebar body and renders blocks, translates line-aligned from Translated, looks up a source line from the context menu, and saves to the workspace; set the model, target language, and code comments on the plugin page."
+    "description": "Long Markdown previews read as one page, and English docs have no Chinese view. Takes over the sidebar body and renders blocks; translates line-aligned from Translated and looks up the source of a selected range; annotate a source selection, or a table/code block as a whole, then attach the feedback as a Markdown file in the composer; set the model, target language, and code comments on the plugin page."
   }
 }

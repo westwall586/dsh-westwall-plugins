@@ -9,6 +9,8 @@
  */
 import type { Context } from '@deepseek-ai/cordis';
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
+import { type AnnotationSaveView } from './annotate/store.ts';
+import type { Annotation, AnnotationDraft, PendingReview } from './annotate/schema.ts';
 import { type CachedTranslation, type CachePutView } from './translate/cache.ts';
 import { type DescribeView, type TranslateView } from './translate/request.ts';
 import { type TranslationLoadView, type TranslationSaveView } from './translate/store.ts';
@@ -40,7 +42,16 @@ export default class ActiveMarkdown extends TypertRemoteService {
     translationSave(sessionId: string, path: string, text: string, translated: string, lang: string, provider?: string, model?: string, promptVersion?: string, extraInstruction?: string, aligned?: boolean): Promise<TranslationSaveView>;
     /** Read a saved pair from the workspace and say whether the source moved on. */
     translationLoad(sessionId: string, path: string, lang: string): Promise<TranslationLoadView | null>;
+    /** Read one document's annotation draft for a session. */
+    annotationLoad(sessionId: string, path: string): Promise<AnnotationDraft | null>;
+    /** Persist one document's annotations; a too-large draft is refused without writing. */
+    annotationSave(sessionId: string, path: string, annotations: Annotation[], pending: PendingReview | null): Promise<AnnotationSaveView>;
+    /** Clear one document's draft for a session. */
+    annotationClear(sessionId: string, path: string): Promise<Record<string, never>>;
+    /** Every draft of one session that holds a pending attachment. */
+    annotationPending(sessionId: string): Promise<AnnotationDraft[]>;
     private call;
+    private callAnnotation;
     /**
      * The effective settings, read fresh so a plugin-page write applies to the
      * next run. A client that sends its own comment policy still wins, because
@@ -50,7 +61,9 @@ export default class ActiveMarkdown extends TypertRemoteService {
     private commentsFor;
     private fileStoreValue?;
     private cacheValue?;
+    private annotationValue?;
     private fileStore;
+    private annotation;
     private cache;
     /**
      * The directory a session's writes belong to: the committed working directory

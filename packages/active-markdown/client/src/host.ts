@@ -7,6 +7,8 @@
  * append it after the business arguments, so only the bridge knows about it.
  */
 import type {
+  AnnotationLoadRequest,
+  AnnotationSaveRequest,
   CacheGetRequest,
   CachePutRequest,
   CachedTranslation,
@@ -19,6 +21,7 @@ import type {
   TranslationLoadRequest,
   TranslationSaveRequest,
 } from './context.ts'
+import type { Annotation, AnnotationDraft, AnnotationSaveView, PendingReview } from './annotate/model.ts'
 
 const JSON_CODEC = {
   mode: 'strict' as const,
@@ -45,6 +48,10 @@ const WIRE = {
     'extraInstruction', 'aligned',
   ],
   translationLoad: ['sessionId', 'path', 'lang'],
+  annotationLoad: ['sessionId', 'path'],
+  annotationSave: ['sessionId', 'path', 'annotations', 'pending'],
+  annotationClear: ['sessionId', 'path'],
+  annotationPending: ['sessionId'],
 } as const
 
 function descriptor(method: keyof typeof WIRE) {
@@ -68,6 +75,10 @@ export const DESCRIPTORS = [
   descriptor('cachePut'),
   descriptor('translationSave'),
   descriptor('translationLoad'),
+  descriptor('annotationLoad'),
+  descriptor('annotationSave'),
+  descriptor('annotationClear'),
+  descriptor('annotationPending'),
 ]
 
 export const CLIENT_CONTRIBUTION = { package: 'active-markdown', descriptors: DESCRIPTORS }
@@ -144,6 +155,23 @@ export interface Namespace {
     path: string,
     lang: string,
   ): Promise<RemoteOutcome<LoadedTranslation | null>>
+  annotationLoad(
+    sessionId: string,
+    path: string,
+  ): Promise<RemoteOutcome<AnnotationDraft | null>>
+  annotationSave(
+    sessionId: string,
+    path: string,
+    annotations: readonly Annotation[],
+    pending: PendingReview | null,
+  ): Promise<RemoteOutcome<AnnotationSaveView>>
+  annotationClear(
+    sessionId: string,
+    path: string,
+  ): Promise<RemoteOutcome<Record<string, never>>>
+  annotationPending(
+    sessionId: string,
+  ): Promise<RemoteOutcome<AnnotationDraft[]>>
 }
 
 /** Value-level facade so the Body never touches wire shapes. */
@@ -205,7 +233,32 @@ export function createBridge(namespace: Namespace): HostBridge {
   ))
   const load = async (request: TranslationLoadRequest): Promise<LoadedTranslation | null> =>
     unwrap(await namespace.translationLoad(request.sessionId, request.path, request.lang)) ?? null
-  return { translate, describe, cacheGet, cachePut, save, load }
+  const annotationLoad = async (request: AnnotationLoadRequest): Promise<AnnotationDraft | null> =>
+    unwrap(await namespace.annotationLoad(request.sessionId, request.path)) ?? null
+  const annotationSave = async (request: AnnotationSaveRequest): Promise<AnnotationSaveView> =>
+    unwrap(await namespace.annotationSave(
+      request.sessionId,
+      request.path,
+      request.annotations,
+      request.pending,
+    ))
+  const annotationClear = async (request: AnnotationLoadRequest): Promise<void> => {
+    unwrap(await namespace.annotationClear(request.sessionId, request.path))
+  }
+  const annotationPending = async (sessionId: string): Promise<AnnotationDraft[]> =>
+    unwrap(await namespace.annotationPending(sessionId))
+  return {
+    translate,
+    describe,
+    cacheGet,
+    cachePut,
+    save,
+    load,
+    annotationLoad,
+    annotationSave,
+    annotationClear,
+    annotationPending,
+  }
 }
 
 const MOUNT_TIMEOUT_MS = 4000

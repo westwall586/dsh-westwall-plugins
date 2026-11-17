@@ -1,5 +1,6 @@
 /** Structural client contract. The plugin does not import DSH client packages. */
 import type { ComponentType } from 'react'
+import type { Annotation, AnnotationDraft, AnnotationSaveView, PendingReview } from './annotate/model.ts'
 
 /** Namespace-bound translator. */
 export interface Translate {
@@ -154,6 +155,18 @@ export interface TranslationLoadRequest {
   lang: string
 }
 
+/** One annotation draft's identity; the path is the canonical absolute document path. */
+export interface AnnotationLoadRequest {
+  sessionId: string
+  path: string
+}
+
+/** The full draft to persist; `pending` is the P2a-3 attachment slot. */
+export interface AnnotationSaveRequest extends AnnotationLoadRequest {
+  annotations: readonly Annotation[]
+  pending: PendingReview | null
+}
+
 /** The stored metadata fields this Body reads. */
 export interface TranslationMeta {
   promptVersion: string
@@ -188,6 +201,10 @@ export interface HostBridge {
   cachePut(request: CachePutRequest): Promise<void>
   save(request: TranslationSaveRequest): Promise<SavedTranslation>
   load(request: TranslationLoadRequest): Promise<LoadedTranslation | null>
+  annotationLoad(request: AnnotationLoadRequest): Promise<AnnotationDraft | null>
+  annotationSave(request: AnnotationSaveRequest): Promise<AnnotationSaveView>
+  annotationClear(request: AnnotationLoadRequest): Promise<void>
+  annotationPending(sessionId: string): Promise<AnnotationDraft[]>
 }
 
 /** The plugin-page config form surface, declared structurally. */

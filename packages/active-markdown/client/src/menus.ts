@@ -1,28 +1,74 @@
 /**
- * The right-click family this renderer contributes: one target per source line.
- * The shared context menu owns presentation and dismissal; this module only maps
- * a captured target back to the body instance that can show it.
+ * The right-click family this renderer contributes: one target per non-empty
+ * selection. The shared context menu owns presentation and dismissal; this
+ * module maps the captured value back to the body instance that opened it, so
+ * two tabs of one document never dispatch to each other.
  */
-export const LINE_MENU_KIND = 'activeMarkdown.line'
+import type { MenuAction } from './context.ts'
+import type { Anchor } from './annotate/model.ts'
 
-/** Immutable identifier of one clicked source line. */
-export interface LineMenuValue {
-  readonly docId: string
-  readonly line: number
+export const SELECTION_MENU_KIND = 'activeMarkdown.selection'
+
+export type SelectionView = 'source' | 'translated'
+
+export interface SelectionRect {
+  left: number
+  top: number
+  right: number
+  bottom: number
 }
 
-const handlers = new Map<string, (line: number) => void>()
+/** Everything the menu needs after the DOM selection may already be gone. */
+export interface SelectionMenuValue {
+  readonly instanceId: string
+  readonly view: SelectionView
+  readonly text: string
+  readonly lineStart: number
+  readonly lineEnd: number
+  readonly rect: SelectionRect
+  /** False when the translation is not line-aligned. */
+  readonly canShowSource: boolean
+  readonly anchor?: Anchor
+}
 
-/** Register the mounted body for one document; returns the unregister function. */
-export function registerLineHandler(docId: string, handler: (line: number) => void): () => void {
-  handlers.set(docId, handler)
+export type SelectionAction = 'annotate' | 'copy' | 'show-source'
+
+export interface SelectionLabels {
+  annotate: string
+  copy: string
+  showSource: string
+}
+
+export type SelectionHandler = (value: SelectionMenuValue, action: SelectionAction) => void
+
+const handlers = new Map<string, SelectionHandler>()
+
+/** Register the mounted body for one document instance; returns the unregister function. */
+export function registerSelectionHandler(instanceId: string, handler: SelectionHandler): () => void {
+  handlers.set(instanceId, handler)
   return () => {
-    if (handlers.get(docId) === handler) handlers.delete(docId)
+    if (handlers.get(instanceId) === handler) handlers.delete(instanceId)
   }
 }
 
-/** Run the action a menu click selected, against the body that owns that document. */
-export function lookUpSource(value: LineMenuValue | undefined): void {
-  if (value === undefined) return
-  handlers.get(value.docId)?.(value.line)
+export function dispatchSelection(value: SelectionMenuValue, action: SelectionAction): void {
+  handlers.get(value.instanceId)?.(value, action)
+}
+
+export function selectionActions(value: SelectionMenuValue, labels: SelectionLabels): readonly MenuAction[] {
+  const copy: MenuAction = {
+    id: 'copy',
+    label: labels.copy,
+    run: () => dispatchSelection(value, 'copy'),
+  }
+  if (value.view === 'translated') {
+    return value.canShowSource
+      ? [{ id: 'show-source', label: labels.showSource, run: () => dispatchSelection(value, 'show-source') }, copy]
+      : [copy]
+  }
+  if (value.anchor === undefined) return [copy]
+  return [
+    { id: 'annotate', label: labels.annotate, run: () => dispatchSelection(value, 'annotate') },
+    copy,
+  ]
 }

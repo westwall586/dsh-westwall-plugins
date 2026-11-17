@@ -1,12 +1,40 @@
-/** The document body: read, fallbacks, and the rendered Markdown. */
+/** The document body: read, fallbacks, the rendered Markdown, and annotations. */
 import * as React from 'react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { AnnotationDrawer } from './annotate/drawer.tsx'
+import {
+  addAnnotation,
+  editAnnotation,
+  newAnnotationId,
+  nextSeq,
+  removeAnnotation,
+  restoreAnnotation,
+  type Annotation,
+  type Anchor,
+} from './annotate/model.ts'
+import { ANNOTATION_POPOVER_WIDTH, AnnotationPopover } from './annotate/popover.tsx'
+import {
+  atomIndexAt,
+  captureAnchor,
+  collectComponentRanges,
+  collectLineAtoms,
+  joinLineAtoms,
+  locateAnchor,
+  type TextLineAtom,
+} from './annotate/selection.ts'
+import type { AnnotationStore, DraftKey } from './annotate/store.ts'
+import { useAnnotationSnapshot } from './annotate/use-store.ts'
 import type { ContextMenuTarget, DescribeView, HostBridge, Translate, TranslationMeta, WorkspaceFilesRemote } from './context.ts'
 import { createImageResolver, type ImageResolver } from './images.ts'
 import { classifyLink } from './links.ts'
-import { parseDocument } from './markdown/blocks.ts'
+import { parseDocument, type ParsedDocument } from './markdown/blocks.ts'
 import { MarkdownView } from './markdown/render.tsx'
-import { LINE_MENU_KIND, registerLineHandler, type LineMenuValue } from './menus.ts'
+import {
+  registerSelectionHandler,
+  SELECTION_MENU_KIND,
+  type SelectionAction,
+  type SelectionMenuValue,
+} from './menus.ts'
 import { READ_CAP, loadDocument, sessionFileOf } from './source.ts'
 import { InstructionAsk } from './translate/ask.tsx'
 import { assembleTranslation, normalize, planTranslation } from './translate/plan.ts'
@@ -44,6 +72,8 @@ export interface BodyInjected {
   readBytes: WorkspaceFilesRemote['readBytes']
   openResource(address: string): void
   host(): Promise<HostBridge>
+  /** The plugin-owned draft store; one instance is shared by every body. */
+  annotations: AnnotationStore
   /** Opens the shared menu; false when the service is absent, so the native menu stays. */
   openMenu(target: ContextMenuTarget, point: { x: number, y: number }): boolean
 }
@@ -72,9 +102,10 @@ type BodyState =
   | { status: 'not-text' }
   | { status: 'failed', code: string, message: string }
 
-/** The source line shown beside a clicked translation line. */
+/** The source lines shown beside a translated selection. */
 interface Peek {
-  line: number
+  lineStart: number
+  lineEnd: number
   text: string
   left: number
   /** Viewport offset used when the panel sits below the clicked line. */
@@ -83,6 +114,27 @@ interface Peek {
   bottom: number
   above: boolean
 }
+
+/** The annotation editor's target and its fixed placement. */
+type Editor =
+  | { mode: 'new-text', anchor: Anchor, left: number, top: number }
+  | { mode: 'edit', annotation: Annotation, left: number, top: number }
+
+interface UndoState {
+  annotation: Annotation
+  key: DraftKey
+  timer: ReturnType<typeof setTimeout>
+}
+
+interface Notice {
+  text: string
+  undo: boolean
+}
+
+const EMPTY_PARSED: ParsedDocument = { blocks: [] }
+const ANNOTATION_HIGHLIGHT = 'am-annotation'
+const UNDO_WINDOW_MS = 6000
+const PIN_STEP = 18
 
 const PEEK_GAP = 6
 /** Room below the clicked line needed before the panel goes underneath it. */
@@ -98,6 +150,98 @@ function scrollportOf(element: HTMLElement | null): HTMLElement | null {
     node = node.parentElement
   }
   return null
+}
+
+/** The rendered line element for a source line, preferring the block that owns it. */
+function lineElement(root: HTMLElement | null, line: number, blockId?: string): HTMLElement | null {
+  if (root === null) return null
+  if (blockId !== undefined) {
+    const exact = root.querySelector<HTMLElement>(`[data-line="${line}"][data-block-id="${blockId}"]`)
+    if (exact !== null) return exact
+  }
+  return root.querySelector<HTMLElement>(`[data-line="${line}"]`)
+}
+
+/** The text line an event target belongs to; components and gutters return null. */
+function closestLineElement(node: Node | null): HTMLElement | null {
+  if (node === null) return null
+  const element = node instanceof Element ? node : node.parentElement
+  return element?.closest<HTMLElement>('[data-line][data-block-id]') ?? null
+}
+
+/** The `data-line` of the nearest line container, component line spans included. */
+function lineNumberOf(node: Node | null): number | undefined {
+  if (node === null) return undefined
+  const element = node instanceof Element ? node : node.parentElement
+  const value = Number(element?.closest<HTMLElement>('[data-line]')?.dataset.line)
+  return Number.isInteger(value) ? value : undefined
+}
+
+/** Character offset of a DOM boundary inside one line element. */
+function offsetWithin(element: HTMLElement, node: Node, offset: number): number {
+  const range = document.createRange()
+  range.selectNodeContents(element)
+  range.setEnd(node, offset)
+  return range.toString().length
+}
+
+/** Whether a right-click landed inside the selected text, not merely elsewhere on the page. */
+function pointInRange(range: Range, x: number, y: number): boolean {
+  for (const rect of range.getClientRects()) {
+    if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) return true
+  }
+  return false
+}
+
+function textPoint(root: HTMLElement, offset: number): { node: Node, offset: number } | null {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  let remaining = offset
+  let node = walker.nextNode()
+  while (node !== null) {
+    const length = node.textContent?.length ?? 0
+    if (remaining <= length) return { node, offset: remaining }
+    remaining -= length
+    node = walker.nextNode()
+  }
+  return null
+}
+
+function atomAtOffset(
+  atoms: readonly TextLineAtom[],
+  starts: readonly number[],
+  offset: number,
+): { index: number, offset: number } | undefined {
+  for (const [index, atom] of atoms.entries()) {
+    const start = starts[index]!
+    const end = start + atom.text.length
+    if (offset <= end) return { index, offset: Math.max(0, offset - start) }
+  }
+  return undefined
+}
+
+/** Rebuild a DOM range from the joined line offsets an anchor stores. */
+function rangeForOffsets(
+  root: HTMLElement,
+  atoms: readonly TextLineAtom[],
+  starts: readonly number[],
+  startOffset: number,
+  endOffset: number,
+): Range | null {
+  const start = atomAtOffset(atoms, starts, startOffset)
+  const end = atomAtOffset(atoms, starts, endOffset)
+  if (start === undefined || end === undefined) return null
+  const startAtom = atoms[start.index]!
+  const endAtom = atoms[end.index]!
+  const startElement = lineElement(root, startAtom.line, startAtom.blockId)
+  const endElement = lineElement(root, endAtom.line, endAtom.blockId)
+  if (startElement === null || endElement === null) return null
+  const startPoint = textPoint(startElement, start.offset)
+  const endPoint = textPoint(endElement, end.offset)
+  if (startPoint === null || endPoint === null) return null
+  const range = document.createRange()
+  range.setStart(startPoint.node, startPoint.offset)
+  range.setEnd(endPoint.node, endPoint.offset)
+  return range
 }
 
 /**
@@ -149,7 +293,7 @@ function alignmentText(ready: ReadyTranslation, t: Translate): string {
  * @param props - owner supplies the address, content protocol state, and locale.
  * @returns the document or its fixed fallback.
  */
-export function Body({ resourceAddress, content, readBytes, openResource, host, openMenu, t }: BodyProps): ReactNode {
+export function Body({ resourceAddress, content, readBytes, openResource, host, annotations, openMenu, t }: BodyProps): ReactNode {
   const file = useMemo(() => sessionFileOf(resourceAddress), [resourceAddress])
   const [state, setState] = useState<BodyState>({ status: 'loading' })
   const container = useRef<HTMLDivElement | null>(null)
@@ -161,7 +305,12 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
   const [instruction, setInstruction] = useState('')
   const [ask, setAsk] = useState<Ask | null>(null)
   const [save, setSave] = useState<SaveState>({ status: 'idle' })
-  const [toast, setToast] = useState<string | null>(null)
+  const [notice, setNotice] = useState<Notice | null>(null)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [editor, setEditor] = useState<Editor | null>(null)
+  const [undo, setUndo] = useState<UndoState | null>(null)
+  const [pinTops, setPinTops] = useState<Readonly<Record<string, number>>>({})
+  const [instanceId] = useState(() => newAnnotationId())
   const peekPanel = useRef<HTMLDivElement | null>(null)
   const requestToken = useRef(0)
   const runController = useRef<AbortController | null>(null)
@@ -291,49 +440,168 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
   const reload = useCallback(() => { rendererRef.current?.reload() }, [])
 
   const sourceLines = useMemo(() => state.status === 'ready' ? normalize(state.text).split('\n') : [], [state])
+  const parsed = useMemo<ParsedDocument>(() => (state.status === 'ready' ? parseDocument(state.text) : EMPTY_PARSED), [state])
+  const translatedSource = view === 'translated' ? translatedText(translation) ?? (state.status === 'ready' ? state.text : '') : ''
+  const translatedParsed = useMemo<ParsedDocument>(
+    () => (view === 'translated' ? parseDocument(translatedSource) : EMPTY_PARSED),
+    [view, translatedSource],
+  )
+  const displayed = view === 'translated' ? translatedParsed : parsed
+  const sourceAtoms = useMemo(() => collectLineAtoms(parsed.blocks), [parsed])
+  const sourceJoined = useMemo(() => joinLineAtoms(sourceAtoms), [sourceAtoms])
+  const componentRanges = useMemo(() => collectComponentRanges(parsed.blocks), [parsed])
+  const translatedAtoms = useMemo(
+    () => (view === 'translated' ? collectLineAtoms(translatedParsed.blocks) : []),
+    [view, translatedParsed],
+  )
+  const absolutePath = state.status === 'ready' ? state.absolutePath : ''
+  const draftKey = useMemo<DraftKey | null>(
+    () => (sessionId === undefined || absolutePath === '' ? null : { sessionId, path: absolutePath }),
+    [sessionId, absolutePath],
+  )
+  const snapshot = useAnnotationSnapshot(annotations, draftKey)
+  const annotationList = snapshot.annotations
   const peekable = view === 'translated' && lineAligned(translation)
   const showGutter = lineNumbers && (view === 'source' || peekable)
 
-  const showLine = useCallback((line: number): void => {
+  useEffect(() => {
+    if (draftKey !== null) annotations.load(draftKey)
+  }, [annotations, draftKey])
+
+  const showSourceRange = useCallback((lineStart: number, lineEnd: number): void => {
     const root = container.current
-    if (root === null) return
-    const element = root.querySelector(`[data-line="${line}"]`)
+    if (root === null || lineEnd < lineStart) return
+    const text = sourceLines.slice(lineStart - 1, lineEnd).join('\n')
+    const element = lineElement(root, lineStart)
     if (element === null) return
-    const text = normalize(state.status === 'ready' ? state.text : '').split('\n')[line - 1]
-    if (text === undefined) return
     const rect = element.getBoundingClientRect()
     setPeek({
-      line,
+      lineStart,
+      lineEnd,
       text,
       left: Math.max(8, Math.min(rect.left, window.innerWidth - PEEK_WIDTH - 8)),
       top: rect.bottom + PEEK_GAP,
       bottom: window.innerHeight - rect.top + PEEK_GAP,
       above: rect.bottom + PEEK_GAP + PEEK_HEIGHT > window.innerHeight,
     })
-  }, [state])
+  }, [sourceLines])
 
-  const docId = `${sessionId ?? ''}:${path ?? ''}`
+  const onSelectionAction = useCallback((value: SelectionMenuValue, action: SelectionAction): void => {
+    if (action === 'copy') {
+      const clipboard = navigator.clipboard
+      if (clipboard === undefined) return
+      void clipboard.writeText(value.text)
+        .then(() => setNotice({ text: t('code.copied'), undo: false }))
+        .catch(() => {})
+      return
+    }
+    if (action === 'show-source') {
+      showSourceRange(value.lineStart, value.lineEnd)
+      return
+    }
+    if (value.anchor === undefined) return
+    setEditor({
+      mode: 'new-text',
+      anchor: value.anchor,
+      left: Math.max(8, Math.min(value.rect.left, window.innerWidth - ANNOTATION_POPOVER_WIDTH - 8)),
+      top: value.rect.bottom + PEEK_GAP,
+    })
+  }, [showSourceRange, t])
 
-  // The menu action runs against the body that owns the document, not the one that is mounted last.
-  useEffect(() => registerLineHandler(docId, showLine), [docId, showLine])
+  // The menu action runs against the body instance that opened it, not the last one mounted.
+  useEffect(() => registerSelectionHandler(instanceId, onSelectionAction), [onSelectionAction])
 
   useEffect(() => {
     const root = container.current
-    if (root === null || !peekable) return
-    const onContextMenu = (event: MouseEvent): void => {
-      const target = event.target
-      if (!(target instanceof Element)) return
-      const element = target.closest('[data-line]')
-      if (element === null || !root.contains(element)) return
-      const line = Number(element.getAttribute('data-line'))
-      if (!Number.isInteger(line)) return
-      const value: LineMenuValue = { docId, line }
-      if (!openMenu({ kind: LINE_MENU_KIND, value }, { x: event.clientX, y: event.clientY })) return
+    if (root === null || state.status !== 'ready') return
+    const openSelectionMenu = (event: MouseEvent, value: SelectionMenuValue): void => {
+      if (!openMenu({ kind: SELECTION_MENU_KIND, value }, { x: event.clientX, y: event.clientY })) return
       event.preventDefault()
+    }
+    const componentSelected = (range: Range): boolean => {
+      const from = lineNumberOf(range.startContainer)
+      const to = lineNumberOf(range.endContainer)
+      if (from === undefined || to === undefined) return false
+      const start = Math.min(from, to)
+      const end = Math.max(from, to)
+      return componentRanges.some(component => component.lineStart <= end && start <= component.lineEnd)
+    }
+    const onContextMenu = (event: MouseEvent): void => {
+      const selection = window.getSelection()
+      if (selection === null || selection.isCollapsed || selection.rangeCount === 0) return
+      const range = selection.getRangeAt(0)
+      if (range.collapsed) return
+      const doc = root.querySelector<HTMLElement>('.am-doc')
+      if (doc === null || !doc.contains(range.commonAncestorContainer)) return
+      if (!pointInRange(range, event.clientX, event.clientY)) return
+      const rect = range.getBoundingClientRect()
+      const area = {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+      }
+
+      if (view === 'source') {
+        const startElement = closestLineElement(range.startContainer)
+        const endElement = closestLineElement(range.endContainer)
+        if (startElement === null || endElement === null) {
+          if (componentSelected(range)) setNotice({ text: t('annotate.componentOnly'), undo: false })
+          return
+        }
+        const start = atomIndexAt(sourceAtoms, Number(startElement.dataset.line), startElement.dataset.blockId ?? '')
+        const end = atomIndexAt(sourceAtoms, Number(endElement.dataset.line), endElement.dataset.blockId ?? '')
+        if (start === undefined || end === undefined) {
+          if (componentSelected(range)) setNotice({ text: t('annotate.componentOnly'), undo: false })
+          return
+        }
+        const anchor = captureAnchor(
+          sourceAtoms,
+          { atom: start, offset: offsetWithin(startElement, range.startContainer, range.startOffset) },
+          { atom: end, offset: offsetWithin(endElement, range.endContainer, range.endOffset) },
+          componentRanges,
+        )
+        if (anchor === null) {
+          if (componentSelected(range)) setNotice({ text: t('annotate.componentOnly'), undo: false })
+          return
+        }
+        openSelectionMenu(event, {
+          instanceId: instanceId,
+          view: 'source',
+          text: selection.toString(),
+          lineStart: anchor.lineStart,
+          lineEnd: anchor.lineEnd,
+          rect: area,
+          canShowSource: true,
+          anchor,
+        })
+        return
+      }
+
+      const startLine = closestLineElement(range.startContainer)
+      const endLine = closestLineElement(range.endContainer)
+      const startAtom = startLine === null
+        ? undefined
+        : atomIndexAt(translatedAtoms, Number(startLine.dataset.line), startLine.dataset.blockId ?? '')
+      const endAtom = endLine === null
+        ? undefined
+        : atomIndexAt(translatedAtoms, Number(endLine.dataset.line), endLine.dataset.blockId ?? '')
+      const lineStart = startAtom === undefined ? lineNumberOf(range.startContainer) : translatedAtoms[startAtom]?.line
+      const lineEnd = endAtom === undefined ? lineNumberOf(range.endContainer) : translatedAtoms[endAtom]?.line
+      if (lineStart === undefined || lineEnd === undefined) return
+      openSelectionMenu(event, {
+        instanceId: instanceId,
+        view: 'translated',
+        text: selection.toString(),
+        lineStart,
+        lineEnd,
+        rect: area,
+        canShowSource: peekable,
+      })
     }
     root.addEventListener('contextmenu', onContextMenu)
     return () => root.removeEventListener('contextmenu', onContextMenu)
-  }, [peekable, docId, openMenu])
+  }, [state.status, view, sourceAtoms, translatedAtoms, componentRanges, peekable, openMenu, t])
 
   // A long source line can make the panel taller than the estimate; flip it once
   // the measured height says it would leave the viewport.
@@ -381,6 +649,143 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
       if (scrollport === null) window.removeEventListener('scroll', onScroll)
     }
   }, [peek])
+
+  const located = useMemo(() => {
+    const map = new Map<string, boolean>()
+    for (const annotation of annotationList) {
+      map.set(annotation.id, annotation.kind === 'text' ? locateAnchor(annotation, sourceJoined).status === 'located' : true)
+    }
+    return map
+  }, [annotationList, sourceJoined])
+
+  const openEditor = useCallback((annotation: Annotation, anchor?: HTMLElement): void => {
+    const rect = anchor?.getBoundingClientRect()
+    setEditor({
+      mode: 'edit',
+      annotation,
+      left: rect === undefined ? Math.max(8, window.innerWidth - ANNOTATION_POPOVER_WIDTH - 24) : Math.max(8, Math.min(rect.left, window.innerWidth - ANNOTATION_POPOVER_WIDTH - 8)),
+      top: rect === undefined ? 72 : rect.bottom + PEEK_GAP,
+    })
+  }, [])
+
+  const saveEditor = useCallback((body: string): void => {
+    const target = draftKey
+    const current = editor
+    const text = body.trim()
+    if (target === null || current === null || text === '') return
+    const next = current.mode === 'edit'
+      ? editAnnotation(annotationList, current.annotation.id, text)
+      : addAnnotation(annotationList, { ...current.anchor, kind: 'text', body: text }, {
+        id: newAnnotationId(),
+        seq: nextSeq(annotationList, snapshot.nextSeq),
+        createdAt: new Date().toISOString(),
+      })
+    setEditor(null)
+    void annotations.write(target, next).then((result) => {
+      if (result.status === 'too-large') setNotice({ text: t('annotate.tooLarge'), undo: false })
+      else if (result.status === 'failed') setNotice({ text: result.message, undo: false })
+    })
+  }, [draftKey, editor, annotationList, snapshot.nextSeq, annotations, t])
+
+  const deleteAnnotation = useCallback((annotation: Annotation): void => {
+    const target = draftKey
+    if (target === null) return
+    if (undo !== null) clearTimeout(undo.timer)
+    void annotations.write(target, removeAnnotation(annotationList, annotation.id))
+    const timer = setTimeout(() => setUndo(current => (current?.annotation.id === annotation.id ? null : current)), UNDO_WINDOW_MS)
+    setUndo({ annotation, key: target, timer })
+    setNotice({ text: t('annotate.deleted'), undo: true })
+  }, [draftKey, annotationList, annotations, undo, t])
+
+  const undoDelete = useCallback((): void => {
+    if (undo === null) return
+    clearTimeout(undo.timer)
+    const current = annotations.getSnapshot(undo.key).annotations
+    void annotations.write(undo.key, restoreAnnotation(current, undo.annotation))
+    setUndo(null)
+    setNotice(null)
+  }, [undo, annotations])
+
+  const clearAnnotations = useCallback((): void => {
+    if (draftKey === null) return
+    if (undo !== null) clearTimeout(undo.timer)
+    setUndo(null)
+    setNotice(null)
+    void annotations.clear(draftKey).then((result) => {
+      if (result.status === 'failed') setNotice({ text: result.message, undo: false })
+    })
+  }, [draftKey, annotations, undo])
+
+  const locateAnnotation = useCallback((annotation: Annotation): void => {
+    if (annotation.kind === 'text' && locateAnchor(annotation, sourceJoined).status !== 'located') {
+      setNotice({ text: t('annotate.missing'), undo: false })
+      return
+    }
+    setView('source')
+    setPeek(null)
+    setDrawerOpen(false)
+    requestAnimationFrame(() => {
+      lineElement(container.current, annotation.lineStart, annotation.blockStartId)?.scrollIntoView({ block: 'center' })
+    })
+  }, [sourceJoined, t])
+
+  useEffect(() => {
+    if (undo === null) return
+    return () => clearTimeout(undo.timer)
+  }, [undo])
+
+  // Pins sit beside the prose at the start line's measured top; they never depend
+  // on the gutter toggle, so annotations stay visible with line numbers off.
+  useLayoutEffect(() => {
+    const root = container.current
+    if (root === null || view !== 'source' || state.status !== 'ready' || annotationList.length === 0) {
+      setPinTops({})
+      return
+    }
+    const doc = root.querySelector<HTMLElement>('.am-doc')
+    if (doc === null) return
+    const place = (): void => {
+      const rootTop = root.getBoundingClientRect().top
+      const tops: Record<string, number> = {}
+      const counts = new Map<number, number>()
+      for (const annotation of annotationList) {
+        if (annotation.kind !== 'text') continue
+        const element = lineElement(root, annotation.lineStart, annotation.blockStartId)
+        if (element === null) continue
+        const stacked = counts.get(annotation.lineStart) ?? 0
+        counts.set(annotation.lineStart, stacked + 1)
+        tops[annotation.id] = element.getBoundingClientRect().top - rootTop + stacked * PIN_STEP
+      }
+      setPinTops(tops)
+    }
+    place()
+    const observer = new ResizeObserver(place)
+    observer.observe(doc)
+    return () => observer.disconnect()
+  }, [annotationList, view, state.status])
+
+  useEffect(() => {
+    if (typeof CSS === 'undefined' || CSS.highlights === undefined || typeof Highlight === 'undefined') return
+    const registry = CSS.highlights
+    if (view !== 'source' || state.status !== 'ready') {
+      registry.delete(ANNOTATION_HIGHLIGHT)
+      return
+    }
+    const root = container.current
+    if (root === null) return
+    const highlight = new Highlight()
+    for (const annotation of annotationList) {
+      if (annotation.kind !== 'text') continue
+      const location = locateAnchor(annotation, sourceJoined)
+      if (location.status !== 'located') continue
+      const range = rangeForOffsets(root, sourceAtoms, sourceJoined.starts, location.startOffset, location.endOffset)
+      if (range !== null) highlight.add(range)
+    }
+    registry.set(ANNOTATION_HIGHLIGHT, highlight)
+    return () => {
+      registry.delete(ANNOTATION_HIGHLIGHT)
+    }
+  }, [annotationList, sourceAtoms, sourceJoined, view, state.status])
 
   const translateDocument = useCallback((
     document: { text: string, absolutePath: string },
@@ -539,7 +944,7 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
         })
         setTranslation(current => (current.status === 'ready' && current.text === ready.text ? markSaved(current) : current))
         setSave({ status: 'idle' })
-        setToast(t('translate.saved', { file: saved.file }))
+        setNotice({ text: t('translate.saved', { file: saved.file }), undo: false })
       } catch (error) {
         setSave({ status: 'failed', message: error instanceof Error ? error.message : String(error) })
       }
@@ -547,10 +952,10 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
   }, [translation, state, sessionId, path, host, t])
 
   useEffect(() => {
-    if (toast === null) return
-    const timer = setTimeout(() => setToast(null), 4000)
+    if (notice === null) return
+    const timer = setTimeout(() => setNotice(null), notice.undo ? UNDO_WINDOW_MS : 4000)
     return () => clearTimeout(timer)
-  }, [toast])
+  }, [notice])
 
   return (
     <div className={showGutter ? 'am-root am-linenos' : 'am-root'} ref={container} data-active-markdown>
@@ -584,6 +989,9 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
             </div>
             <button type="button" className="am-toolbar-toggle" aria-pressed={lineNumbers} onClick={() => setLineNumbers(value => !value)}>
               {t('lineNumbers')}
+            </button>
+            <button type="button" className="am-toolbar-toggle" aria-pressed={drawerOpen} onClick={() => setDrawerOpen(value => !value)}>
+              {t('annotate.count', { count: annotationList.length })}
             </button>
             {saveable(translation) === undefined ? null : (
               <button type="button" className="am-toolbar-toggle" disabled={save.status === 'busy'} onClick={saveTranslation}>
@@ -642,7 +1050,7 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
             onReload={reload}
           >
             <DocumentView
-              text={view === 'translated' ? translatedText(translation) ?? state.text : state.text}
+              parsed={displayed}
               labels={labels}
               actions={actions}
               lineNumbers={showGutter}
@@ -651,13 +1059,37 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
           </RenderBoundary>
         </>
       )}
+      {view === 'source' ? (
+        <div className="am-pins">
+          {annotationList.map(annotation => (
+            annotation.kind !== 'text' || pinTops[annotation.id] === undefined
+              ? null
+              : (
+                <button
+                  key={annotation.id}
+                  type="button"
+                  className="am-pin"
+                  style={{ top: pinTops[annotation.id] }}
+                  title={annotation.quote}
+                  onClick={(event) => openEditor(annotation, event.currentTarget)}
+                >
+                  {annotation.seq}
+                </button>
+              )
+          ))}
+        </div>
+      ) : null}
       {peek === null ? null : (
         <div
           ref={peekPanel}
           className="am-peek"
           style={peek.above ? { left: peek.left, bottom: peek.bottom } : { left: peek.left, top: peek.top }}
         >
-          <div className="am-peek-head">{t('peek.line', { line: peek.line })}</div>
+          <div className="am-peek-head">
+            {peek.lineStart === peek.lineEnd
+              ? t('peek.line', { line: peek.lineStart })
+              : t('peek.range', { start: peek.lineStart, end: peek.lineEnd })}
+          </div>
           <div className="am-peek-text">{peek.text}</div>
         </div>
       )}
@@ -676,22 +1108,74 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
           onConfirm={value => retranslate(value)}
         />
       )}
-      {toast === null ? null : <div className="am-toast" role="status">{toast}</div>}
+      <AnnotationDrawer
+        open={drawerOpen}
+        annotations={annotationList}
+        readOnly={view === 'translated'}
+        located={located}
+        persistence={snapshot.persistence}
+        labels={{
+          title: t('annotate.drawer.title'),
+          empty: t('annotate.drawer.empty'),
+          clear: t('annotate.drawer.clear'),
+          locate: t('annotate.drawer.locate'),
+          edit: t('annotate.drawer.edit'),
+          delete: t('annotate.drawer.delete'),
+          missing: t('annotate.missing'),
+          memory: t('annotate.memory'),
+          tooLarge: t('annotate.tooLarge'),
+          readOnly: t('annotate.readOnly'),
+          top: t('annotate.drawer.top'),
+          line: line => t('annotate.line', { line }),
+          range: (start, end) => t('annotate.range', { start, end }),
+        }}
+        onClose={() => setDrawerOpen(false)}
+        onLocate={locateAnnotation}
+        onEdit={openEditor}
+        onDelete={deleteAnnotation}
+        onClear={clearAnnotations}
+      />
+      {editor === null ? null : (
+        <AnnotationPopover
+          left={editor.left}
+          top={editor.top}
+          quote={editor.mode === 'edit' ? editor.annotation.quote : editor.anchor.quote}
+          initial={editor.mode === 'edit' ? editor.annotation.body : ''}
+          labels={{
+            title: t('annotate.drawer.title'),
+            quote: t('annotate.quote'),
+            placeholder: t('annotate.placeholder'),
+            save: t('annotate.save'),
+            cancel: t('annotate.cancel'),
+          }}
+          onSave={saveEditor}
+          onCancel={() => setEditor(null)}
+        />
+      )}
+      {notice === null
+        ? null
+        : (
+          <div className="am-toast" role="status">
+            <span>{notice.text}</span>
+            {notice.undo && undo !== null
+              ? <button type="button" className="am-toast-action" onClick={undoDelete}>{t('annotate.undo')}</button>
+              : null}
+          </div>
+        )}
     </div>
   )
 }
 
 interface DocumentViewProps {
-  text: string
+  parsed: ParsedDocument
   labels: { copy: string, copied: string, imageFailed: string }
   actions: { openLink(href: string): void, resolveImage(src: string): Promise<string | undefined> }
   lineNumbers: boolean
   t: Translate
 }
 
-/** Parse inside the boundary so a parser failure stays recoverable. */
-function DocumentView({ text, labels, actions, lineNumbers, t }: DocumentViewProps): ReactNode {
-  const parsed = useMemo(() => parseDocument(text), [text])
+/** Parse once in the body so annotations and the rendered tree share one block model. */
+function DocumentView({ parsed, labels, actions, lineNumbers, t }: DocumentViewProps): ReactNode {
   return (
     <>
       {parsed.frontmatter === undefined ? null : (

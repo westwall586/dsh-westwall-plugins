@@ -9,6 +9,14 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import { RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
+import { AnnotationError, type AnnotationErrorCode } from './annotate/paths.ts'
+import {
+  openAnnotationStore,
+  type AnnotationDomainFacility,
+  type AnnotationSaveView,
+  type AnnotationStore,
+} from './annotate/store.ts'
+import type { Annotation, AnnotationDraft, PendingReview } from './annotate/schema.ts'
 import type { LlmLike } from './translate/call.ts'
 import {
   createTranslationCache,
@@ -79,6 +87,12 @@ const REMOTE_CODES: Record<TranslateErrorCode, RemoteCode> = {
   'provider-unknown': 'activeMarkdown/unknown-provider',
   'llm-unavailable': 'activeMarkdown/llm-unavailable',
   'model-failed': 'activeMarkdown/model-failed',
+  'read-failed': 'activeMarkdown/read-failed',
+  'write-failed': 'activeMarkdown/write-failed',
+}
+
+const ANNOTATION_CODES: Record<AnnotationErrorCode, RemoteCode> = {
+  'invalid-request': 'activeMarkdown/invalid-request',
   'read-failed': 'activeMarkdown/read-failed',
   'write-failed': 'activeMarkdown/write-failed',
 }
@@ -248,11 +262,45 @@ export default class ActiveMarkdown extends TypertRemoteService {
     return this.call(() => this.fileStore().load({ sessionId, path, lang }))
   }
 
+  /** Read one document's annotation draft for a session. */
+  async annotationLoad(sessionId: string, path: string): Promise<AnnotationDraft | null> {
+    return this.callAnnotation(async () => (await this.annotation()).load({ sessionId, path }))
+  }
+
+  /** Persist one document's annotations; a too-large draft is refused without writing. */
+  async annotationSave(
+    sessionId: string,
+    path: string,
+    annotations: Annotation[],
+    pending: PendingReview | null,
+  ): Promise<AnnotationSaveView> {
+    return this.callAnnotation(async () => (await this.annotation()).save({ sessionId, path, annotations, pending }))
+  }
+
+  /** Clear one document's draft for a session. */
+  async annotationClear(sessionId: string, path: string): Promise<Record<string, never>> {
+    return this.callAnnotation(async () => (await this.annotation()).clear({ sessionId, path }))
+  }
+
+  /** Every draft of one session that holds a pending attachment. */
+  async annotationPending(sessionId: string): Promise<AnnotationDraft[]> {
+    return this.callAnnotation(async () => (await this.annotation()).pending(sessionId))
+  }
+
   private async call<T>(operation: () => Promise<T>): Promise<T> {
     try {
       return await operation()
     } catch (error) {
       if (error instanceof TranslateError) throw new RemoteError(REMOTE_CODES[error.code], error.message, {})
+      throw error
+    }
+  }
+
+  private async callAnnotation<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      return await operation()
+    } catch (error) {
+      if (error instanceof AnnotationError) throw new RemoteError(ANNOTATION_CODES[error.code], error.message, {})
       throw error
     }
   }
@@ -276,6 +324,7 @@ export default class ActiveMarkdown extends TypertRemoteService {
 
   private fileStoreValue?: TranslationStore
   private cacheValue?: Promise<TranslationCache>
+  private annotationValue?: Promise<AnnotationStore>
 
   private fileStore(): TranslationStore {
     this.fileStoreValue ??= createTranslationStore({
@@ -285,6 +334,14 @@ export default class ActiveMarkdown extends TypertRemoteService {
       now: () => new Date(),
     })
     return this.fileStoreValue
+  }
+
+  private annotation(): Promise<AnnotationStore> {
+    this.annotationValue ??= openAnnotationStore(
+      this.serviceOf<AnnotationDomainFacility>('storageDomain'),
+      { now: () => new Date() },
+    )
+    return this.annotationValue
   }
 
   private cache(): Promise<TranslationCache> {
@@ -379,7 +436,10 @@ function textField(value: unknown): string {
   return typeof value === 'string' ? value : ''
 }
 
-const METHODS = ['describe', 'translate', 'cacheGet', 'cachePut', 'translationSave', 'translationLoad'] as const
+const METHODS = [
+  'describe', 'translate', 'cacheGet', 'cachePut', 'translationSave', 'translationLoad',
+  'annotationLoad', 'annotationSave', 'annotationClear', 'annotationPending',
+] as const
 
 Object.defineProperty(ActiveMarkdown.prototype, '@deepseek-ai/dsh-typert-protocol/remote-methods', {
   configurable: true,

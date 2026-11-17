@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import { Context } from '@deepseek-ai/cordis'
 
 import ActiveMarkdown from '../src/index.ts'
+import { createMemoryAnnotationTable } from '../src/annotate/store.ts'
+import type { Annotation } from '../src/annotate/schema.ts'
 import { FALLBACK_MAX_TOKENS, type LlmCallOptions, type LlmLike } from '../src/translate/call.ts'
 import { LANGUAGES } from '../src/translate/language.ts'
 import { MAX_TEXT_BYTES } from '../src/translate/request.ts'
@@ -147,5 +149,44 @@ test('模型失败以 Remote 错误码返回', async () => {
   await assert.rejects(
     service.translate('session-1', 'a.md', SOURCE, 'zh', 'p', 'm', PROMPT_VERSION),
     (error: unknown) => codeOf(error) === 'activeMarkdown/model-failed',
+  )
+})
+
+function annotation(): Annotation {
+  return {
+    id: 'a1',
+    seq: 1,
+    kind: 'text',
+    body: '意见',
+    quote: '原文',
+    prefix: '',
+    suffix: '',
+    startOffset: 0,
+    blockStartId: 'paragraph-1',
+    blockEndId: 'paragraph-1',
+    blockSignature: '',
+    section: '',
+    lineStart: 1,
+    lineEnd: 1,
+    createdAt: '2026-11-17T00:00:00.000Z',
+  }
+}
+
+test('批注方法走 storageDomain，非法路径映射成 Remote 错误码', async () => {
+  const table = createMemoryAnnotationTable()
+  const service = serviceWith({
+    storageDomain: { open: async () => ({ table: () => table }) },
+  })
+
+  const saved = await service.annotationSave('s1', '/w/a.md', [annotation()], null)
+  assert.deepEqual(saved, { status: 'saved', durable: true })
+  assert.equal((await service.annotationLoad('s1', '/w/a.md'))?.annotations[0]?.body, '意见')
+  assert.deepEqual(await service.annotationPending('s1'), [])
+  assert.deepEqual(await service.annotationClear('s1', '/w/a.md'), {})
+  assert.equal(await service.annotationLoad('s1', '/w/a.md'), null)
+
+  await assert.rejects(
+    service.annotationSave('s1', 'relative.md', [annotation()], null),
+    (error: unknown) => codeOf(error) === 'activeMarkdown/invalid-request',
   )
 })

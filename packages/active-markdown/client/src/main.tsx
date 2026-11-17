@@ -1,9 +1,10 @@
 /** Browser half: locale, the Markdown renderer registration, and its body. */
 import CSS from './styles.css'
+import { createAnnotationStore } from './annotate/store.ts'
 import { Body, type BodyInjected } from './body.tsx'
 import type { ClientContext, HostBridge, SidebarRight } from './context.ts'
 import { mountHostBridge } from './host.ts'
-import { LINE_MENU_KIND, lookUpSource, type LineMenuValue } from './menus.ts'
+import { SELECTION_MENU_KIND, selectionActions, type SelectionMenuValue } from './menus.ts'
 import { en, zh } from './locales.ts'
 import { createSettingsPage } from './settings.tsx'
 
@@ -33,21 +34,25 @@ export default {
 
     const t = ctx.locale.bind(NS)
 
-    // One contribution for our line family; the shared menu owns the popup.
-    ctx.inject(['contextMenus'], (menus) => {
-      menus.effect(() => menus.contextMenus.register({
-        id: 'active-markdown.look-source',
-        target: LINE_MENU_KIND,
-        order: 20,
-        resolve: (target: LineMenuValue) => [{
-          id: 'look-source',
-          label: t('peek.action'),
-          run: () => lookUpSource(target),
-        }],
-      }), 'active-markdown line menu')
-    })
+    // One draft store for the plugin's lifetime; the body and a future session
+    // committer share it instead of each opening their own copy.
     let bridge: Promise<HostBridge> | undefined
     const host = (): Promise<HostBridge> => (bridge ??= mountHostBridge(ctx))
+    const annotationStore = createAnnotationStore({ host })
+
+    // One contribution for our selection family; the shared menu owns the popup.
+    ctx.inject(['contextMenus'], (menus) => {
+      menus.effect(() => menus.contextMenus.register({
+        id: 'active-markdown.selection',
+        target: SELECTION_MENU_KIND,
+        order: 20,
+        resolve: (target: SelectionMenuValue) => selectionActions(target, {
+          annotate: t('annotate.action'),
+          copy: t('code.copy'),
+          showSource: t('peek.action'),
+        }),
+      }), 'active-markdown selection menu')
+    })
 
     // The plugin page owns the three settings; the preview only reads them.
     ctx.inject(['configForms'], (scoped) => {
@@ -85,6 +90,7 @@ export default {
           readBytes: (sessionId, path, options, signal) => scoped.remote.workspaceFiles.readBytes(sessionId, path, options, signal),
           openResource: (address) => (scoped.get('sidebarRight') as SidebarRight | undefined)?.openResource(address),
           host,
+          annotations: annotationStore,
           openMenu: (target, point) => {
             const menus = ctx.get('contextMenus')
             if (menus === undefined || menus === null) return false

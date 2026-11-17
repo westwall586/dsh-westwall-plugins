@@ -1,4 +1,6 @@
 import { RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
+import { AnnotationError } from "./annotate/paths.js";
+import { openAnnotationStore, } from "./annotate/store.js";
 import { createTranslationCache, openCacheStore, } from "./translate/cache.js";
 import { LANGUAGES } from "./translate/language.js";
 import { PROMPT_VERSION } from "./translate/prompt.js";
@@ -17,6 +19,11 @@ const REMOTE_CODES = {
     'provider-unknown': 'activeMarkdown/unknown-provider',
     'llm-unavailable': 'activeMarkdown/llm-unavailable',
     'model-failed': 'activeMarkdown/model-failed',
+    'read-failed': 'activeMarkdown/read-failed',
+    'write-failed': 'activeMarkdown/write-failed',
+};
+const ANNOTATION_CODES = {
+    'invalid-request': 'activeMarkdown/invalid-request',
     'read-failed': 'activeMarkdown/read-failed',
     'write-failed': 'activeMarkdown/write-failed',
 };
@@ -109,6 +116,22 @@ export default class ActiveMarkdown extends TypertRemoteService {
     async translationLoad(sessionId, path, lang) {
         return this.call(() => this.fileStore().load({ sessionId, path, lang }));
     }
+    /** Read one document's annotation draft for a session. */
+    async annotationLoad(sessionId, path) {
+        return this.callAnnotation(async () => (await this.annotation()).load({ sessionId, path }));
+    }
+    /** Persist one document's annotations; a too-large draft is refused without writing. */
+    async annotationSave(sessionId, path, annotations, pending) {
+        return this.callAnnotation(async () => (await this.annotation()).save({ sessionId, path, annotations, pending }));
+    }
+    /** Clear one document's draft for a session. */
+    async annotationClear(sessionId, path) {
+        return this.callAnnotation(async () => (await this.annotation()).clear({ sessionId, path }));
+    }
+    /** Every draft of one session that holds a pending attachment. */
+    async annotationPending(sessionId) {
+        return this.callAnnotation(async () => (await this.annotation()).pending(sessionId));
+    }
     async call(operation) {
         try {
             return await operation();
@@ -116,6 +139,16 @@ export default class ActiveMarkdown extends TypertRemoteService {
         catch (error) {
             if (error instanceof TranslateError)
                 throw new RemoteError(REMOTE_CODES[error.code], error.message, {});
+            throw error;
+        }
+    }
+    async callAnnotation(operation) {
+        try {
+            return await operation();
+        }
+        catch (error) {
+            if (error instanceof AnnotationError)
+                throw new RemoteError(ANNOTATION_CODES[error.code], error.message, {});
             throw error;
         }
     }
@@ -137,6 +170,7 @@ export default class ActiveMarkdown extends TypertRemoteService {
     }
     fileStoreValue;
     cacheValue;
+    annotationValue;
     fileStore() {
         this.fileStoreValue ??= createTranslationStore({
             files: nodeFiles,
@@ -145,6 +179,10 @@ export default class ActiveMarkdown extends TypertRemoteService {
             now: () => new Date(),
         });
         return this.fileStoreValue;
+    }
+    annotation() {
+        this.annotationValue ??= openAnnotationStore(this.serviceOf('storageDomain'), { now: () => new Date() });
+        return this.annotationValue;
     }
     cache() {
         this.cacheValue ??= openCacheStore(this.serviceOf('storageDomain')).then((store) => createTranslationCache({
@@ -231,7 +269,10 @@ export default class ActiveMarkdown extends TypertRemoteService {
 function textField(value) {
     return typeof value === 'string' ? value : '';
 }
-const METHODS = ['describe', 'translate', 'cacheGet', 'cachePut', 'translationSave', 'translationLoad'];
+const METHODS = [
+    'describe', 'translate', 'cacheGet', 'cachePut', 'translationSave', 'translationLoad',
+    'annotationLoad', 'annotationSave', 'annotationClear', 'annotationPending',
+];
 Object.defineProperty(ActiveMarkdown.prototype, '@deepseek-ai/dsh-typert-protocol/remote-methods', {
     configurable: true,
     value: Object.freeze(structuredClone({ version: 1, methods: METHODS.map((method) => ({ method, invocation: { kind: 'direct' } })) })),

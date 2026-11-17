@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 
 import ActiveMarkdown from '../src/index.ts'
 import { CLIENT_CONTRIBUTION, DESCRIPTORS, createBridge, type Namespace } from '../client/src/host.ts'
+import type { AnnotationDraft } from '../client/src/annotate/model.ts'
 
 const DESCRIPTOR_KEY = '@deepseek-ai/dsh-typert-protocol/remote-methods'
 
@@ -23,6 +24,10 @@ const WIRE_PARAMETERS: Record<string, string[]> = {
     'extraInstruction', 'aligned',
   ],
   translationLoad: ['sessionId', 'path', 'lang'],
+  annotationLoad: ['sessionId', 'path'],
+  annotationSave: ['sessionId', 'path', 'annotations', 'pending'],
+  annotationClear: ['sessionId', 'path'],
+  annotationPending: ['sessionId'],
 }
 
 /** Host method parameters: the wire names, plus the Gateway-injected signal on translate. */
@@ -110,9 +115,35 @@ interface Answers {
   /** 'missing' omits the value field, the way a null result may arrive. */
   cacheGet?: 'hit' | 'missing'
   load?: 'hit' | 'missing'
+  annotationLoad?: 'hit' | 'missing'
 }
 
 const META = { promptVersion: 'am.translate.v1', lang: 'zh', provider: 'p', model: 'm' }
+
+const DRAFT: AnnotationDraft = {
+  sessionId: 's1',
+  path: '/w/a.md',
+  annotations: [{
+    id: 'a1',
+    seq: 1,
+    kind: 'text',
+    body: '意见',
+    quote: '原文',
+    prefix: '',
+    suffix: '',
+    startOffset: 0,
+    blockStartId: 'paragraph-1',
+    blockEndId: 'paragraph-1',
+    blockSignature: '',
+    section: '',
+    lineStart: 1,
+    lineEnd: 1,
+    createdAt: '2026-01-01T00:00:00.000Z',
+  }],
+  nextSeq: 2,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+}
 
 function recordingNamespace(answers: Answers = {}): { namespace: Namespace, calls: Call[] } {
   const calls: Call[] = []
@@ -148,6 +179,22 @@ function recordingNamespace(answers: Answers = {}): { namespace: Namespace, call
     async translationLoad(...args: unknown[]) {
       record('translationLoad', args)
       return answers.load === 'hit' ? { ok: true, value: stored } : { ok: true }
+    },
+    async annotationLoad(...args: unknown[]) {
+      record('annotationLoad', args)
+      return answers.annotationLoad === 'hit' ? { ok: true, value: DRAFT } : { ok: true }
+    },
+    async annotationSave(...args: unknown[]) {
+      record('annotationSave', args)
+      return { ok: true, value: { status: 'saved', durable: true } }
+    },
+    async annotationClear(...args: unknown[]) {
+      record('annotationClear', args)
+      return { ok: true, value: {} }
+    },
+    async annotationPending(...args: unknown[]) {
+      record('annotationPending', args)
+      return { ok: true, value: [] }
     },
   }
   return { namespace, calls }
@@ -189,6 +236,35 @@ test('桥接方法按 Host 的线序传参', async () => {
 
   await bridge.load({ sessionId: 's1', path: 'a.md', lang: 'zh' })
   assert.deepEqual(calls.at(-1), { method: 'translationLoad', args: ['s1', 'a.md', 'zh'] })
+})
+
+test('批注桥接按 Host 的线序传参，空结果按 null 返回', async () => {
+  const hit = recordingNamespace({ annotationLoad: 'hit' })
+  const bridge = createBridge(hit.namespace)
+  const draft = await bridge.annotationLoad({ sessionId: 's1', path: '/w/a.md' })
+  assert.equal(draft?.annotations[0]?.body, '意见')
+  assert.deepEqual(hit.calls.at(-1), { method: 'annotationLoad', args: ['s1', '/w/a.md'] })
+
+  await bridge.annotationSave({
+    sessionId: 's1',
+    path: '/w/a.md',
+    annotations: DRAFT.annotations,
+    pending: null,
+  })
+  assert.deepEqual(hit.calls.at(-1), {
+    method: 'annotationSave',
+    args: ['s1', '/w/a.md', DRAFT.annotations, null],
+  })
+
+  await bridge.annotationClear({ sessionId: 's1', path: '/w/a.md' })
+  assert.deepEqual(hit.calls.at(-1), { method: 'annotationClear', args: ['s1', '/w/a.md'] })
+
+  const pending = await bridge.annotationPending('s1')
+  assert.deepEqual(pending, [])
+  assert.deepEqual(hit.calls.at(-1), { method: 'annotationPending', args: ['s1'] })
+
+  const empty = createBridge(recordingNamespace().namespace)
+  assert.equal(await empty.annotationLoad({ sessionId: 's1', path: '/w/a.md' }), null)
 })
 
 test('取消信号只在提供时追加到 translate 参数末尾', async () => {

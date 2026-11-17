@@ -67,7 +67,7 @@ function renderBlock(block: Block, key: string, labels: RenderLabels, actions: R
     }
     case 'paragraph': {
       const lines = splitSourceLines(block.inline, block.sourceStartLine)
-      if (block.tight) return <React.Fragment key={key}>{renderLineSpans(lines, key, labels, actions, true)}</React.Fragment>
+      if (block.tight) return <React.Fragment key={key}>{renderLineSpans(lines, key, labels, actions, true, block.id)}</React.Fragment>
       const single = lines.length === 1
       return (
         <p
@@ -78,7 +78,7 @@ function renderBlock(block: Block, key: string, labels: RenderLabels, actions: R
           data-source-line={block.sourceStartLine}
           {...(single ? { 'data-line': block.sourceStartLine, 'data-gutter-line': block.sourceStartLine } : {})}
         >
-          {single ? renderInline(lines[0].inline, key, labels, actions) : renderLineSpans(lines, key, labels, actions, true)}
+          {single ? renderInline(lines[0].inline, key, labels, actions) : renderLineSpans(lines, key, labels, actions, true, block.id)}
         </p>
       )
     }
@@ -116,9 +116,16 @@ function renderItem(item: ListItem, key: string, labels: RenderLabels, actions: 
 }
 
 /** One element per rendered source line; the first may anchor a gutter number. */
-function renderLineSpans(lines: readonly SourceLine[], key: string, labels: RenderLabels, actions: RenderActions, gutter: boolean): ReactNode[] {
+function renderLineSpans(
+  lines: readonly SourceLine[],
+  key: string,
+  labels: RenderLabels,
+  actions: RenderActions,
+  gutter: boolean,
+  blockId: string,
+): ReactNode[] {
   return lines.map((line, index) => (
-    <span key={`${key}-l${index}`} data-line={line.line} {...(gutter && index === 0 ? { 'data-gutter-line': line.line } : {})}>
+    <span key={`${key}-l${index}`} data-line={line.line} data-block-id={blockId} {...(gutter && index === 0 ? { 'data-gutter-line': line.line } : {})}>
       {renderInline(line.inline, `${key}-l${index}`, labels, actions)}
       {line.break === undefined ? null : line.break === 'hard' ? <br /> : ' '}
     </span>

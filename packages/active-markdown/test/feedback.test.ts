@@ -49,6 +49,12 @@ test('文件名取文档名去掉扩展名，roundId 在 sanitize 后仍保留',
   assert.equal(feedbackFileName('', 'ab12cd34'), 'document-review-ab12cd34.md')
 })
 
+test('超长文档名被截断，文件名仍在 200 字节内且带 roundId', () => {
+  const name = feedbackFileName(`docs/${'长'.repeat(300)}.md`, 'ab12cd34')
+  assert.ok(Buffer.byteLength(name, 'utf8') <= 200)
+  assert.ok(name.endsWith('-review-ab12cd34.md'))
+})
+
 test('反馈文件有 frontmatter、路径只出现一次、没有标签和版本', () => {
   const content = renderFeedback({
     roundId: 'ab12cd34',

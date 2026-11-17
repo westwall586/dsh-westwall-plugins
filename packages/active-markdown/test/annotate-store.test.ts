@@ -353,3 +353,14 @@ test('commit 失败保留草稿与 pending，可重试', async () => {
   assert.equal(store.getSnapshot(key()).pending?.roundId, 'r1')
   assert.equal(store.getSnapshot(key()).annotations.length, 1)
 })
+
+test('committer 在快照未加载时先读 Host 草稿再提交', async () => {
+  const fake = fakeHost()
+  fake.loadResult = { ...draft([annotation(1)], 2), pending: pendingReview('r1') }
+  const store = createAnnotationStore({ host: async () => fake.host })
+
+  assert.deepEqual(await store.commit(key(), 'r1', '发送'), { status: 'committed', snapshotMissing: false })
+  assert.equal(fake.loads.length, 1)
+  assert.deepEqual(fake.commits, [{ sessionId: 's1', path: '/w/a.md', roundId: 'r1', sentText: '发送' }])
+  assert.deepEqual(store.getSnapshot(key()).annotations, [])
+})

@@ -45,11 +45,27 @@ function sanitizeSegment(value: string): string {
   return clean === '' || clean === '.' || clean === '..' ? 'document' : clean
 }
 
+/** Keep the whole leaf name inside what every host filesystem stores. */
+function utf8Prefix(value: string, maxBytes: number): string {
+  let bytes = 0
+  let prefix = ''
+  for (const character of value) {
+    const size = new TextEncoder().encode(character).byteLength
+    if (bytes + size > maxBytes) break
+    prefix += character
+    bytes += size
+  }
+  return prefix
+}
+
 /** `<doc stem>-review-<roundId>.md`, sanitized so the round id always survives. */
 export function feedbackFileName(sourcePath: string, roundId: string): string {
   const leaf = sourcePath.replace(/\\/g, '/').split('/').pop() ?? ''
   const stem = leaf.replace(/\.(?:markdown|md)$/iu, '')
-  return `${sanitizeSegment(stem)}-review-${roundId}.md`
+  const suffix = `-review-${roundId}.md`
+  const clean = sanitizeSegment(stem)
+  const room = Math.max(1, 200 - new TextEncoder().encode(suffix).byteLength)
+  return `${utf8Prefix(clean, room)}${suffix}`
 }
 
 function quoteLines(text: string): string[] {

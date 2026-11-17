@@ -79,7 +79,7 @@ export const EMPTY_SNAPSHOT: AnnotationSnapshot = Object.freeze({
 interface Entry {
   snapshot: AnnotationSnapshot
   generation: number
-  loading: boolean
+  loadPromise: Promise<void> | null
   listeners: Set<() => void>
 }
 
@@ -104,7 +104,7 @@ export function createAnnotationStore(deps: AnnotationStoreDeps): AnnotationStor
     const id = keyId(key)
     let entry = entries.get(id)
     if (entry === undefined) {
-      entry = { snapshot: { ...EMPTY_SNAPSHOT }, generation: 0, loading: false, listeners: new Set() }
+      entry = { snapshot: { ...EMPTY_SNAPSHOT }, generation: 0, loadPromise: null, listeners: new Set() }
       entries.set(id, entry)
     }
     return entry
@@ -160,6 +160,47 @@ export function createAnnotationStore(deps: AnnotationStoreDeps): AnnotationStor
 
   const refuse = (reason: PendingRefusal): PendingWrite => ({ status: 'refused', reason })
 
+  const startLoad = (key: DraftKey, entry: Entry): Promise<void> => {
+    if (entry.loadPromise !== null) return entry.loadPromise
+    const generation = entry.generation
+    setSnapshot(entry, { ...entry.snapshot, status: 'loading' })
+    const promise = (async () => {
+      let draft: AnnotationDraft | null = null
+      let persistence: AnnotationPersistence = 'durable'
+      try {
+        const host = await deps.host()
+        draft = await host.annotationLoad({ sessionId: key.sessionId, path: key.path })
+      } catch {
+        persistence = 'memory'
+      }
+      if (entry.generation !== generation) {
+        // A local write landed while the read was in flight; keep it.
+        setSnapshot(entry, { ...entry.snapshot, status: 'ready' })
+        return
+      }
+      const annotations = draft?.annotations ?? []
+      setSnapshot(entry, {
+        status: 'ready',
+        annotations,
+        pending: draft?.pending ?? null,
+        nextSeq: draft?.nextSeq ?? nextSeq(annotations),
+        persistence,
+      })
+    })()
+    entry.loadPromise = promise
+    void promise.finally(() => {
+      if (entry.loadPromise === promise) entry.loadPromise = null
+    })
+    return promise
+  }
+
+  /** Pending writes may arrive from the committer before this tab loaded the draft. */
+  const ensureLoaded = async (key: DraftKey, entry: Entry): Promise<boolean> => {
+    if (entry.snapshot.status === 'ready') return true
+    await startLoad(key, entry)
+    return (entry.snapshot as AnnotationSnapshot).status === 'ready'
+  }
+
   return {
     subscribe(key, listener) {
       const entry = ensure(key)
@@ -177,34 +218,8 @@ export function createAnnotationStore(deps: AnnotationStoreDeps): AnnotationStor
 
     load(key) {
       const entry = ensure(key)
-      if (entry.loading || entry.snapshot.status === 'ready') return
-      entry.loading = true
-      const generation = entry.generation
-      setSnapshot(entry, { ...entry.snapshot, status: 'loading' })
-      void (async () => {
-        let draft: AnnotationDraft | null = null
-        let persistence: AnnotationPersistence = 'durable'
-        try {
-          const host = await deps.host()
-          draft = await host.annotationLoad({ sessionId: key.sessionId, path: key.path })
-        } catch {
-          persistence = 'memory'
-        }
-        entry.loading = false
-        if (entry.generation !== generation) {
-          // A local write landed while the read was in flight; keep it.
-          setSnapshot(entry, { ...entry.snapshot, status: 'ready' })
-          return
-        }
-        const annotations = draft?.annotations ?? []
-        setSnapshot(entry, {
-          status: 'ready',
-          annotations,
-          pending: draft?.pending ?? null,
-          nextSeq: draft?.nextSeq ?? nextSeq(annotations),
-          persistence,
-        })
-      })()
+      if (entry.loadPromise !== null || entry.snapshot.status === 'ready') return
+      void startLoad(key, entry)
     },
 
     async write(key, annotations, options = {}) {
@@ -257,6 +272,9 @@ export function createAnnotationStore(deps: AnnotationStoreDeps): AnnotationStor
 
     async detach(key, roundId) {
       const entry = ensure(key)
+      if (!(await ensureLoaded(key, entry))) {
+        return { status: 'failed', message: 'annotation draft could not be loaded' }
+      }
       const current = entry.snapshot.pending
       if (current === null) return refuse('no-pending')
       if (current.roundId !== roundId) return refuse('round-mismatch')
@@ -274,6 +292,9 @@ export function createAnnotationStore(deps: AnnotationStoreDeps): AnnotationStor
 
     async commit(key, roundId, sentText) {
       const entry = ensure(key)
+      if (!(await ensureLoaded(key, entry))) {
+        return { status: 'failed', message: 'annotation draft could not be loaded' }
+      }
       const current = entry.snapshot.pending
       if (current === null) return { status: 'refused', reason: 'no-pending' }
       if (current.roundId !== roundId) return { status: 'refused', reason: 'round-mismatch' }

@@ -56,8 +56,9 @@
 
 理由：反馈附件属于某个会话的输入框。同一份文档在两个会话各开一个 tab 时，如果草稿只按文档存，两份 `pendingReview` 会抢同一个 key。按会话隔离后，每个会话各有自己的草稿与附件，互不覆盖。
 
-- 工作区内：路径用会话相对路径，`/` 分隔。
-- 工作区外：路径用绝对路径，键里再做 hash，避免超长。
+- 路径统一用 `readBytes` 返回的规范绝对路径；相对地址会随工作目录变化，不能让两份草稿抢同一个键。
+- Host 记录键是 `sha1(sessionId + '\0' + 绝对路径)` 的十六进制串，记录里保留 `sessionId` 与完整路径。
+- 反馈文本里的 `文件路径` 仍用适合 Agent 读的显示路径；身份判定不依赖它。
 - 刷新页面、重启 DSH 后 sessionId 不变，草稿仍能恢复。
 
 ### 3.2 文本行原子
@@ -112,11 +113,15 @@ interface PendingReview {
   fileBytes: number
   fileHash: string            // 反馈文件的 sha256，hex
   sourceHash: string          // 加入输入框时原文的 sha256
+  annotations: Annotation[]   // 加入输入框时冻结的副本
+  feedback: string            // 加入输入框时冻结的反馈正文
   createdAt: string
 }
 ```
 
 一个批注草稿最多一条 `PendingReview`。它是「这份文档的批注附件」的唯一凭据，也是发送判定与旧版快照的关联点。
+
+`annotations` 与 `feedback` 是冻结副本。加入输入框后继续编辑批注会重做附件并更新这两个字段；一旦进入发送阶段就不再更新，提交时用冻结副本，避免「发出去的是旧文件、元数据写的是新批注」。
 
 ### 3.5 草稿记录
 
@@ -290,6 +295,8 @@ source: docs/designs/active-markdown/P2-ANNOTATION-TECH.md
 
 这样不会把旧内容的附件发出去。若用户已手动移除附件，只更新草稿，不自动重建；重新点「加入输入框」时再创建。
 
+如果用户已经在发送中（`phase` 为 `sending` 或 `submitting`），不再重建附件。提交时使用 `PendingReview` 里冻结的 `annotations` 与 `feedback`，与已经上传的文件字节保持一致。发送中的批注编辑不会进入这一轮。
+
 若加入输入框后源文件变化，批注会按锚点重算；旧附件与旧 pending 快照不再代表当前内容。此时提示重新加入，重新加入生成新的 `roundId` 与新 pending 快照。
 
 同一份文档只允许一个待发送附件。已加入时按钮显示「已在输入框」，重复点击复用，不新建。
@@ -325,6 +332,7 @@ source: docs/designs/active-markdown/P2-ANNOTATION-TECH.md
    - id 还在：发送失败，保留草稿与批注。
 3. `phase === 'plain'` 时 id 消失，且此前没有候选发送：用户手动移除附件，标记「已移除」，保留批注。
 4. 排队发送只要 input facade 接受并移除 id，就算已进入会话；后续从队列撤回不自动恢复批注。
+5. 只处理普通消息。slash 命令带附件时 `phase` 会走 `submitting` 而不是 `sending`，本版不把命令提交当成批注发送；附件与批注保留，需要用户手动清空。
 
 ### 7.4 兜底确认
 
@@ -371,7 +379,7 @@ Web Clipper 的文件名与 hash 都不匹配，不会被误认。
 
 - 按 session 加载全部 `pendingReview`。
 - 监听 `phase`、`attachmentIds` 与最近用户消息里的 `FileBlock`。
-- 发送成功时逐个提交；一个 round 的快照失败不影响另一个。
+- 发送成功时逐个提交；提交用 `PendingReview` 的冻结副本，不用当前草稿；一个 round 的快照失败不影响另一个。
 - 手动移除时标记 detached，不删批注。
 - 清空当前文档时同步删草稿、快照与附件。
 - 提交后通知仍打开的文档 Body 清空 UI；已关闭的 tab 不需要通知。
@@ -401,7 +409,7 @@ defineDomain({
 })
 ```
 
-- key：`sessionId + '\0' + path` 的 hash 或编码，保证可读性与唯一性。
+- key：`sha1(sessionId + '\0' + canonicalPath)` 的十六进制串。`per-record` JSON 后端只接受 `[A-Za-z0-9_-]`，不能用 `sessionId + '\0' + path` 直接做 key；`sessionId` 与完整路径存在记录里，`annotationPending` 用记录字段过滤。
 - 读取同步，写入 durable；domain 打不开时退回内存并提示，不阻塞批注。
 - 单份草稿上限 512 KiB；超过拒绝落盘，保留内存并提示。
 - 清理：最多 20 份文档草稿，按 `updatedAt` LRU；超过 30 天未更新删除；当前打开的文档不淘汰。
@@ -442,8 +450,9 @@ interface ReviewRoundMeta {
 }
 ```
 
-3. 删草稿与 `pendingReview`。
-4. 通知 UI 清空。
+3. 元数据里的 `annotations` 与 `feedback` 取 `PendingReview` 的冻结副本，不取当前草稿。
+4. 删草稿与 `pendingReview`。
+5. 通知 UI 清空。
 
 顺序是「写快照 → 写元数据 → 删草稿 → 清 UI」。元数据写失败时不清草稿，保留可重试；`roundId` 幂等，重试不会产生重复轮次。
 
@@ -590,6 +599,7 @@ Host：
 - session committer 挂 `conversation.input.left` 是否在全部布局（全屏、窄栏、只读预览）都挂载；不挂载时靠重新打开文档时补提交。
 - 20 份 / 30 天 / 5 轮 / 50 MiB 是默认值，实测后再调；当前不做用户可配置。
 - 同一文档两个会话各有草稿，用户可能误以为共享；README 要写清。
+- slash 命令带附件的提交走 `submitting`，本版不清理；这是刻意限制，不是漏判。
 
 ## 17. 变更记录
 

@@ -41,12 +41,17 @@ interface FakeHost {
   loads: AnnotationLoadRequest[]
   saves: AnnotationSaveRequest[]
   clears: AnnotationLoadRequest[]
+  detaches: { sessionId: string, path: string, roundId: string }[]
+  commits: { sessionId: string, path: string, roundId: string, sentText: string }[]
   loadResult: AnnotationDraft | null
   loadError: Error | null
   loadGate: Promise<void> | null
   saveResult: AnnotationSaveView
   saveError: Error | null
   saveGate: Promise<void> | null
+  detachError: Error | null
+  commitResult: { roundId: string, committed: boolean, snapshotMissing: boolean }
+  commitError: Error | null
 }
 
 function fakeHost(): FakeHost {
@@ -54,12 +59,17 @@ function fakeHost(): FakeHost {
     loads: [],
     saves: [],
     clears: [],
+    detaches: [],
+    commits: [],
     loadResult: null,
     loadError: null,
     loadGate: null,
     saveResult: { status: 'saved', durable: true },
     saveError: null,
     saveGate: null,
+    detachError: null,
+    commitResult: { roundId: 'r1', committed: true, snapshotMissing: false },
+    commitError: null,
     host: {} as HostBridge,
   }
   state.host = {
@@ -81,6 +91,19 @@ function fakeHost(): FakeHost {
     },
     async annotationPending() {
       return []
+    },
+    async reviewDetach(request: { sessionId: string, path: string, roundId: string }) {
+      state.detaches.push(request)
+      if (state.detachError !== null) throw state.detachError
+      return { detached: true }
+    },
+    async reviewCommit(request: { sessionId: string, path: string, roundId: string, sentText: string }) {
+      state.commits.push(request)
+      if (state.commitError !== null) throw state.commitError
+      return state.commitResult
+    },
+    async reviewPrepare() {
+      return { sourceHash: 'hash', snapshotWritten: true, bytes: 1 }
     },
   } as unknown as HostBridge
   return state
@@ -236,4 +259,97 @@ test('写入推进编号高水位，删除后不回收', async () => {
   assert.equal(store.getSnapshot(key()).nextSeq, 4)
   await store.write(key(), [annotation(1)])
   assert.equal(store.getSnapshot(key()).nextSeq, 4)
+})
+
+function pendingReview(roundId: string): PendingReview {
+  return {
+    roundId,
+    draftAttachmentId: `d-${roundId}`,
+    fileName: `a-review-${roundId}.md`,
+    fileBytes: 10,
+    fileHash: `hash-${roundId}`,
+    sourceHash: `source-${roundId}`,
+    annotations: [annotation()],
+    feedback: '反馈',
+    createdAt: '2026-11-17T00:00:00.000Z',
+  }
+}
+
+test('加入附件后再写批注，pending 记录保留', async () => {
+  const fake = fakeHost()
+  const store = createAnnotationStore({ host: async () => fake.host })
+  await store.write(key(), [annotation(1)])
+  assert.deepEqual(await store.attach(key(), pendingReview('r1')), { status: 'saved', durable: true })
+
+  await store.write(key(), [annotation(1, '改过的意见')])
+  assert.equal(store.getSnapshot(key()).pending?.roundId, 'r1')
+  assert.deepEqual(fake.saves.at(-1)?.pending?.roundId, 'r1')
+  assert.deepEqual(fake.saves.at(-1)?.annotations[0]?.body, '改过的意见')
+})
+
+test('已有 pending 时再次 attach 被拒绝，不写盘', async () => {
+  const fake = fakeHost()
+  const store = createAnnotationStore({ host: async () => fake.host })
+  await store.write(key(), [annotation(1)])
+  await store.attach(key(), pendingReview('r1'))
+  const saves = fake.saves.length
+
+  assert.deepEqual(await store.attach(key(), pendingReview('r2')), { status: 'refused', reason: 'already-pending' })
+  assert.equal(fake.saves.length, saves)
+})
+
+test('regenerate 只接受同一 roundId，替换后仍是同一条 pending', async () => {
+  const fake = fakeHost()
+  const store = createAnnotationStore({ host: async () => fake.host })
+  await store.write(key(), [annotation(1)])
+  await store.attach(key(), pendingReview('r1'))
+
+  assert.deepEqual(
+    await store.regenerate(key(), 'r2', pendingReview('r2')),
+    { status: 'refused', reason: 'round-mismatch' },
+  )
+  assert.deepEqual(await store.regenerate(key(), 'r1', pendingReview('r1')), { status: 'saved', durable: true })
+  assert.equal(store.getSnapshot(key()).pending?.roundId, 'r1')
+})
+
+test('detach 的 roundId 不匹配时拒绝，不调用 Host', async () => {
+  const fake = fakeHost()
+  const store = createAnnotationStore({ host: async () => fake.host })
+  await store.write(key(), [annotation(1)])
+  await store.attach(key(), pendingReview('r1'))
+
+  assert.deepEqual(await store.detach(key(), 'r2'), { status: 'refused', reason: 'round-mismatch' })
+  assert.deepEqual(fake.detaches, [])
+
+  assert.deepEqual(await store.detach(key(), 'r1'), { status: 'saved', durable: true })
+  assert.deepEqual(fake.detaches, [{ sessionId: 's1', path: '/w/a.md', roundId: 'r1' }])
+  assert.equal(store.getSnapshot(key()).pending, null)
+  assert.equal(store.getSnapshot(key()).annotations.length, 1, 'detach 不删批注')
+})
+
+test('commit 使用冻结的 roundId，成功后才清空草稿', async () => {
+  const fake = fakeHost()
+  const store = createAnnotationStore({ host: async () => fake.host })
+  await store.write(key(), [annotation(1)])
+  await store.attach(key(), pendingReview('r1'))
+
+  assert.deepEqual(await store.commit(key(), 'r2', '已发送'), { status: 'refused', reason: 'round-mismatch' })
+  assert.equal(store.getSnapshot(key()).annotations.length, 1)
+
+  assert.deepEqual(await store.commit(key(), 'r1', '已发送'), { status: 'committed', snapshotMissing: false })
+  assert.deepEqual(fake.commits, [{ sessionId: 's1', path: '/w/a.md', roundId: 'r1', sentText: '已发送' }])
+  assert.deepEqual(store.getSnapshot(key()).annotations, [])
+  assert.equal(store.getSnapshot(key()).pending, null)
+})
+
+test('commit 失败保留草稿与 pending，可重试', async () => {
+  const fake = fakeHost()
+  const store = createAnnotationStore({ host: async () => fake.host })
+  await store.write(key(), [annotation(1)])
+  await store.attach(key(), pendingReview('r1'))
+  fake.commitError = new Error('meta failed')
+
+  assert.deepEqual(await store.commit(key(), 'r1', ''), { status: 'failed', message: 'meta failed' })
+  assert.equal(store.getSnapshot(key()).pending?.roundId, 'r1')
+  assert.equal(store.getSnapshot(key()).annotations.length, 1)
 })

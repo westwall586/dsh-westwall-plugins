@@ -733,6 +733,38 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
+.am-drawer-clear:disabled,
+.am-drawer-attach-action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.am-drawer-attach {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.am-drawer-attached {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.am-drawer-attach-action {
+  padding: 3px 10px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 0.9em;
+  cursor: pointer;
+}
+
+.am-drawer-attach-action:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
 /* Fixed, so the editor is placed by viewport coordinates and escapes the prose. */
 .am-annotate {
   position: fixed;

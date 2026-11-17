@@ -1,7 +1,7 @@
-/** The annotation drawer: grouped by heading path, with locate, edit and delete. */
+/** The annotation drawer: grouped by heading path, with locate, edit, delete and attach. */
 import * as React from 'react'
 import type { ReactNode } from 'react'
-import type { Annotation } from './model.ts'
+import type { Annotation, PendingReview } from './model.ts'
 import type { AnnotationPersistence } from './store.ts'
 
 export interface AnnotationDrawerLabels {
@@ -16,6 +16,9 @@ export interface AnnotationDrawerLabels {
   tooLarge: string
   readOnly: string
   top: string
+  attach: string
+  attached: string
+  removeAttachment: string
   line(line: number): string
   range(start: number, end: number): string
 }
@@ -27,12 +30,20 @@ export interface AnnotationDrawerProps {
   readOnly: boolean
   located: ReadonlyMap<string, boolean>
   persistence: AnnotationPersistence
+  /** One pending review per document; its id must be in the composer to count as attached. */
+  pending: PendingReview | null
+  attached: boolean
+  /** The composer is sending or running a command; edits and attach wait. */
+  busy: boolean
+  attachError: string | null
   labels: AnnotationDrawerLabels
   onClose(): void
   onLocate(annotation: Annotation): void
   onEdit(annotation: Annotation): void
   onDelete(annotation: Annotation): void
   onClear(): void
+  onAttach(): void
+  onRemoveAttachment(): void
 }
 
 interface Section {
@@ -58,12 +69,18 @@ export function AnnotationDrawer({
   readOnly,
   located,
   persistence,
+  pending,
+  attached,
+  busy,
+  attachError,
   labels,
   onClose,
   onLocate,
   onEdit,
   onDelete,
   onClear,
+  onAttach,
+  onRemoveAttachment,
 }: AnnotationDrawerProps): ReactNode {
   if (!open) return null
   return (
@@ -102,12 +119,12 @@ export function AnnotationDrawer({
                             {labels.locate}
                           </button>
                           {readOnly ? null : (
-                            <button type="button" className="am-drawer-action" onClick={() => onEdit(annotation)}>
+                            <button type="button" className="am-drawer-action" disabled={busy} onClick={() => onEdit(annotation)}>
                               {labels.edit}
                             </button>
                           )}
                           {readOnly ? null : (
-                            <button type="button" className="am-drawer-action am-drawer-delete" onClick={() => onDelete(annotation)}>
+                            <button type="button" className="am-drawer-action am-drawer-delete" disabled={busy} onClick={() => onDelete(annotation)}>
                               {labels.delete}
                             </button>
                           )}
@@ -120,12 +137,34 @@ export function AnnotationDrawer({
             </div>
           )}
         <footer className="am-drawer-foot">
+          {attachError === null ? null : <span className="am-drawer-warning">{attachError}</span>}
           {persistence === 'memory' ? <span className="am-drawer-warning">{labels.memory}</span> : null}
           {persistence === 'too-large' ? <span className="am-drawer-warning">{labels.tooLarge}</span> : null}
           {readOnly ? <span className="am-drawer-note">{labels.readOnly}</span> : null}
+          <div className="am-drawer-attach">
+            {attached
+              ? (
+                <>
+                  <span className="am-drawer-attached">{labels.attached}</span>
+                  <button type="button" className="am-drawer-action" disabled={busy} onClick={onRemoveAttachment}>
+                    {labels.removeAttachment}
+                  </button>
+                </>
+              )
+              : (
+                <button
+                  type="button"
+                  className="am-drawer-attach-action"
+                  disabled={busy || annotations.length === 0}
+                  onClick={onAttach}
+                >
+                  {labels.attach}
+                </button>
+              )}
+          </div>
           {readOnly || annotations.length === 0
             ? null
-            : <button type="button" className="am-drawer-clear" onClick={onClear}>{labels.clear}</button>}
+            : <button type="button" className="am-drawer-clear" disabled={busy} onClick={onClear}>{labels.clear}</button>}
         </footer>
       </aside>
     </>

@@ -16,6 +16,12 @@ import type {
   DescribeView,
   HostBridge,
   LoadedTranslation,
+  ReviewCommitRequest,
+  ReviewCommitView,
+  ReviewDetachRequest,
+  ReviewDetachView,
+  ReviewPrepareRequest,
+  ReviewPrepareView,
   SavedTranslation,
   TranslateRequest,
   TranslationLoadRequest,
@@ -52,6 +58,9 @@ const WIRE = {
   annotationSave: ['sessionId', 'path', 'annotations', 'pending'],
   annotationClear: ['sessionId', 'path'],
   annotationPending: ['sessionId'],
+  reviewPrepare: ['sessionId', 'path', 'roundId', 'text'],
+  reviewCommit: ['sessionId', 'path', 'roundId', 'sentText'],
+  reviewDetach: ['sessionId', 'path', 'roundId'],
 } as const
 
 function descriptor(method: keyof typeof WIRE) {
@@ -79,6 +88,9 @@ export const DESCRIPTORS = [
   descriptor('annotationSave'),
   descriptor('annotationClear'),
   descriptor('annotationPending'),
+  descriptor('reviewPrepare'),
+  descriptor('reviewCommit'),
+  descriptor('reviewDetach'),
 ]
 
 export const CLIENT_CONTRIBUTION = { package: 'active-markdown', descriptors: DESCRIPTORS }
@@ -172,6 +184,23 @@ export interface Namespace {
   annotationPending(
     sessionId: string,
   ): Promise<RemoteOutcome<AnnotationDraft[]>>
+  reviewPrepare(
+    sessionId: string,
+    path: string,
+    roundId: string,
+    text: string,
+  ): Promise<RemoteOutcome<ReviewPrepareView>>
+  reviewCommit(
+    sessionId: string,
+    path: string,
+    roundId: string,
+    sentText: string,
+  ): Promise<RemoteOutcome<ReviewCommitView>>
+  reviewDetach(
+    sessionId: string,
+    path: string,
+    roundId: string,
+  ): Promise<RemoteOutcome<ReviewDetachView>>
 }
 
 /** Value-level facade so the Body never touches wire shapes. */
@@ -247,6 +276,12 @@ export function createBridge(namespace: Namespace): HostBridge {
   }
   const annotationPending = async (sessionId: string): Promise<AnnotationDraft[]> =>
     unwrap(await namespace.annotationPending(sessionId))
+  const reviewPrepare = async (request: ReviewPrepareRequest): Promise<ReviewPrepareView> =>
+    unwrap(await namespace.reviewPrepare(request.sessionId, request.path, request.roundId, request.text))
+  const reviewCommit = async (request: ReviewCommitRequest): Promise<ReviewCommitView> =>
+    unwrap(await namespace.reviewCommit(request.sessionId, request.path, request.roundId, request.sentText))
+  const reviewDetach = async (request: ReviewDetachRequest): Promise<ReviewDetachView> =>
+    unwrap(await namespace.reviewDetach(request.sessionId, request.path, request.roundId))
   return {
     translate,
     describe,
@@ -258,6 +293,9 @@ export function createBridge(namespace: Namespace): HostBridge {
     annotationSave,
     annotationClear,
     annotationPending,
+    reviewPrepare,
+    reviewCommit,
+    reviewDetach,
   }
 }
 

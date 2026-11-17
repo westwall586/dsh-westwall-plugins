@@ -37,6 +37,14 @@ export function canonicalDocumentPath(path) {
         throw new AnnotationError('invalid-request', `文档路径必须是绝对路径：${raw}`);
     return resolve(raw);
 }
+/** 审阅轮次 id：短、稳定，sanitize 后仍能放进文件名。 */
+export const ROUND_ID_PATTERN = /^[a-z0-9]{2,32}$/;
+export function requireRoundId(value) {
+    if (typeof value !== 'string' || !ROUND_ID_PATTERN.test(value)) {
+        throw new AnnotationError('invalid-request', `轮次 id 不合法：${String(value)}`);
+    }
+    return value;
+}
 /** 一份草稿的 domain 记录键。 */
 export function draftKeyOf(sessionId, path) {
     const session = requireSessionId(sessionId);

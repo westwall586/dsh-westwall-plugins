@@ -9,7 +9,7 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import { RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
-import { AnnotationError, type AnnotationErrorCode } from './annotate/paths.ts'
+import { AnnotationError, canonicalDocumentPath, requireRoundId, requireSessionId, type AnnotationErrorCode } from './annotate/paths.ts'
 import {
   openAnnotationStore,
   type AnnotationDomainFacility,
@@ -17,6 +17,14 @@ import {
   type AnnotationStore,
 } from './annotate/store.ts'
 import type { Annotation, AnnotationDraft, PendingReview } from './annotate/schema.ts'
+import {
+  createReviewStore,
+  nodeReviewFiles,
+  type ReviewCommitView,
+  type ReviewDetachView,
+  type ReviewPrepareView,
+  type ReviewStore,
+} from './annotate/reviews.ts'
 import type { LlmLike } from './translate/call.ts'
 import {
   createTranslationCache,
@@ -93,6 +101,8 @@ const REMOTE_CODES: Record<TranslateErrorCode, RemoteCode> = {
 
 const ANNOTATION_CODES: Record<AnnotationErrorCode, RemoteCode> = {
   'invalid-request': 'activeMarkdown/invalid-request',
+  'invalid-path': 'activeMarkdown/invalid-path',
+  'unknown-session': 'activeMarkdown/unknown-session',
   'read-failed': 'activeMarkdown/read-failed',
   'write-failed': 'activeMarkdown/write-failed',
 }
@@ -287,6 +297,72 @@ export default class ActiveMarkdown extends TypertRemoteService {
     return this.callAnnotation(async () => (await this.annotation()).pending(sessionId))
   }
 
+  /** Write the pending full-text snapshot the annotation round was based on. */
+  async reviewPrepare(
+    sessionId: string,
+    path: string,
+    roundId: string,
+    text: string,
+  ): Promise<ReviewPrepareView> {
+    return this.callAnnotation(async () => this.reviews().prepare({
+      sessionId: requireSessionId(sessionId),
+      path,
+      roundId,
+      text: textField(text),
+    }))
+  }
+
+  /**
+   * Promote the pending snapshot, write the round metadata and delete the
+   * draft. A missing pending snapshot is not a failure: the round is marked
+   * `snapshotMissing` and the send is allowed to complete.
+   */
+  async reviewCommit(
+    sessionId: string,
+    path: string,
+    roundId: string,
+    sentText: string,
+  ): Promise<ReviewCommitView> {
+    return this.callAnnotation(async () => {
+      const session = requireSessionId(sessionId)
+      const canonical = canonicalDocumentPath(path)
+      const round = requireRoundId(roundId)
+      const annotations = await this.annotation()
+      const draft = await annotations.load({ sessionId: session, path: canonical })
+      const view = await this.reviews().commit({
+        sessionId: session,
+        path: canonical,
+        roundId: round,
+        pending: draft?.pending ?? null,
+        sentText: textField(sentText),
+      })
+      if (view.committed && draft?.pending?.roundId === round) {
+        await annotations.clear({ sessionId: session, path: canonical })
+      }
+      return view
+    })
+  }
+
+  /** Clear one matching pending record and its snapshot; annotations stay. */
+  async reviewDetach(sessionId: string, path: string, roundId: string): Promise<ReviewDetachView> {
+    return this.callAnnotation(async () => {
+      const session = requireSessionId(sessionId)
+      const canonical = canonicalDocumentPath(path)
+      const round = requireRoundId(roundId)
+      const annotations = await this.annotation()
+      const draft = await annotations.load({ sessionId: session, path: canonical })
+      if (draft?.pending?.roundId !== round) return { detached: false }
+      await this.reviews().detach({ sessionId: session, roundId: round })
+      await annotations.save({
+        sessionId: session,
+        path: canonical,
+        annotations: draft.annotations,
+        pending: null,
+      })
+      return { detached: true }
+    })
+  }
+
   private async call<T>(operation: () => Promise<T>): Promise<T> {
     try {
       return await operation()
@@ -325,6 +401,7 @@ export default class ActiveMarkdown extends TypertRemoteService {
   private fileStoreValue?: TranslationStore
   private cacheValue?: Promise<TranslationCache>
   private annotationValue?: Promise<AnnotationStore>
+  private reviewValue?: ReviewStore
 
   private fileStore(): TranslationStore {
     this.fileStoreValue ??= createTranslationStore({
@@ -342,6 +419,15 @@ export default class ActiveMarkdown extends TypertRemoteService {
       { now: () => new Date() },
     )
     return this.annotationValue
+  }
+
+  private reviews(): ReviewStore {
+    this.reviewValue ??= createReviewStore({
+      files: nodeReviewFiles,
+      workspaceOf: (sessionId) => this.workspaceOf(sessionId),
+      now: () => new Date(),
+    })
+    return this.reviewValue
   }
 
   private cache(): Promise<TranslationCache> {
@@ -439,6 +525,7 @@ function textField(value: unknown): string {
 const METHODS = [
   'describe', 'translate', 'cacheGet', 'cachePut', 'translationSave', 'translationLoad',
   'annotationLoad', 'annotationSave', 'annotationClear', 'annotationPending',
+  'reviewPrepare', 'reviewCommit', 'reviewDetach',
 ] as const
 
 Object.defineProperty(ActiveMarkdown.prototype, '@deepseek-ai/dsh-typert-protocol/remote-methods', {

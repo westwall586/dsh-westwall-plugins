@@ -118,14 +118,11 @@ export declare const annotationDraftSchema: z.ZodObject<{
 export type Annotation = z.infer<typeof annotationSchema>;
 export type PendingReview = z.infer<typeof pendingReviewSchema>;
 export type AnnotationDraft = z.infer<typeof annotationDraftSchema>;
-/**
- * P2a-4 的一轮审阅元数据。本切片只定形状，P2a-4 的 reviews 存储直接用它，
- * 不再改 pending 与草稿的结构。
- */
+/** 发送成功后写在轮次快照旁的元数据；`annotations` 与 `feedback` 取冻结副本。 */
 export declare const reviewRoundSchema: z.ZodObject<{
     roundId: z.ZodString;
     sessionId: z.ZodString;
-    path: z.ZodString;
+    sourcePath: z.ZodString;
     sourceHash: z.ZodString;
     feedback: z.ZodString;
     sentText: z.ZodString;

@@ -44,14 +44,11 @@ export const annotationDraftSchema = z.object({
     createdAt: z.string(),
     updatedAt: z.string(),
 }).strict();
-/**
- * P2a-4 的一轮审阅元数据。本切片只定形状，P2a-4 的 reviews 存储直接用它，
- * 不再改 pending 与草稿的结构。
- */
+/** 发送成功后写在轮次快照旁的元数据；`annotations` 与 `feedback` 取冻结副本。 */
 export const reviewRoundSchema = z.object({
     roundId: z.string().min(1),
     sessionId: z.string().min(1),
-    path: z.string().min(1),
+    sourcePath: z.string().min(1),
     sourceHash: z.string(),
     feedback: z.string(),
     sentText: z.string(),

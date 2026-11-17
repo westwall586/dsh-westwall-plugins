@@ -28,6 +28,9 @@ const WIRE_PARAMETERS: Record<string, string[]> = {
   annotationSave: ['sessionId', 'path', 'annotations', 'pending'],
   annotationClear: ['sessionId', 'path'],
   annotationPending: ['sessionId'],
+  reviewPrepare: ['sessionId', 'path', 'roundId', 'text'],
+  reviewCommit: ['sessionId', 'path', 'roundId', 'sentText'],
+  reviewDetach: ['sessionId', 'path', 'roundId'],
 }
 
 /** Host method parameters: the wire names, plus the Gateway-injected signal on translate. */
@@ -196,6 +199,18 @@ function recordingNamespace(answers: Answers = {}): { namespace: Namespace, call
       record('annotationPending', args)
       return { ok: true, value: [] }
     },
+    async reviewPrepare(...args: unknown[]) {
+      record('reviewPrepare', args)
+      return { ok: true, value: { sourceHash: 'hash', snapshotWritten: true, bytes: 12 } }
+    },
+    async reviewCommit(...args: unknown[]) {
+      record('reviewCommit', args)
+      return { ok: true, value: { roundId: 'r1', committed: true, snapshotMissing: false } }
+    },
+    async reviewDetach(...args: unknown[]) {
+      record('reviewDetach', args)
+      return { ok: true, value: { detached: true } }
+    },
   }
   return { namespace, calls }
 }
@@ -265,6 +280,32 @@ test('批注桥接按 Host 的线序传参，空结果按 null 返回', async ()
 
   const empty = createBridge(recordingNamespace().namespace)
   assert.equal(await empty.annotationLoad({ sessionId: 's1', path: '/w/a.md' }), null)
+})
+
+test('审阅快照桥接按 Host 的线序传参', async () => {
+  const { namespace, calls } = recordingNamespace()
+  const bridge = createBridge(namespace)
+
+  const prepared = await bridge.reviewPrepare({ sessionId: 's1', path: '/w/a.md', roundId: 'r1', text: '原文' })
+  assert.deepEqual(prepared, { sourceHash: 'hash', snapshotWritten: true, bytes: 12 })
+  assert.deepEqual(calls.at(-1), {
+    method: 'reviewPrepare',
+    args: ['s1', '/w/a.md', 'r1', '原文'],
+  })
+
+  const committed = await bridge.reviewCommit({ sessionId: 's1', path: '/w/a.md', roundId: 'r1', sentText: '已发送' })
+  assert.deepEqual(committed, { roundId: 'r1', committed: true, snapshotMissing: false })
+  assert.deepEqual(calls.at(-1), {
+    method: 'reviewCommit',
+    args: ['s1', '/w/a.md', 'r1', '已发送'],
+  })
+
+  const detached = await bridge.reviewDetach({ sessionId: 's1', path: '/w/a.md', roundId: 'r1' })
+  assert.deepEqual(detached, { detached: true })
+  assert.deepEqual(calls.at(-1), {
+    method: 'reviewDetach',
+    args: ['s1', '/w/a.md', 'r1'],
+  })
 })
 
 test('取消信号只在提供时追加到 translate 参数末尾', async () => {

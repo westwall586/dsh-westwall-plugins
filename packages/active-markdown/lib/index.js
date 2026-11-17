@@ -1,6 +1,7 @@
 import { RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
-import { AnnotationError } from "./annotate/paths.js";
+import { AnnotationError, canonicalDocumentPath, requireRoundId, requireSessionId } from "./annotate/paths.js";
 import { openAnnotationStore, } from "./annotate/store.js";
+import { createReviewStore, nodeReviewFiles, } from "./annotate/reviews.js";
 import { createTranslationCache, openCacheStore, } from "./translate/cache.js";
 import { LANGUAGES } from "./translate/language.js";
 import { PROMPT_VERSION } from "./translate/prompt.js";
@@ -24,6 +25,8 @@ const REMOTE_CODES = {
 };
 const ANNOTATION_CODES = {
     'invalid-request': 'activeMarkdown/invalid-request',
+    'invalid-path': 'activeMarkdown/invalid-path',
+    'unknown-session': 'activeMarkdown/unknown-session',
     'read-failed': 'activeMarkdown/read-failed',
     'write-failed': 'activeMarkdown/write-failed',
 };
@@ -132,6 +135,60 @@ export default class ActiveMarkdown extends TypertRemoteService {
     async annotationPending(sessionId) {
         return this.callAnnotation(async () => (await this.annotation()).pending(sessionId));
     }
+    /** Write the pending full-text snapshot the annotation round was based on. */
+    async reviewPrepare(sessionId, path, roundId, text) {
+        return this.callAnnotation(async () => this.reviews().prepare({
+            sessionId: requireSessionId(sessionId),
+            path,
+            roundId,
+            text: textField(text),
+        }));
+    }
+    /**
+     * Promote the pending snapshot, write the round metadata and delete the
+     * draft. A missing pending snapshot is not a failure: the round is marked
+     * `snapshotMissing` and the send is allowed to complete.
+     */
+    async reviewCommit(sessionId, path, roundId, sentText) {
+        return this.callAnnotation(async () => {
+            const session = requireSessionId(sessionId);
+            const canonical = canonicalDocumentPath(path);
+            const round = requireRoundId(roundId);
+            const annotations = await this.annotation();
+            const draft = await annotations.load({ sessionId: session, path: canonical });
+            const view = await this.reviews().commit({
+                sessionId: session,
+                path: canonical,
+                roundId: round,
+                pending: draft?.pending ?? null,
+                sentText: textField(sentText),
+            });
+            if (view.committed && draft?.pending?.roundId === round) {
+                await annotations.clear({ sessionId: session, path: canonical });
+            }
+            return view;
+        });
+    }
+    /** Clear one matching pending record and its snapshot; annotations stay. */
+    async reviewDetach(sessionId, path, roundId) {
+        return this.callAnnotation(async () => {
+            const session = requireSessionId(sessionId);
+            const canonical = canonicalDocumentPath(path);
+            const round = requireRoundId(roundId);
+            const annotations = await this.annotation();
+            const draft = await annotations.load({ sessionId: session, path: canonical });
+            if (draft?.pending?.roundId !== round)
+                return { detached: false };
+            await this.reviews().detach({ sessionId: session, roundId: round });
+            await annotations.save({
+                sessionId: session,
+                path: canonical,
+                annotations: draft.annotations,
+                pending: null,
+            });
+            return { detached: true };
+        });
+    }
     async call(operation) {
         try {
             return await operation();
@@ -171,6 +228,7 @@ export default class ActiveMarkdown extends TypertRemoteService {
     fileStoreValue;
     cacheValue;
     annotationValue;
+    reviewValue;
     fileStore() {
         this.fileStoreValue ??= createTranslationStore({
             files: nodeFiles,
@@ -183,6 +241,14 @@ export default class ActiveMarkdown extends TypertRemoteService {
     annotation() {
         this.annotationValue ??= openAnnotationStore(this.serviceOf('storageDomain'), { now: () => new Date() });
         return this.annotationValue;
+    }
+    reviews() {
+        this.reviewValue ??= createReviewStore({
+            files: nodeReviewFiles,
+            workspaceOf: (sessionId) => this.workspaceOf(sessionId),
+            now: () => new Date(),
+        });
+        return this.reviewValue;
     }
     cache() {
         this.cacheValue ??= openCacheStore(this.serviceOf('storageDomain')).then((store) => createTranslationCache({
@@ -272,6 +338,7 @@ function textField(value) {
 const METHODS = [
     'describe', 'translate', 'cacheGet', 'cachePut', 'translationSave', 'translationLoad',
     'annotationLoad', 'annotationSave', 'annotationClear', 'annotationPending',
+    'reviewPrepare', 'reviewCommit', 'reviewDetach',
 ];
 Object.defineProperty(ActiveMarkdown.prototype, '@deepseek-ai/dsh-typert-protocol/remote-methods', {
     configurable: true,

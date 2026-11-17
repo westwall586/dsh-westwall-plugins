@@ -1,8 +1,11 @@
 /** Browser half: locale, the Markdown renderer registration, and its body. */
 import CSS from './styles.css'
+import { createAttachmentController } from './annotate/attachment.ts'
+import { AnnotationCommitter, type CommitterInjected } from './annotate/committer.tsx'
+import { createPendingHub } from './annotate/committer.ts'
 import { createAnnotationStore } from './annotate/store.ts'
 import { Body, type BodyInjected } from './body.tsx'
-import type { ClientContext, HostBridge, SidebarRight } from './context.ts'
+import type { ClientContext, ConversationPort, HostBridge, SidebarRight } from './context.ts'
 import { mountHostBridge } from './host.ts'
 import { SELECTION_MENU_KIND, selectionActions, type SelectionMenuValue } from './menus.ts'
 import { en, zh } from './locales.ts'
@@ -34,11 +37,21 @@ export default {
 
     const t = ctx.locale.bind(NS)
 
-    // One draft store for the plugin's lifetime; the body and a future session
+    // One draft store for the plugin's lifetime; the body and the session
     // committer share it instead of each opening their own copy.
     let bridge: Promise<HostBridge> | undefined
     const host = (): Promise<HostBridge> => (bridge ??= mountHostBridge(ctx))
     const annotationStore = createAnnotationStore({ host })
+    const pendingHub = createPendingHub()
+    const conversationFor = (sessionId: string): ConversationPort | null => {
+      const root = ctx.get('conversation') as ConversationPort | null | undefined
+      if (root !== null && root !== undefined && typeof root.createDrafts === 'function') return root
+      const scoped = (ctx.get('sessions') as { scope?: (id: string) => { get?: (name: string) => unknown } } | null | undefined)
+        ?.scope?.(sessionId)?.get?.('conversation') as ConversationPort | null | undefined
+      if (scoped !== null && scoped !== undefined && typeof scoped.createDrafts === 'function') return scoped
+      return null
+    }
+    const attachment = createAttachmentController({ store: annotationStore, host, conversation: conversationFor })
 
     // One contribution for our selection family; the shared menu owns the popup.
     ctx.inject(['contextMenus'], (menus) => {
@@ -91,6 +104,8 @@ export default {
           openResource: (address) => (scoped.get('sidebarRight') as SidebarRight | undefined)?.openResource(address),
           host,
           annotations: annotationStore,
+          attachment,
+          hub: pendingHub,
           openMenu: (target, point) => {
             const menus = ctx.get('contextMenus')
             if (menus === undefined || menus === null) return false
@@ -99,6 +114,24 @@ export default {
           },
         }),
       }, Body)), 'active-markdown body')
+    })
+
+    // Session scope, not a document tab: a send clears every document whose
+    // attachment entered the message, even when its tab is closed.
+    ctx.inject(['slots'], (scoped) => {
+      scoped.effect(() => scoped.slots.inject('conversation.input.left', () => scoped.slots.register({
+        name: 'conversation.input.left',
+        id: 'active-markdown-annotation-committer',
+        order: 40,
+        locale: NS,
+        inject: (): CommitterInjected => ({
+          annotations: annotationStore,
+          hub: pendingHub,
+          attachments: attachment,
+          conversation: conversationFor,
+          host,
+        }),
+      }, AnnotationCommitter)), 'active-markdown annotation committer')
     })
   },
 }

@@ -11,6 +11,7 @@ import type { Context } from '@deepseek-ai/cordis';
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
 import { type AnnotationSaveView } from './annotate/store.ts';
 import type { Annotation, AnnotationDraft, PendingReview } from './annotate/schema.ts';
+import { type ReviewCommitView, type ReviewDetachView, type ReviewPrepareView } from './annotate/reviews.ts';
 import { type CachedTranslation, type CachePutView } from './translate/cache.ts';
 import { type DescribeView, type TranslateView } from './translate/request.ts';
 import { type TranslationLoadView, type TranslationSaveView } from './translate/store.ts';
@@ -50,6 +51,16 @@ export default class ActiveMarkdown extends TypertRemoteService {
     annotationClear(sessionId: string, path: string): Promise<Record<string, never>>;
     /** Every draft of one session that holds a pending attachment. */
     annotationPending(sessionId: string): Promise<AnnotationDraft[]>;
+    /** Write the pending full-text snapshot the annotation round was based on. */
+    reviewPrepare(sessionId: string, path: string, roundId: string, text: string): Promise<ReviewPrepareView>;
+    /**
+     * Promote the pending snapshot, write the round metadata and delete the
+     * draft. A missing pending snapshot is not a failure: the round is marked
+     * `snapshotMissing` and the send is allowed to complete.
+     */
+    reviewCommit(sessionId: string, path: string, roundId: string, sentText: string): Promise<ReviewCommitView>;
+    /** Clear one matching pending record and its snapshot; annotations stay. */
+    reviewDetach(sessionId: string, path: string, roundId: string): Promise<ReviewDetachView>;
     private call;
     private callAnnotation;
     /**
@@ -62,8 +73,10 @@ export default class ActiveMarkdown extends TypertRemoteService {
     private fileStoreValue?;
     private cacheValue?;
     private annotationValue?;
+    private reviewValue?;
     private fileStore;
     private annotation;
+    private reviews;
     private cache;
     /**
      * The directory a session's writes belong to: the committed working directory

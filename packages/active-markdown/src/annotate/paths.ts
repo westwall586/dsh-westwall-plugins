@@ -13,7 +13,7 @@ export const DRAFT_TTL_MS = 30 * 24 * 60 * 60 * 1000
 /** Document keys double as backend document names; hex is a safe subset. */
 export const DRAFT_KEY_PATTERN = /^[a-z0-9]+$/
 
-export type AnnotationErrorCode = 'invalid-request' | 'read-failed' | 'write-failed'
+export type AnnotationErrorCode = 'invalid-request' | 'invalid-path' | 'unknown-session' | 'read-failed' | 'write-failed'
 
 /** 批注存储的边界失败；由服务层映射成 Remote 错误码。 */
 export class AnnotationError extends Error {
@@ -42,6 +42,16 @@ export function canonicalDocumentPath(path: unknown): string {
   if (raw === '') throw new AnnotationError('invalid-request', '缺少文档路径')
   if (!isAbsolute(raw)) throw new AnnotationError('invalid-request', `文档路径必须是绝对路径：${raw}`)
   return resolve(raw)
+}
+
+/** 审阅轮次 id：短、稳定，sanitize 后仍能放进文件名。 */
+export const ROUND_ID_PATTERN = /^[a-z0-9]{2,32}$/
+
+export function requireRoundId(value: unknown): string {
+  if (typeof value !== 'string' || !ROUND_ID_PATTERN.test(value)) {
+    throw new AnnotationError('invalid-request', `轮次 id 不合法：${String(value)}`)
+  }
+  return value
 }
 
 /** 一份草稿的 domain 记录键。 */

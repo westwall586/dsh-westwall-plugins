@@ -1,10 +1,13 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { Context } from '@deepseek-ai/cordis'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 import ActiveMarkdown from '../src/index.ts'
 import { createMemoryAnnotationTable } from '../src/annotate/store.ts'
-import type { Annotation } from '../src/annotate/schema.ts'
+import type { Annotation, PendingReview } from '../src/annotate/schema.ts'
 import { FALLBACK_MAX_TOKENS, type LlmCallOptions, type LlmLike } from '../src/translate/call.ts'
 import { LANGUAGES } from '../src/translate/language.ts'
 import { MAX_TEXT_BYTES } from '../src/translate/request.ts'
@@ -141,6 +144,92 @@ test('边界守卫以 Remote 错误码返回，而不是裸异常', async () => 
     service.translate('session-1', 'a.md', SOURCE, 'zh', '', '', PROMPT_VERSION),
     (error: unknown) => codeOf(error) === 'activeMarkdown/no-model',
   )
+})
+
+test('reviewPrepare / reviewCommit / reviewDetach 走工作区快照与草稿', async () => {
+  const workspace = await mkdtemp(join(tmpdir(), 'am-review-'))
+  const table = createMemoryAnnotationTable()
+  const service = serviceWith({
+    storageDomain: { open: async () => ({ table: () => table }) },
+    sessions: { get: () => ({ header: { cwd: workspace } }) },
+  })
+  const path = join(workspace, 'docs', 'a.md')
+  const pending: PendingReview = {
+    roundId: 'r1',
+    draftAttachmentId: 'd-r1',
+    fileName: 'a-review-r1.md',
+    fileBytes: 10,
+    fileHash: 'f'.repeat(64),
+    sourceHash: 's'.repeat(64),
+    annotations: [annotation()],
+    feedback: '# 反馈',
+    createdAt: '2026-11-17T00:00:00.000Z',
+  }
+
+  try {
+    const prepared = await service.reviewPrepare('s1', path, 'r1', '# 原文\n')
+    assert.equal(prepared.snapshotWritten, true)
+    assert.equal(prepared.bytes, Buffer.byteLength('# 原文\n', 'utf8'))
+    assert.match(prepared.sourceHash, /^[0-9a-f]{64}$/)
+
+    await service.annotationSave('s1', path, [annotation()], pending)
+    const committed = await service.reviewCommit('s1', path, 'r1', '发送的文本')
+    assert.deepEqual(committed, { roundId: 'r1', committed: true, snapshotMissing: false })
+    assert.equal(await service.annotationLoad('s1', path), null)
+
+    const snapshot = join(workspace, '.dsh-active-markdown', 'reviews', 'docs', 'a.md', 'r1.md')
+    assert.equal(await readFile(snapshot, 'utf8'), '# 原文\n')
+    const meta = JSON.parse(await readFile(snapshot.replace(/\.md$/, '.json'), 'utf8')) as {
+      sourcePath: string
+      sentText: string
+      feedback: string
+      annotations: unknown[]
+    }
+    assert.equal(meta.sourcePath, 'docs/a.md')
+    assert.equal(meta.sentText, '发送的文本')
+    assert.equal(meta.feedback, '# 反馈')
+    assert.equal(meta.annotations.length, 1)
+
+    const second: PendingReview = { ...pending, roundId: 'r2', draftAttachmentId: 'd-r2' }
+    await service.reviewPrepare('s1', path, 'r2', '第二轮原文')
+    await service.annotationSave('s1', path, [annotation()], second)
+    assert.deepEqual(await service.reviewDetach('s1', path, 'r1'), { detached: false })
+    assert.deepEqual(await service.reviewDetach('s1', path, 'r2'), { detached: true })
+    const draft = await service.annotationLoad('s1', path)
+    assert.equal(draft?.pending, undefined)
+    assert.equal(draft?.annotations.length, 1)
+  } finally {
+    await rm(workspace, { recursive: true, force: true })
+  }
+})
+
+test('reviewCommit 在 pending 快照缺失时仍提交并标 snapshotMissing', async () => {
+  const workspace = await mkdtemp(join(tmpdir(), 'am-review-missing-'))
+  const table = createMemoryAnnotationTable()
+  const service = serviceWith({
+    storageDomain: { open: async () => ({ table: () => table }) },
+    sessions: { get: () => ({ header: { cwd: workspace } }) },
+  })
+  const path = join(workspace, 'a.md')
+  const pending: PendingReview = {
+    roundId: 'r9',
+    draftAttachmentId: 'd-r9',
+    fileName: 'a-review-r9.md',
+    fileBytes: 10,
+    fileHash: 'f'.repeat(64),
+    sourceHash: 's'.repeat(64),
+    annotations: [annotation()],
+    feedback: '反馈',
+    createdAt: '2026-11-17T00:00:00.000Z',
+  }
+  try {
+    await service.annotationSave('s1', path, [annotation()], pending)
+    const committed = await service.reviewCommit('s1', path, 'r9', '')
+    assert.deepEqual(committed, { roundId: 'r9', committed: true, snapshotMissing: true })
+    assert.equal(await service.annotationLoad('s1', path), null)
+  } finally {
+    await rm(workspace, { recursive: true, force: true })
+  }
 })
 
 test('模型失败以 Remote 错误码返回', async () => {

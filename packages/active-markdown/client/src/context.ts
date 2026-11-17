@@ -167,6 +167,89 @@ export interface AnnotationSaveRequest extends AnnotationLoadRequest {
   pending: PendingReview | null
 }
 
+/** Write the pending full-text snapshot for one review round. */
+export interface ReviewPrepareRequest extends AnnotationLoadRequest {
+  roundId: string
+  text: string
+}
+
+export interface ReviewPrepareView {
+  sourceHash: string
+  snapshotWritten: boolean
+  bytes: number
+}
+
+/** Promote the pending snapshot and finish one review round. */
+export interface ReviewCommitRequest extends AnnotationLoadRequest {
+  roundId: string
+  sentText: string
+}
+
+export interface ReviewCommitView {
+  roundId: string
+  committed: boolean
+  snapshotMissing: boolean
+}
+
+/** Clear one round's pending record and snapshot without touching annotations. */
+export interface ReviewDetachRequest extends AnnotationLoadRequest {
+  roundId: string
+}
+
+export interface ReviewDetachView {
+  detached: boolean
+}
+
+/** The input submit plane this plugin observes. */
+export type InputPhase = 'plain' | 'adjudicating' | 'claimed' | 'submitting' | 'sending'
+
+export interface InputStateView {
+  readonly draft: string
+  readonly attachmentIds: readonly string[]
+  readonly phase: InputPhase
+}
+
+export type UseInput = <T>(selector: (state: InputStateView) => T) => T
+
+/** The public input actions this plugin calls; never `submit()`. */
+export interface InputActionsView {
+  addAttachments(ids: readonly string[]): boolean
+  removeAttachment?(id: string): boolean | void
+}
+
+/** The concrete conversation service, declared structurally and fail-closed. */
+export interface ConversationPort {
+  createDrafts(sessionId: string, files: readonly File[], uploadImages: boolean): readonly unknown[]
+  releaseDraftAttachments(drafts: readonly unknown[]): void
+  releaseDraftAttachment?(id: string): void
+  resolveDraftAttachments?(ids: readonly string[]): readonly unknown[]
+}
+
+export interface FileReferenceView {
+  readonly attachmentId: string
+  readonly name: string
+  readonly bytes: number
+}
+
+/** A `FileBlock` inside a finalized user message. */
+export interface FileBlockView {
+  readonly type: 'file'
+  readonly attachment: FileReferenceView
+}
+
+export interface ChatMessageView {
+  readonly kind: string
+  readonly data?: { readonly content?: readonly { readonly type: string }[] }
+}
+
+/** The Chat target this plugin reads for the sent-file fallback. */
+export interface ChatSnapshotView {
+  readonly legacy?: { readonly nodes?: readonly ChatMessageView[] }
+  readonly nodes?: { values?: () => readonly ChatMessageView[] }
+}
+
+export type UseChat = <T>(selector: (state: ChatSnapshotView) => T) => T
+
 /** The stored metadata fields this Body reads. */
 export interface TranslationMeta {
   promptVersion: string
@@ -205,6 +288,9 @@ export interface HostBridge {
   annotationSave(request: AnnotationSaveRequest): Promise<AnnotationSaveView>
   annotationClear(request: AnnotationLoadRequest): Promise<void>
   annotationPending(sessionId: string): Promise<AnnotationDraft[]>
+  reviewPrepare(request: ReviewPrepareRequest): Promise<ReviewPrepareView>
+  reviewCommit(request: ReviewCommitRequest): Promise<ReviewCommitView>
+  reviewDetach(request: ReviewDetachRequest): Promise<ReviewDetachView>
 }
 
 /** The plugin-page config form surface, declared structurally. */

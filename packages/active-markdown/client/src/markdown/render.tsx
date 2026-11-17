@@ -1,7 +1,9 @@
 /** Render the block tree as themed React elements. */
 import * as React from 'react'
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { Inline, Block, ListItem } from './model.ts'
+import { componentOf } from './model.ts'
+import { ComponentFrame } from './component-frame.tsx'
 import { splitSourceLines, type SourceLine } from './lines.ts'
 import { isRemoteSource } from '../images.ts'
 
@@ -10,6 +12,8 @@ export interface RenderLabels {
   copy: string
   copied: string
   imageFailed: string
+  annotate: string
+  edit: string
 }
 
 /** Side effects the view delegates to the body. */
@@ -18,19 +22,27 @@ export interface RenderActions {
   resolveImage(src: string): Promise<string | undefined>
 }
 
+/** The block frame's annotation hooks; absent actions mean the view is read-only. */
+export interface ComponentContext {
+  labelOf(block: Block): string
+  annotationOf(block: Block): { seq: number } | undefined
+  annotate?: (block: Block) => void
+}
+
 export interface MarkdownViewProps {
   blocks: readonly Block[]
   labels: RenderLabels
   actions: RenderActions
   lineNumbers: boolean
+  components: ComponentContext
 }
 
 /**
  * Render the whole document body.
- * @param props - block tree, labels, line-number toggle, and link/image behaviour.
+ * @param props - block tree, labels, line-number toggle, component hooks, and link/image behaviour.
  * @returns the rendered article.
  */
-export function MarkdownView({ blocks, labels, actions, lineNumbers }: MarkdownViewProps): ReactNode {
+export function MarkdownView({ blocks, labels, actions, lineNumbers, components }: MarkdownViewProps): ReactNode {
   const doc = useRef<HTMLElement | null>(null)
   // Gutter numbers are absolutely positioned inside the article, so their tops
   // have to be measured after layout and again whenever the prose reflows.
@@ -50,12 +62,18 @@ export function MarkdownView({ blocks, labels, actions, lineNumbers }: MarkdownV
   }, [blocks, lineNumbers])
   return (
     <article ref={doc} className="am-doc" data-active-markdown-doc>
-      {blocks.map((block, index) => renderBlock(block, `b${index}`, labels, actions))}
+      {blocks.map((block, index) => renderBlock(block, `b${index}`, labels, actions, components))}
     </article>
   )
 }
 
-function renderBlock(block: Block, key: string, labels: RenderLabels, actions: RenderActions): ReactNode {
+function renderBlock(
+  block: Block,
+  key: string,
+  labels: RenderLabels,
+  actions: RenderActions,
+  components: ComponentContext,
+): ReactNode {
   switch (block.type) {
     case 'heading': {
       const Tag = `h${Math.min(Math.max(block.level, 1), 6)}` as 'h1'
@@ -82,36 +100,82 @@ function renderBlock(block: Block, key: string, labels: RenderLabels, actions: R
         </p>
       )
     }
-    case 'code': return <CodeView key={key} block={block} labels={labels} />
-    case 'table': return (
-      <div key={key} className="am-table-wrap" data-block-id={block.id} data-block-type="table" data-source-line={block.sourceStartLine} data-gutter-line={block.sourceStartLine}>
-        <table className="am-table">
-          <thead><tr data-line={block.sourceStartLine}>{block.header.map((cell, index) => <th key={index} style={cell.align === undefined ? undefined : { textAlign: cell.align }}>{renderInline(cell.inline, `${key}-h${index}`, labels, actions)}</th>)}</tr></thead>
-          <tbody>{block.rows.map((row, rowIndex) => <tr key={rowIndex} data-line={block.sourceStartLine + 2 + rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex} style={cell.align === undefined ? undefined : { textAlign: cell.align }}>{renderInline(cell.inline, `${key}-${rowIndex}-${cellIndex}`, labels, actions)}</td>)}</tr>)}</tbody>
-        </table>
-      </div>
-    )
+    case 'code':
+    case 'table': {
+      const component = componentOf(block)
+      if (component === null) return null
+      return (
+        <ComponentFrame
+          key={key}
+          block={block}
+          component={component}
+          annotation={components.annotationOf(block)}
+          {...(components.annotate === undefined ? {} : { annotate: components.annotate })}
+          label={components.labelOf(block)}
+          labels={{ annotate: labels.annotate, edit: labels.edit, copy: labels.copy, copied: labels.copied }}
+        >
+          {block.type === 'table' ? renderTable(block, key, labels, actions) : renderCode(block)}
+        </ComponentFrame>
+      )
+    }
     case 'list': {
-      const items = block.items.map((item, index) => renderItem(item, `${key}-i${index}`, labels, actions))
+      const items = block.items.map((item, index) => renderItem(item, `${key}-i${index}`, labels, actions, components))
       return block.ordered
         ? <ol key={key} className="am-list" start={block.start} data-block-id={block.id} data-block-type="list" data-source-line={block.sourceStartLine}>{items}</ol>
         : <ul key={key} className="am-list" data-block-id={block.id} data-block-type="list" data-source-line={block.sourceStartLine}>{items}</ul>
     }
     case 'quote': return (
       <blockquote key={key} className="am-quote" data-block-id={block.id} data-block-type="quote" data-source-line={block.sourceStartLine}>
-        {block.blocks.map((child, index) => renderBlock(child, `${key}-q${index}`, labels, actions))}
+        {block.blocks.map((child, index) => renderBlock(child, `${key}-q${index}`, labels, actions, components))}
       </blockquote>
     )
     case 'divider': return <hr key={key} className="am-divider" data-block-id={block.id} data-block-type="divider" data-source-line={block.sourceStartLine} data-line={block.sourceStartLine} data-gutter-line={block.sourceStartLine} />
   }
 }
 
-function renderItem(item: ListItem, key: string, labels: RenderLabels, actions: RenderActions): ReactNode {
+function renderItem(
+  item: ListItem,
+  key: string,
+  labels: RenderLabels,
+  actions: RenderActions,
+  components: ComponentContext,
+): ReactNode {
   return (
     <li key={key} className={item.task === undefined ? 'am-item' : 'am-item am-item-task'} data-block-id={item.id} data-block-type="list-item" data-source-line={item.sourceStartLine} data-line={item.sourceStartLine}>
       {item.task === undefined ? null : <input className="am-checkbox" type="checkbox" checked={item.task === 'done'} readOnly tabIndex={-1} aria-hidden="true" />}
-      {item.blocks.map((block, index) => renderBlock(block, `${key}-${index}`, labels, actions))}
+      {item.blocks.map((block, index) => renderBlock(block, `${key}-${index}`, labels, actions, components))}
     </li>
+  )
+}
+
+function renderTable(
+  block: Extract<Block, { type: 'table' }>,
+  key: string,
+  labels: RenderLabels,
+  actions: RenderActions,
+): ReactNode {
+  return (
+    <div className="am-table-wrap">
+      <table className="am-table">
+        <thead><tr data-line={block.sourceStartLine}>{block.header.map((cell, index) => <th key={index} style={cell.align === undefined ? undefined : { textAlign: cell.align }}>{renderInline(cell.inline, `${key}-h${index}`, labels, actions)}</th>)}</tr></thead>
+        <tbody>{block.rows.map((row, rowIndex) => <tr key={rowIndex} data-line={block.sourceStartLine + 2 + rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex} style={cell.align === undefined ? undefined : { textAlign: cell.align }}>{renderInline(cell.inline, `${key}-${rowIndex}-${cellIndex}`, labels, actions)}</td>)}</tr>)}</tbody>
+      </table>
+    </div>
+  )
+}
+
+function renderCode(block: Extract<Block, { type: 'code' }>): ReactNode {
+  const lines = block.content.split('\n')
+  const firstLine = block.sourceStartLine + (block.fence ? 1 : 0)
+  return (
+    <pre className="am-code-body"><code>
+      {lines.map((line, index) => (
+        <React.Fragment key={index}>
+          <span className="am-code-line" data-line={firstLine + index}>{line}</span>
+          {index === lines.length - 1 ? null : '\n'}
+        </React.Fragment>
+      ))}
+    </code></pre>
   )
 }
 
@@ -205,41 +269,5 @@ function InlineImage({ src, alt, title, labels, actions }: InlineImageProps): Re
         ? <span className="am-image-pending">{alt}</span>
         : <img src={url} alt={alt} title={title} loading="lazy" onError={() => setFailed(true)} />}
     </span>
-  )
-}
-
-interface CodeViewProps {
-  block: Extract<Block, { type: 'code' }>
-  labels: RenderLabels
-}
-
-function CodeView({ block, labels }: CodeViewProps): ReactNode {
-  const [copied, setCopied] = useState(false)
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  const copy = useCallback(() => {
-    void navigator.clipboard?.writeText(block.content).then(() => {
-      setCopied(true)
-      clearTimeout(timer.current)
-      timer.current = setTimeout(() => setCopied(false), 1600)
-    }).catch(() => {})
-  }, [block.content])
-  useEffect(() => () => clearTimeout(timer.current), [])
-  const lines = block.content.split('\n')
-  const firstLine = block.sourceStartLine + (block.fence ? 1 : 0)
-  return (
-    <figure className="am-code" data-block-id={block.id} data-block-type="code" data-source-line={block.sourceStartLine} data-gutter-line={block.sourceStartLine}>
-      <figcaption className="am-code-head">
-        <span className="am-code-lang">{block.lang === '' ? 'text' : block.lang}</span>
-        <button type="button" className="am-code-copy" onClick={copy}>{copied ? labels.copied : labels.copy}</button>
-      </figcaption>
-      <pre className="am-code-body"><code>
-        {lines.map((line, index) => (
-          <React.Fragment key={index}>
-            <span className="am-code-line" data-line={firstLine + index}>{line}</span>
-            {index === lines.length - 1 ? null : '\n'}
-          </React.Fragment>
-        ))}
-      </code></pre>
-    </figure>
   )
 }

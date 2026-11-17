@@ -4,6 +4,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { AnnotationDrawer } from './annotate/drawer.tsx'
 import {
   addAnnotation,
+  annotateBlock,
+  blockAnnotationOf,
   editAnnotation,
   newAnnotationId,
   nextSeq,
@@ -20,6 +22,7 @@ import {
   collectLineAtoms,
   joinLineAtoms,
   locateAnchor,
+  locateBlockAnchor,
   type TextLineAtom,
 } from './annotate/selection.ts'
 import type { AnnotationStore, DraftKey } from './annotate/store.ts'
@@ -28,7 +31,8 @@ import type { ContextMenuTarget, DescribeView, HostBridge, Translate, Translatio
 import { createImageResolver, type ImageResolver } from './images.ts'
 import { classifyLink } from './links.ts'
 import { parseDocument, type ParsedDocument } from './markdown/blocks.ts'
-import { MarkdownView } from './markdown/render.tsx'
+import { componentLabel, componentOf, type Block } from './markdown/model.ts'
+import { MarkdownView, type ComponentContext } from './markdown/render.tsx'
 import {
   registerSelectionHandler,
   SELECTION_MENU_KIND,
@@ -118,6 +122,7 @@ interface Peek {
 /** The annotation editor's target and its fixed placement. */
 type Editor =
   | { mode: 'new-text', anchor: Anchor, left: number, top: number }
+  | { mode: 'new-block', block: Block, left: number, top: number }
   | { mode: 'edit', annotation: Annotation, left: number, top: number }
 
 interface UndoState {
@@ -435,7 +440,13 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
   }, [sessionId, state, path, openResource])
 
   const actions = useMemo(() => ({ openLink, resolveImage }), [openLink, resolveImage])
-  const labels = useMemo(() => ({ copy: t('code.copy'), copied: t('code.copied'), imageFailed: t('image.failed') }), [t])
+  const labels = useMemo(() => ({
+    copy: t('code.copy'),
+    copied: t('code.copied'),
+    imageFailed: t('image.failed'),
+    annotate: t('component.annotate'),
+    edit: t('component.edit'),
+  }), [t])
 
   const reload = useCallback(() => { rendererRef.current?.reload() }, [])
 
@@ -653,10 +664,12 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
   const located = useMemo(() => {
     const map = new Map<string, boolean>()
     for (const annotation of annotationList) {
-      map.set(annotation.id, annotation.kind === 'text' ? locateAnchor(annotation, sourceJoined).status === 'located' : true)
+      map.set(annotation.id, annotation.kind === 'text'
+        ? locateAnchor(annotation, sourceJoined).status === 'located'
+        : locateBlockAnchor(annotation, parsed.blocks).status === 'located')
     }
     return map
-  }, [annotationList, sourceJoined])
+  }, [annotationList, sourceJoined, parsed])
 
   const openEditor = useCallback((annotation: Annotation, anchor?: HTMLElement): void => {
     const rect = anchor?.getBoundingClientRect()
@@ -668,24 +681,48 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
     })
   }, [])
 
+  const openBlockEditor = useCallback((block: Block): void => {
+    const element = container.current?.querySelector<HTMLElement>(`[data-component][data-block-id="${block.id}"]`)
+    const rect = element?.getBoundingClientRect()
+    const existing = blockAnnotationOf(annotationList, block.id)
+    const left = rect === undefined
+      ? Math.max(8, window.innerWidth - ANNOTATION_POPOVER_WIDTH - 24)
+      : Math.max(8, Math.min(rect.right - ANNOTATION_POPOVER_WIDTH, window.innerWidth - ANNOTATION_POPOVER_WIDTH - 8))
+    const top = rect === undefined ? 72 : rect.top + 36
+    if (existing !== undefined) setEditor({ mode: 'edit', annotation: existing, left, top })
+    else setEditor({ mode: 'new-block', block, left, top })
+  }, [annotationList])
+
+  const componentContext = useMemo<ComponentContext>(() => ({
+    labelOf: (block) => {
+      const component = componentOf(block)
+      return component === null ? '' : componentLabel(component, t)
+    },
+    annotationOf: block => (view === 'source' ? blockAnnotationOf(annotationList, block.id) : undefined),
+    ...(view === 'source' ? { annotate: openBlockEditor } : {}),
+  }), [view, annotationList, t, openBlockEditor])
+
   const saveEditor = useCallback((body: string): void => {
     const target = draftKey
     const current = editor
     const text = body.trim()
     if (target === null || current === null || text === '') return
+    const options = {
+      id: newAnnotationId(),
+      seq: nextSeq(annotationList, snapshot.nextSeq),
+      createdAt: new Date().toISOString(),
+    }
     const next = current.mode === 'edit'
       ? editAnnotation(annotationList, current.annotation.id, text)
-      : addAnnotation(annotationList, { ...current.anchor, kind: 'text', body: text }, {
-        id: newAnnotationId(),
-        seq: nextSeq(annotationList, snapshot.nextSeq),
-        createdAt: new Date().toISOString(),
-      })
+      : current.mode === 'new-block'
+        ? annotateBlock(annotationList, current.block, text, options, componentContext.labelOf(current.block))
+        : addAnnotation(annotationList, { ...current.anchor, kind: 'text', body: text }, options)
     setEditor(null)
     void annotations.write(target, next).then((result) => {
       if (result.status === 'too-large') setNotice({ text: t('annotate.tooLarge'), undo: false })
       else if (result.status === 'failed') setNotice({ text: result.message, undo: false })
     })
-  }, [draftKey, editor, annotationList, snapshot.nextSeq, annotations, t])
+  }, [draftKey, editor, annotationList, snapshot.nextSeq, annotations, componentContext, t])
 
   const deleteAnnotation = useCallback((annotation: Annotation): void => {
     const target = draftKey
@@ -717,17 +754,25 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
   }, [draftKey, annotations, undo])
 
   const locateAnnotation = useCallback((annotation: Annotation): void => {
-    if (annotation.kind === 'text' && locateAnchor(annotation, sourceJoined).status !== 'located') {
-      setNotice({ text: t('annotate.missing'), undo: false })
+    if (annotation.kind === 'text') {
+      if (locateAnchor(annotation, sourceJoined).status !== 'located') {
+        setNotice({ text: t('annotate.missing'), undo: false })
+        return
+      }
+    } else if (locateBlockAnchor(annotation, parsed.blocks).status !== 'located') {
+      setNotice({ text: t('annotate.blockMissing'), undo: false })
       return
     }
     setView('source')
     setPeek(null)
     setDrawerOpen(false)
     requestAnimationFrame(() => {
-      lineElement(container.current, annotation.lineStart, annotation.blockStartId)?.scrollIntoView({ block: 'center' })
+      const element = annotation.kind === 'block'
+        ? container.current?.querySelector<HTMLElement>(`[data-component][data-block-id="${annotation.blockStartId}"]`)
+        : lineElement(container.current, annotation.lineStart, annotation.blockStartId)
+      element?.scrollIntoView({ block: 'center' })
     })
-  }, [sourceJoined, t])
+  }, [parsed, sourceJoined, t])
 
   useEffect(() => {
     if (undo === null) return
@@ -1053,6 +1098,7 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
               parsed={displayed}
               labels={labels}
               actions={actions}
+              components={componentContext}
               lineNumbers={showGutter}
               t={t}
             />
@@ -1139,7 +1185,7 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
         <AnnotationPopover
           left={editor.left}
           top={editor.top}
-          quote={editor.mode === 'edit' ? editor.annotation.quote : editor.anchor.quote}
+          quote={editor.mode === 'edit' ? editor.annotation.quote : editor.mode === 'new-block' ? componentContext.labelOf(editor.block) : editor.anchor.quote}
           initial={editor.mode === 'edit' ? editor.annotation.body : ''}
           labels={{
             title: t('annotate.drawer.title'),
@@ -1168,14 +1214,15 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
 
 interface DocumentViewProps {
   parsed: ParsedDocument
-  labels: { copy: string, copied: string, imageFailed: string }
+  labels: { copy: string, copied: string, imageFailed: string, annotate: string, edit: string }
   actions: { openLink(href: string): void, resolveImage(src: string): Promise<string | undefined> }
+  components: ComponentContext
   lineNumbers: boolean
   t: Translate
 }
 
 /** Parse once in the body so annotations and the rendered tree share one block model. */
-function DocumentView({ parsed, labels, actions, lineNumbers, t }: DocumentViewProps): ReactNode {
+function DocumentView({ parsed, labels, actions, components, lineNumbers, t }: DocumentViewProps): ReactNode {
   return (
     <>
       {parsed.frontmatter === undefined ? null : (
@@ -1184,7 +1231,7 @@ function DocumentView({ parsed, labels, actions, lineNumbers, t }: DocumentViewP
           <pre className="am-frontmatter-source">{parsed.frontmatter.source}</pre>
         </section>
       )}
-      <MarkdownView blocks={parsed.blocks} labels={labels} actions={actions} lineNumbers={lineNumbers} />
+      <MarkdownView blocks={parsed.blocks} labels={labels} actions={actions} components={components} lineNumbers={lineNumbers} />
     </>
   )
 }

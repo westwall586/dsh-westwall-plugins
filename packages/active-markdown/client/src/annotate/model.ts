@@ -2,6 +2,7 @@
  * 批注的数据形状与纯草稿变换。编号只在追加时增大：删除不重排、不回收，
  * 撤销按原 id 与原 seq 放回。草稿身份由 store 生成，这里只处理一份文档的列表。
  */
+import { componentOf, type Block } from '../markdown/model.ts'
 
 export type AnnotationKind = 'text' | 'block'
 
@@ -109,4 +110,40 @@ export function removeAnnotation(annotations: readonly Annotation[], id: string)
 export function restoreAnnotation(annotations: readonly Annotation[], annotation: Annotation): Annotation[] {
   if (annotations.some(entry => entry.id === annotation.id)) return [...annotations]
   return [...annotations, annotation].sort((left, right) => left.seq - right.seq)
+}
+
+/** 组件批注的锚点：`quote` 是标签，行号与块 id 取代字符偏移。 */
+export function blockAnchor(block: Block, quote: string): Anchor {
+  return {
+    quote,
+    prefix: '',
+    suffix: '',
+    startOffset: 0,
+    blockStartId: block.id,
+    blockEndId: block.id,
+    blockSignature: componentOf(block)?.signature ?? '',
+    section: block.headingPath.join(' / '),
+    lineStart: block.sourceStartLine,
+    lineEnd: block.sourceEndLine,
+  }
+}
+
+export function blockAnnotationOf(annotations: readonly Annotation[], blockId: string): Annotation | undefined {
+  return annotations.find(annotation => annotation.kind === 'block' && annotation.blockStartId === blockId)
+}
+
+/**
+ * 写组件批注：已有则改正文，没有才追加。调用方仍拿函数返回的列表落草稿，
+ * 因此「一个组件一条」是模型约束，不靠按钮状态维持。
+ */
+export function annotateBlock(
+  annotations: readonly Annotation[],
+  block: Block,
+  body: string,
+  options: AddOptions,
+  quote: string,
+): Annotation[] {
+  const existing = blockAnnotationOf(annotations, block.id)
+  if (existing !== undefined) return editAnnotation(annotations, existing.id, body)
+  return addAnnotation(annotations, { ...blockAnchor(block, quote), kind: 'block', body }, options)
 }

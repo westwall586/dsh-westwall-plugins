@@ -3,9 +3,9 @@
  * 文本的原子；选区边界落在原子上，跨行时用 `\n` 拼接，列表、引用与软换行
  * 都不会把偏移算歪。恢复只认精确偏移、唯一搜索，绝不把批注糊到相近文本上。
  */
-import type { Block, Inline } from '../markdown/model.ts'
+import { componentOf, type Block, type Inline } from '../markdown/model.ts'
 import { splitSourceLines } from '../markdown/lines.ts'
-import type { Anchor } from './model.ts'
+import type { Anchor, Annotation } from './model.ts'
 
 export interface TextLineAtom {
   /** 1-based，相对整份源文件。 */
@@ -212,4 +212,35 @@ export function locateAnchor(annotation: Anchor, lines: JoinedLines): AnchorLoca
   if (count !== 1) return { status: 'unlocatable' }
   const start = found + annotation.prefix.length
   return { status: 'located', startOffset: start, endOffset: start + annotation.quote.length }
+}
+
+export type BlockLocation =
+  | { status: 'located', block: Block }
+  | { status: 'unlocatable', reason: 'missing' | 'changed' }
+
+function findBlock(blocks: readonly Block[], id: string): Block | undefined {
+  for (const block of blocks) {
+    if (block.id === id) return block
+    const children = block.type === 'list' ? block.items.flatMap(item => item.blocks) : block.type === 'quote' ? block.blocks : []
+    const found = findBlock(children, id)
+    if (found !== undefined) return found
+  }
+  return undefined
+}
+
+/**
+ * Locate a component annotation by block id and content signature. A missing
+ * block or changed content is reported, never moved to a lookalike block.
+ * @param annotation - the stored block annotation.
+ * @param blocks - the current document's block tree.
+ * @returns the block when it still matches.
+ */
+export function locateBlockAnchor(annotation: Annotation, blocks: readonly Block[]): BlockLocation {
+  const block = findBlock(blocks, annotation.blockStartId)
+  if (block === undefined) return { status: 'unlocatable', reason: 'missing' }
+  const component = componentOf(block)
+  if (component === null || component.signature !== annotation.blockSignature) {
+    return { status: 'unlocatable', reason: 'changed' }
+  }
+  return { status: 'located', block }
 }

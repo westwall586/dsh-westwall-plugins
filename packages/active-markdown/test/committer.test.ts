@@ -8,6 +8,7 @@ import {
   observeCommitter,
   runCommitterEffects,
   settleCommitterState,
+  transcriptFilesOfNodes,
   type CommitterEffectPorts,
   type CommitterObservation,
   type PendingEntry,
@@ -191,6 +192,31 @@ test('slash 命令的 submitting 完全忽略，已有候选保留', () => {
   const submitting = observeCommitter(state, observe('submitting', [], []))
   assert.equal(submitting.effects.length, 0)
   assert.deepEqual(submitting.state, state)
+})
+
+test('legacy ConversationNode 的顶层 content 也能读到 FileBlock', () => {
+  const files = transcriptFilesOfNodes([{
+    kind: 'user',
+    content: [{
+      type: 'file',
+      attachment: {
+        attachmentId: 'sha256:abc',
+        name: 'a-review-r1.md',
+        bytes: 12,
+      },
+    }],
+  }])
+  assert.deepEqual(files, [{ name: 'a-review-r1.md', attachmentId: 'sha256:abc' }])
+})
+
+test('pending hub 同一文档换轮次时只保留最新一条', () => {
+  const hub = createPendingHub()
+  const first = entry('ra')
+  const second = entry('rc', 'd-rc')
+  second.key = { ...second.key, path: first.key.path }
+  hub.set(first)
+  hub.set(second)
+  assert.deepEqual(hub.list('s1').map(item => item.pending.roundId), ['rc'])
 })
 
 test('pending hub 按会话广播，set/remove/clear 不串会话', () => {

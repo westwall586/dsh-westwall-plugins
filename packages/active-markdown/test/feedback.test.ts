@@ -55,7 +55,7 @@ test('超长文档名被截断，文件名仍在 200 字节内且带 roundId', (
   assert.ok(name.endsWith('-review-ab12cd34.md'))
 })
 
-test('反馈文件有 frontmatter、路径只出现一次、没有标签和版本', () => {
+test('反馈文件有 frontmatter、路径在元数据与正文各一次、没有标签和版本', () => {
   const content = renderFeedback({
     roundId: 'ab12cd34',
     sourcePath: 'docs/a.md',
@@ -65,7 +65,7 @@ test('反馈文件有 frontmatter、路径只出现一次、没有标签和版�
   assert.deepEqual(lines.slice(0, 5), [
     '---',
     'dsh-active-markdown-review: ab12cd34',
-    'source: docs/a.md',
+    'source: "docs/a.md"',
     '---',
     '',
   ])
@@ -79,6 +79,16 @@ test('反馈文件有 frontmatter、路径只出现一次、没有标签和版�
   assert.equal(content.includes('标签'), false)
   assert.equal(content.includes('版本'), false)
   assert.equal(content.includes('优先级'), false)
+})
+
+test('含引号与换行的源路径仍安全地留在 frontmatter 里', () => {
+  const content = renderFeedback({
+    roundId: 'r1',
+    sourcePath: 'docs/a"b\nc.md',
+    annotations: [annotation()],
+  })
+  assert.ok(content.includes('source: "docs/a\\"b\\nc.md"'))
+  assert.equal(content.split('\n').some(line => line === 'c.md"'), false)
 })
 
 test('无法定位的条目排在最后并注明原文可能已变化', () => {

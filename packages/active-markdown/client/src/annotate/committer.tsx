@@ -4,14 +4,14 @@
  * exists and outlives every document tab.
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { ConversationPort, HostBridge, UseChat, UseInput } from '../context.ts'
+import type { HostBridge, UseConversation, UseInput } from '../context.ts'
 import type { AttachmentController } from './attachment.ts'
 import {
   initialCommitterState,
   observeCommitter,
   runCommitterEffects,
   settleCommitterState,
-  transcriptFilesOf,
+  transcriptFilesOfNodes,
   type CommitterState,
   type PendingEntry,
   type PendingHub,
@@ -25,22 +25,19 @@ export interface CommitterInjected {
   annotations: AnnotationStore
   hub: PendingHub
   attachments: AttachmentController
-  conversation(sessionId: string): ConversationPort | null
   host(): Promise<HostBridge>
 }
 
 export interface CommitterProps extends CommitterInjected {
   sessionId: string
   useInput: UseInput
-  /** Absent only when the Chat package is not assembled; the fallback then never matches. */
-  useChat?: UseChat
-  inputActions: unknown
+  useConversation: UseConversation
 }
 
 export function AnnotationCommitter({
   sessionId,
   useInput,
-  useChat,
+  useConversation,
   annotations,
   hub,
   attachments,
@@ -49,7 +46,7 @@ export function AnnotationCommitter({
   const phase = useInput(state => state.phase)
   const attachmentIds = useInput(state => state.attachmentIds)
   const draftText = useInput(state => state.draft)
-  const transcript = useTranscript(useChat)
+  const transcript = useTranscript(useConversation)
   const entries = usePendingEntries(hub, sessionId)
   const verified = useVerified(entries, attachmentIds, attachments, sessionId)
   const state = useRef<CommitterState>(initialCommitterState())
@@ -70,6 +67,8 @@ export function AnnotationCommitter({
       for (const draft of drafts) {
         const pending = draft.pending
         if (pending === undefined || pending.annotations.length === 0) continue
+        // A local attach may have won the race with this mount-time read.
+        if (hub.list(sessionId).some(entry => entry.key.path === draft.path)) continue
         hub.set({ key: { sessionId, path: draft.path }, pending })
       }
     }).catch(() => {})
@@ -122,9 +121,9 @@ export function AnnotationCommitter({
   return null
 }
 
-function useTranscript(useChat: UseChat | undefined): readonly TranscriptFile[] {
-  const chat = useChat === undefined ? undefined : useChat(state => state)
-  return useMemo(() => (chat === undefined ? [] : transcriptFilesOf(chat)), [chat])
+function useTranscript(useConversation: UseConversation): readonly TranscriptFile[] {
+  const nodes = useConversation(state => state.views.get('chat')?.legacy?.nodes)
+  return useMemo(() => (nodes === undefined ? [] : transcriptFilesOfNodes(nodes)), [nodes])
 }
 
 function usePendingEntries(hub: PendingHub, sessionId: string): readonly PendingEntry[] {

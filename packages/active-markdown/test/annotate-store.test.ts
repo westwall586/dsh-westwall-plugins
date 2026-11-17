@@ -261,7 +261,7 @@ test('写入推进编号高水位，删除后不回收', async () => {
   assert.equal(store.getSnapshot(key()).nextSeq, 4)
 })
 
-function pendingReview(roundId: string): PendingReview {
+function pendingReview(roundId: string, annotations: Annotation[] = [annotation(1)]): PendingReview {
   return {
     roundId,
     draftAttachmentId: `d-${roundId}`,
@@ -269,7 +269,7 @@ function pendingReview(roundId: string): PendingReview {
     fileBytes: 10,
     fileHash: `hash-${roundId}`,
     sourceHash: `source-${roundId}`,
-    annotations: [annotation()],
+    annotations,
     feedback: '反馈',
     createdAt: '2026-11-17T00:00:00.000Z',
   }
@@ -339,6 +339,31 @@ test('commit 使用冻结的 roundId，成功后才清空草稿', async () => {
   assert.deepEqual(await store.commit(key(), 'r1', '已发送'), { status: 'committed', snapshotMissing: false })
   assert.deepEqual(fake.commits, [{ sessionId: 's1', path: '/w/a.md', roundId: 'r1', sentText: '已发送' }])
   assert.deepEqual(store.getSnapshot(key()).annotations, [])
+  assert.equal(store.getSnapshot(key()).pending, null)
+})
+
+test('commit 只清掉冻结轮次里的批注，发送后新加的批注留下', async () => {
+  const fake = fakeHost()
+  const store = createAnnotationStore({ host: async () => fake.host })
+  await store.write(key(), [annotation(1)])
+  await store.attach(key(), pendingReview('r1', [annotation(1)]))
+  await store.write(key(), [annotation(1), annotation(2)])
+
+  assert.deepEqual(await store.commit(key(), 'r1', '已发送'), { status: 'committed', snapshotMissing: false })
+  assert.deepEqual(store.getSnapshot(key()).annotations.map(item => item.seq), [2])
+  assert.equal(store.getSnapshot(key()).nextSeq, 3)
+  assert.equal(store.getSnapshot(key()).pending, null)
+})
+
+test('commit 保留发送后改过、未进入冻结轮次的同一批注内容', async () => {
+  const fake = fakeHost()
+  const store = createAnnotationStore({ host: async () => fake.host })
+  await store.write(key(), [annotation(1, '旧意见')])
+  await store.attach(key(), pendingReview('r1', [annotation(1, '旧意见')]))
+  await store.write(key(), [annotation(1, '新意见')])
+
+  assert.deepEqual(await store.commit(key(), 'r1', '已发送'), { status: 'committed', snapshotMissing: false })
+  assert.deepEqual(store.getSnapshot(key()).annotations.map(item => item.body), ['新意见'])
   assert.equal(store.getSnapshot(key()).pending, null)
 })
 

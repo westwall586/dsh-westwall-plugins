@@ -8,7 +8,7 @@
  * the sent message carries a matching FileBlock (or the id disappeared after a
  * `sending` latch, which is the input facade's own acceptance signal).
  */
-import type { ChatSnapshotView, FileBlockView, InputPhase } from '../context.ts'
+import type { ChatMessageView, FileBlockView, InputPhase } from '../context.ts'
 import type { PendingReview } from './model.ts'
 import type { DraftKey } from './store.ts'
 
@@ -68,15 +68,14 @@ export function initialCommitterState(candidates: readonly PendingEntry[] = []):
   return { candidates: [...candidates], attached: new Set(), latched: new Map(), inFlight: new Set() }
 }
 
-export function transcriptFilesOf(chat: ChatSnapshotView): TranscriptFile[] {
-  const nodes = chat.legacy?.nodes ?? chat.nodes?.values?.() ?? []
+export function transcriptFilesOfNodes(nodes: readonly ChatMessageView[]): TranscriptFile[] {
   const files: TranscriptFile[] = []
   let messages = 0
   for (let index = nodes.length - 1; index >= 0 && messages < 8; index -= 1) {
     const node = nodes[index]!
     if (node.kind !== 'user' && node.kind !== 'steering') continue
     messages += 1
-    for (const block of node.data?.content ?? []) {
+    for (const block of node.data?.content ?? node.content ?? []) {
       if (!isFileBlock(block)) continue
       files.push({ name: block.attachment.name, attachmentId: block.attachment.attachmentId })
     }
@@ -217,12 +216,6 @@ export interface PendingHub {
   clear(roundId: string): void
 }
 
-function sameEntry(left: PendingEntry, right: PendingEntry): boolean {
-  return left.key.sessionId === right.key.sessionId
-    && left.key.path === right.key.path
-    && left.pending.roundId === right.pending.roundId
-}
-
 export function createPendingHub(): PendingHub {
   const entries = new Map<string, PendingEntry[]>()
   const listeners = new Map<string, Set<() => void>>()
@@ -253,10 +246,9 @@ export function createPendingHub(): PendingHub {
     set(entry) {
       const sessionId = entry.key.sessionId
       const group = entries.get(sessionId) ?? []
-      const index = group.findIndex(existing => sameEntry(existing, entry))
-      if (index === -1) group.push(entry)
-      else group[index] = entry
-      entries.set(sessionId, group)
+      const next = group.filter(existing => !(existing.key.sessionId === entry.key.sessionId && existing.key.path === entry.key.path))
+      next.push(entry)
+      entries.set(sessionId, next)
       publish(sessionId)
     },
 

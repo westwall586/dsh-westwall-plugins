@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { createAttachmentController, type AttachmentRequest } from '../client/src/annotate/attachment.ts'
+import { normalizeSourceText, sha256Hex } from '../client/src/annotate/feedback.ts'
 import type { Annotation } from '../client/src/annotate/model.ts'
 import { createAnnotationStore } from '../client/src/annotate/store.ts'
 import type {
@@ -47,7 +48,7 @@ interface Harness {
   prepares: ReviewPrepareRequest[]
   detaches: ReviewDetachRequest[]
   drafts: Array<{ id: string, kind: 'file', file: File }>
-  flags: { prepareFails: boolean, saveFails: boolean, addResult: boolean }
+  flags: { prepareFails: boolean, saveFails: boolean, createFails: boolean, addResult: boolean }
 }
 
 function harness(): Harness {
@@ -60,7 +61,7 @@ function harness(): Harness {
   const drafts: Array<{ id: string, kind: 'file', file: File }> = []
   let counter = 0
 
-  const flags = { prepareFails: false, saveFails: false, addResult: true }
+  const flags = { prepareFails: false, saveFails: false, createFails: false, addResult: true }
 
   const host = {
     async annotationLoad(_request: AnnotationLoadRequest) { return null },
@@ -75,7 +76,7 @@ function harness(): Harness {
       events.push('prepare')
       prepares.push(request)
       if (flags.prepareFails) throw new Error('snapshot failed')
-      return { sourceHash: 'source-hash', snapshotWritten: true, bytes: 10 }
+      return { sourceHash: await sha256Hex(normalizeSourceText(request.text)), snapshotWritten: true, bytes: 10 }
     },
     async reviewCommit(_request: ReviewCommitRequest) {
       return { roundId: 'r', committed: true, snapshotMissing: false }
@@ -90,6 +91,7 @@ function harness(): Harness {
   const conversation = {
     createDrafts(_sessionId: string, files: readonly File[], _uploadImages: boolean) {
       events.push('create')
+      if (flags.createFails) throw new Error('composer refused')
       const created = files.map(file => ({ id: `d${++counter}`, kind: 'file' as const, file }))
       drafts.push(...created)
       return created
@@ -172,7 +174,7 @@ test('加入输入框依次 prepare / create / add / save，并冻结待发送�
   assert.match(result.pending.roundId, /^[a-z0-9]{8}$/)
   assert.equal(result.pending.draftAttachmentId, 'd1')
   assert.equal(result.pending.fileName, `a-review-${result.pending.roundId}.md`)
-  assert.equal(result.pending.sourceHash, 'source-hash')
+  assert.match(result.pending.sourceHash, /^[0-9a-f]{64}$/)
   assert.equal(result.pending.annotations.length, 1)
   assert.equal(value.store.getSnapshot(KEY).pending?.roundId, result.pending.roundId)
   assert.equal(value.added[0]?.length, 1)
@@ -186,13 +188,14 @@ test('composer 不在 plain 时拒绝，不创建 draft', async () => {
   assert.deepEqual(value.events, [])
 })
 
-test('addAttachments 拒绝时释放 draft，不落 pending', async () => {
+test('addAttachments 拒绝时释放 draft 并清掉 pending 快照', async () => {
   const value = harness()
   await ready(value)
   value.flags.addResult = false
   const result = await attachWithInput(value)
   assert.deepEqual(result, { status: 'refused', reason: 'composer-busy' })
-  assert.deepEqual(value.events, ['prepare', 'create', 'add', 'release'])
+  assert.deepEqual(value.events, ['prepare', 'create', 'add', 'release', 'detach'])
+  assert.equal(value.detaches.length, 1)
   assert.equal(value.store.getSnapshot(KEY).pending, null)
 })
 
@@ -263,6 +266,34 @@ test('批注改动后按同一 roundId 重新生成，先加新 id 再移除旧 
   assert.deepEqual(value.events, ['prepare', 'create', 'add', 'save', 'remove'])
   assert.deepEqual(value.removed, [first.pending.draftAttachmentId])
   assert.equal(value.store.getSnapshot(KEY).pending?.draftAttachmentId, result.pending.draftAttachmentId)
+})
+
+test('源文变化后拒绝按旧轮次重新生成', async () => {
+  const value = harness()
+  await ready(value)
+  const first = await attachWithInput(value)
+  assert.equal(first.status, 'attached')
+  if (first.status !== 'attached') return
+  value.events.length = 0
+
+  const result = await value.controller.regenerate({
+    ...request({ text: '原文改了' }),
+    annotations: [annotation({ body: '改过的意见' })],
+    roundId: first.pending.roundId,
+  })
+  assert.deepEqual(result, { status: 'refused', reason: 'source-changed' })
+  assert.deepEqual(value.events, [])
+  assert.equal(value.store.getSnapshot(KEY).pending?.roundId, first.pending.roundId)
+})
+
+test('createDrafts 失败时清掉已写的 pending 快照', async () => {
+  const value = harness()
+  await ready(value)
+  value.flags.createFails = true
+  const result = await attachWithInput(value)
+  assert.equal(result.status, 'failed')
+  assert.equal(value.detaches.length, 1)
+  assert.equal(value.store.getSnapshot(KEY).pending, null)
 })
 
 test('compose session 与草稿键不一致时拒绝', async () => {

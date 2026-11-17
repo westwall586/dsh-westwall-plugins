@@ -203,6 +203,74 @@ test('reviewPrepare / reviewCommit / reviewDetach 走工作区快照与草稿', 
   }
 })
 
+test('reviewDetach 能清掉 attach 失败留下的孤儿 pending 快照', async () => {
+  const workspace = await mkdtemp(join(tmpdir(), 'am-review-orphan-'))
+  const service = serviceWith({
+    storageDomain: { open: async () => ({ table: () => createMemoryAnnotationTable() }) },
+    sessions: { get: () => ({ header: { cwd: workspace } }) },
+  })
+  const path = join(workspace, 'a.md')
+  try {
+    await service.reviewPrepare('s1', path, 'orphan', '原文')
+    assert.deepEqual(await service.reviewDetach('s1', path, 'orphan'), { detached: true })
+    await assert.rejects(readFile(join(workspace, '.dsh-active-markdown', 'reviews', 'pending', 'orphan.md'), 'utf8'))
+    assert.deepEqual(await service.reviewDetach('s1', path, 'orphan'), { detached: false })
+  } finally {
+    await rm(workspace, { recursive: true, force: true })
+  }
+})
+
+test('reviewPrepare 拒绝空原文', async () => {
+  const workspace = await mkdtemp(join(tmpdir(), 'am-review-empty-'))
+  const service = serviceWith({
+    storageDomain: { open: async () => ({ table: () => createMemoryAnnotationTable() }) },
+    sessions: { get: () => ({ header: { cwd: workspace } }) },
+  })
+  try {
+    await assert.rejects(
+      service.reviewPrepare('s1', join(workspace, 'a.md'), 'r1', ''),
+      (error: unknown) => codeOf(error) === 'activeMarkdown/invalid-request',
+    )
+  } finally {
+    await rm(workspace, { recursive: true, force: true })
+  }
+})
+
+test('reviewCommit 保留发送后新加、未冻结进这一轮的批注', async () => {
+  const workspace = await mkdtemp(join(tmpdir(), 'am-review-extra-'))
+  const table = createMemoryAnnotationTable()
+  const service = serviceWith({
+    storageDomain: { open: async () => ({ table: () => table }) },
+    sessions: { get: () => ({ header: { cwd: workspace } }) },
+  })
+  const path = join(workspace, 'a.md')
+  const first = annotation()
+  const edited = { ...first, body: '改过的同一批注' }
+  const second = { ...annotation(), id: 'a2', seq: 2 }
+  const pending: PendingReview = {
+    roundId: 'r1',
+    draftAttachmentId: 'd-r1',
+    fileName: 'a-review-r1.md',
+    fileBytes: 10,
+    fileHash: 'f'.repeat(64),
+    sourceHash: 's'.repeat(64),
+    annotations: [first],
+    feedback: '反馈',
+    createdAt: '2026-11-17T00:00:00.000Z',
+  }
+  try {
+    await service.reviewPrepare('s1', path, 'r1', '原文')
+    await service.annotationSave('s1', path, [edited, second], pending)
+    assert.deepEqual(await service.reviewCommit('s1', path, 'r1', ''), { roundId: 'r1', committed: true, snapshotMissing: false })
+    const draft = await service.annotationLoad('s1', path)
+    assert.deepEqual(draft?.annotations.map(item => item.id), ['a1', 'a2'])
+    assert.equal(draft?.annotations[0]?.body, '改过的同一批注')
+    assert.equal(draft?.pending, undefined)
+  } finally {
+    await rm(workspace, { recursive: true, force: true })
+  }
+})
+
 test('reviewCommit 在 pending 快照缺失时仍提交并标 snapshotMissing', async () => {
   const workspace = await mkdtemp(join(tmpdir(), 'am-review-missing-'))
   const table = createMemoryAnnotationTable()

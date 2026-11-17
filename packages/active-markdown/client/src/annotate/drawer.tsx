@@ -1,7 +1,7 @@
 /** The annotation drawer: grouped by heading path, with locate, edit, delete and attach. */
 import * as React from 'react'
 import type { ReactNode } from 'react'
-import type { Annotation, PendingReview } from './model.ts'
+import type { Annotation } from './model.ts'
 import type { AnnotationPersistence } from './store.ts'
 
 export interface AnnotationDrawerLabels {
@@ -30,8 +30,6 @@ export interface AnnotationDrawerProps {
   readOnly: boolean
   located: ReadonlyMap<string, boolean>
   persistence: AnnotationPersistence
-  /** One pending review per document; its id must be in the composer to count as attached. */
-  pending: PendingReview | null
   attached: boolean
   /** The composer is sending or running a command; edits and attach wait. */
   busy: boolean
@@ -69,7 +67,6 @@ export function AnnotationDrawer({
   readOnly,
   located,
   persistence,
-  pending,
   attached,
   busy,
   attachError,

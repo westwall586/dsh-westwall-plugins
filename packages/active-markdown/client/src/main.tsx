@@ -128,7 +128,6 @@ export default {
           annotations: annotationStore,
           hub: pendingHub,
           attachments: attachment,
-          conversation: conversationFor,
           host,
         }),
       }, AnnotationCommitter)), 'active-markdown annotation committer')

@@ -100,7 +100,7 @@ export function renderFeedback(input: FeedbackInput): string {
   const lines = [
     '---',
     `dsh-active-markdown-review: ${input.roundId}`,
-    `source: ${input.sourcePath}`,
+    `source: ${JSON.stringify(input.sourcePath)}`,
     '---',
     '',
     `文件路径：${input.sourcePath}`,

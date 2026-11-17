@@ -239,6 +239,9 @@ export interface FileBlockView {
 
 export interface ChatMessageView {
   readonly kind: string
+  /** Durable ConversationNode content (legacy slice). */
+  readonly content?: readonly { readonly type: string }[]
+  /** Chat view payload content, when the node comes from the keyed store. */
   readonly data?: { readonly content?: readonly { readonly type: string }[] }
 }
 
@@ -248,7 +251,12 @@ export interface ChatSnapshotView {
   readonly nodes?: { values?: () => readonly ChatMessageView[] }
 }
 
-export type UseChat = <T>(selector: (state: ChatSnapshotView) => T) => T
+/** The target-neutral Conversation assembly; views.get('chat') is the Chat snapshot. */
+export interface ConversationAssemblyView {
+  readonly views: { get(target: string): ChatSnapshotView | undefined }
+}
+
+export type UseConversation = <T>(selector: (state: ConversationAssemblyView) => T) => T
 
 /** The stored metadata fields this Body reads. */
 export interface TranslationMeta {

@@ -8,8 +8,6 @@ import { isAbsolute, resolve } from 'node:path';
 export const MAX_DRAFT_BYTES = 512 * 1024;
 export const MAX_DRAFTS = 20;
 export const DRAFT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-/** Document keys double as backend document names; hex is a safe subset. */
-export const DRAFT_KEY_PATTERN = /^[a-z0-9]+$/;
 /** 批注存储的边界失败；由服务层映射成 Remote 错误码。 */
 export class AnnotationError extends Error {
     code;

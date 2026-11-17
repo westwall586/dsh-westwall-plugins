@@ -309,8 +309,16 @@ export function createAnnotationStore(deps: AnnotationStoreDeps): AnnotationStor
       } catch (error) {
         return { status: 'failed', message: messageOf(error) }
       }
+      const sent = new Map(current.annotations.map(annotation => [annotation.id, JSON.stringify(annotation)]))
+      const remaining = entry.snapshot.annotations.filter(annotation => sent.get(annotation.id) !== JSON.stringify(annotation))
       entry.generation += 1
-      setSnapshot(entry, { status: 'ready', annotations: [], pending: null, nextSeq: 1, persistence: entry.snapshot.persistence })
+      setSnapshot(entry, {
+        status: 'ready',
+        annotations: remaining,
+        pending: null,
+        nextSeq: remaining.length === 0 ? 1 : nextSeq(remaining, entry.snapshot.nextSeq),
+        persistence: entry.snapshot.persistence,
+      })
       return { status: 'committed', snapshotMissing }
     },
 

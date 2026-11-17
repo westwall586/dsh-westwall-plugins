@@ -1,8 +1,6 @@
 export declare const MAX_DRAFT_BYTES: number;
 export declare const MAX_DRAFTS = 20;
 export declare const DRAFT_TTL_MS: number;
-/** Document keys double as backend document names; hex is a safe subset. */
-export declare const DRAFT_KEY_PATTERN: RegExp;
 export type AnnotationErrorCode = 'invalid-request' | 'invalid-path' | 'unknown-session' | 'read-failed' | 'write-failed';
 /** 批注存储的边界失败；由服务层映射成 Remote 错误码。 */
 export declare class AnnotationError extends Error {

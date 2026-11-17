@@ -363,13 +363,16 @@ export function createReviewStore(deps) {
             const roundId = requireRoundId(input.roundId);
             const workspace = await workspaceOf(sessionId);
             const root = rootsOf(workspace);
+            const pendingPath = pendingFileOf(root, roundId);
+            let existed;
             try {
-                await deps.files.remove(pendingFileOf(root, roundId));
+                existed = await deps.files.exists(pendingPath);
+                await deps.files.remove(pendingPath);
             }
             catch (error) {
                 throw new AnnotationError('write-failed', `删除 pending 快照失败（${roundId}）：${String(error)}`);
             }
-            return { detached: true };
+            return { detached: existed };
         },
         prune,
     };

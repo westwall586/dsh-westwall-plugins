@@ -304,6 +304,7 @@ function refusalText(reason: AttachmentFailure, t: Translate): string {
     case 'unavailable': return t('annotate.attachUnavailable')
     case 'no-pending': return t('annotate.noPending')
     case 'round-mismatch': return t('annotate.roundMismatch')
+    case 'source-changed': return t('annotate.sourceChanged')
     default: return t('annotate.attachFailed', { message: reason })
   }
 }
@@ -825,6 +826,7 @@ export function Body({
     })
     if (result.status === 'attached') hub.set({ key: target, pending: result.pending })
     else if (result.status === 'failed') setAttachError(t('annotate.attachFailed', { message: result.message }))
+    else if (result.reason === 'source-changed') setAttachError(refusalText(result.reason, t))
   }, [
     draftKey, state, phase, annotations, inputAttachmentIds, attachment, inputActions, hub,
     composeSessionId, path, displayPath, unlocatableNow, t,
@@ -1408,7 +1410,6 @@ export function Body({
         readOnly={view === 'translated'}
         located={located}
         persistence={snapshot.persistence}
-        pending={pendingReview}
         attached={attached}
         busy={composerBusy || attachBusy}
         attachError={attachError}

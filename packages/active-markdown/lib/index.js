@@ -5,7 +5,7 @@ import { createReviewStore, nodeReviewFiles, } from "./annotate/reviews.js";
 import { createTranslationCache, openCacheStore, } from "./translate/cache.js";
 import { LANGUAGES } from "./translate/language.js";
 import { PROMPT_VERSION } from "./translate/prompt.js";
-import { translateRequest, TranslateError, } from "./translate/request.js";
+import { MAX_TEXT_BYTES, translateRequest, TranslateError, } from "./translate/request.js";
 import { Config, configSnapshot } from "./settings.js";
 import { createTranslationStore, nodeFiles, } from "./translate/store.js";
 const REMOTE_CODES = {
@@ -137,12 +137,20 @@ export default class ActiveMarkdown extends TypertRemoteService {
     }
     /** Write the pending full-text snapshot the annotation round was based on. */
     async reviewPrepare(sessionId, path, roundId, text) {
-        return this.callAnnotation(async () => this.reviews().prepare({
-            sessionId: requireSessionId(sessionId),
-            path,
-            roundId,
-            text: textField(text),
-        }));
+        return this.callAnnotation(async () => {
+            if (typeof text !== 'string' || text === '') {
+                throw new AnnotationError('invalid-request', '缺少原文');
+            }
+            if (Buffer.byteLength(text, 'utf8') > MAX_TEXT_BYTES) {
+                throw new AnnotationError('invalid-request', `原文超过 ${MAX_TEXT_BYTES / 1024 / 1024} MiB`);
+            }
+            return this.reviews().prepare({
+                sessionId: requireSessionId(sessionId),
+                path,
+                roundId,
+                text,
+            });
+        });
     }
     /**
      * Promote the pending snapshot, write the round metadata and delete the
@@ -164,7 +172,15 @@ export default class ActiveMarkdown extends TypertRemoteService {
                 sentText: textField(sentText),
             });
             if (view.committed && draft?.pending?.roundId === round) {
-                await annotations.clear({ sessionId: session, path: canonical });
+                const sent = new Map(draft.pending.annotations.map(annotation => [annotation.id, JSON.stringify(annotation)]));
+                const remaining = draft.annotations.filter(annotation => sent.get(annotation.id) !== JSON.stringify(annotation));
+                if (remaining.length === 0) {
+                    await annotations.clear({ sessionId: session, path: canonical });
+                }
+                else {
+                    // Annotations added or changed after the frozen round are a new, unsent draft.
+                    await annotations.save({ sessionId: session, path: canonical, annotations: remaining, pending: null });
+                }
             }
             return view;
         });
@@ -177,8 +193,11 @@ export default class ActiveMarkdown extends TypertRemoteService {
             const round = requireRoundId(roundId);
             const annotations = await this.annotation();
             const draft = await annotations.load({ sessionId: session, path: canonical });
-            if (draft?.pending?.roundId !== round)
-                return { detached: false };
+            if (draft?.pending?.roundId !== round) {
+                // An attach can fail before its pending record is saved; removing the
+                // orphan snapshot by round id keeps a retry from inheriting stale text.
+                return this.reviews().detach({ sessionId: session, roundId: round });
+            }
             await this.reviews().detach({ sessionId: session, roundId: round });
             await annotations.save({
                 sessionId: session,

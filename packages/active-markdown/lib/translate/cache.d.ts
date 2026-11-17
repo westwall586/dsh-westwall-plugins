@@ -1,6 +1,4 @@
 import { type ModelSelection } from './request.ts';
-/** 单条缓存记录的上限；更大的译文不缓存，避免插件存储无界增长。 */
-export declare const CACHE_VALUE_MAX_BYTES: number;
 export interface CachedMeta {
     readonly sourceHash: string;
     readonly sourceLines: number;
@@ -32,7 +30,7 @@ export interface CachePutInput extends CacheGetInput {
     readonly sourceLines: number;
     readonly translatedLines: number;
 }
-/** 空对象是 wire 上的成功回执；超限与写失败都返回它，不打断翻译。 */
+/** 空对象是 wire 上的成功回执；写入失败返回它并只记录警告，校验失败仍抛类型化错误。 */
 export type CachePutView = Record<string, never>;
 /** 一块同步读、异步写的键值表；插件存储的 domain table 就是这个形状。 */
 export interface CacheTable {

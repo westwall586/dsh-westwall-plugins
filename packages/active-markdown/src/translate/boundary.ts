@@ -1,18 +1,24 @@
-/**
- * 缓存与保存方法的边界守卫。`translate` 的校验仍留在 request.ts 不动；这里只加
- * 新写盘方法共用的三条：原文/译文非空且不超 2 MiB、目标语言可安全用作文件名
- * 片段、会话标识非空。
- */
+/** 缓存与保存共用的边界守卫。 */
 import { MAX_TEXT_BYTES, TranslateError } from './request.ts'
 
-export function requireText(value: unknown, what: string): string {
+export const MAX_TRANSLATED_BYTES = 2 * MAX_TEXT_BYTES
+
+function requireBounded(value: unknown, what: string, limit: number): string {
   if (typeof value !== 'string' || value.trim() === '') {
     throw new TranslateError('invalid-text', `${what}为空`)
   }
-  if (Buffer.byteLength(value, 'utf8') > MAX_TEXT_BYTES) {
-    throw new TranslateError('text-too-large', `${what}超过 ${MAX_TEXT_BYTES / 1024 / 1024} MiB`)
+  if (Buffer.byteLength(value, 'utf8') > limit) {
+    throw new TranslateError('text-too-large', `${what}超过 ${limit / 1024 / 1024} MiB`)
   }
   return value
+}
+
+export function requireText(value: unknown, what: string): string {
+  return requireBounded(value, what, MAX_TEXT_BYTES)
+}
+
+export function requireTranslatedText(value: unknown): string {
+  return requireBounded(value, '译文', MAX_TRANSLATED_BYTES)
 }
 
 const UNSAFE_SEGMENT = /[\\/\u0000-\u001f]/

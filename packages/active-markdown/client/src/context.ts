@@ -182,7 +182,7 @@ export interface LoadedTranslation {
 
 /** The Host half as the Body sees it. */
 export interface HostBridge {
-  translate(request: TranslateRequest): Promise<string>
+  translate(request: TranslateRequest, signal?: AbortSignal): Promise<string>
   describe(): Promise<DescribeView>
   cacheGet(request: CacheGetRequest): Promise<CachedTranslation | null>
   cachePut(request: CachePutRequest): Promise<void>

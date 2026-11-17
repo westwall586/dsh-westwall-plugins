@@ -72,4 +72,5 @@ export declare function translateRequest(input: {
     readonly llm: LlmLike | null;
     readonly readDefault: () => ModelSelection | null;
     readonly request: TranslateInput;
+    readonly signal?: AbortSignal;
 }): Promise<TranslateView>;

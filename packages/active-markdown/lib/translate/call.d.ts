@@ -22,6 +22,7 @@ export interface LlmCallOptions {
     readonly temperature?: number;
     readonly maxTokens?: number;
     readonly purpose?: string;
+    readonly signal?: AbortSignal;
 }
 export interface LlmFailure {
     readonly code?: string;
@@ -51,6 +52,7 @@ export interface ResolveMaxTokensInput {
     readonly llm: LlmLike;
     readonly provider: string;
     readonly model: string;
+    readonly signal?: AbortSignal;
 }
 /** Prefer the model's disclosed output cap; 8192 is only the fallback. */
 export declare function resolveMaxTokens(input: ResolveMaxTokensInput): Promise<number>;
@@ -61,6 +63,7 @@ export interface CallTranslationInput {
     readonly maxTokens: number;
     readonly system: string;
     readonly text: string;
+    readonly signal?: AbortSignal;
 }
 export type CallTranslationResult = {
     readonly kind: 'ok';

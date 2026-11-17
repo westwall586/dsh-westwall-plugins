@@ -7,11 +7,8 @@
 import { z } from 'zod'
 import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain'
 import { cacheKeyOf, extraInstructionHash, normalizeSource, sha256Hex } from './digest.ts'
-import { errorText, requireLanguage, requireText } from './boundary.ts'
+import { errorText, requireLanguage, requireText, requireTranslatedText } from './boundary.ts'
 import { resolveModel, type ModelSelection } from './request.ts'
-
-/** 单条缓存记录的上限；更大的译文不缓存，避免插件存储无界增长。 */
-export const CACHE_VALUE_MAX_BYTES = 64 * 1024
 
 const cachedMetaSchema = z.object({
   sourceHash: z.string().regex(/^[0-9a-f]{64}$/),
@@ -66,7 +63,7 @@ export interface CachePutInput extends CacheGetInput {
   readonly translatedLines: number
 }
 
-/** 空对象是 wire 上的成功回执；超限与写失败都返回它，不打断翻译。 */
+/** 空对象是 wire 上的成功回执；写入失败返回它并只记录警告，校验失败仍抛类型化错误。 */
 export type CachePutView = Record<string, never>
 
 /** 一块同步读、异步写的键值表；插件存储的 domain table 就是这个形状。 */
@@ -157,10 +154,6 @@ function integer(value: unknown): number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 0
 }
 
-function encodedBytes(value: unknown): number {
-  return Buffer.byteLength(JSON.stringify(value), 'utf8')
-}
-
 function parseInput(input: CacheGetInput): CacheRequest {
   const provider = textField(input.provider).trim()
   const model = textField(input.model).trim()
@@ -203,14 +196,12 @@ export function createTranslationCache(deps: CacheDeps): TranslationCache {
     async cacheGet(input) {
       const request = parseInput(input)
       const selection = resolveSelection(request, deps.readDefault)
-      const record = deps.store.get(keyFor(request, selection))
-      if (record === undefined) return null
-      return encodedBytes(record) > CACHE_VALUE_MAX_BYTES ? null : record
+      return deps.store.get(keyFor(request, selection)) ?? null
     },
 
     async cachePut(input) {
       const request = parseInput(input)
-      const translated = requireText(input.translated, '译文')
+      const translated = requireTranslatedText(input.translated)
       const selection = resolveSelection(request, deps.readDefault)
       const record: CachedTranslation = {
         text: translated,
@@ -227,7 +218,6 @@ export function createTranslationCache(deps: CacheDeps): TranslationCache {
           cachedAt: now().toISOString(),
         },
       }
-      if (encodedBytes(record) > CACHE_VALUE_MAX_BYTES) return {}
       try {
         await deps.store.put(keyFor(request, selection), record)
       } catch (error) {

@@ -3,6 +3,8 @@
  * lazy bridge that resolves the mounted namespace. 0.2.2's Client Gateway
  * rejects a parameter without a strict codec, so every parameter carries one,
  * and it installs arguments positionally: a wrong order is a silent wrong call.
+ * The cancel signal is not a wire parameter: `cancellation` makes the Gateway
+ * append it after the business arguments, so only the bridge knows about it.
  */
 import type {
   CacheGetRequest,
@@ -55,6 +57,7 @@ function descriptor(method: keyof typeof WIRE) {
     invocation: { kind: 'direct' as const },
     parameters: WIRE[method].map(PARAM),
     result: JSON_CODEC,
+    ...(method === 'translate' ? { cancellation: { parameter: 'signal' as const } } : {}),
   }
 }
 
@@ -100,6 +103,7 @@ export interface Namespace {
     promptVersion: string,
     extraInstruction: string,
     translateComments: boolean,
+    signal?: AbortSignal,
   ): Promise<RemoteOutcome<{ text: string }>>
   cacheGet(
     text: string,
@@ -144,8 +148,8 @@ export interface Namespace {
 
 /** Value-level facade so the Body never touches wire shapes. */
 export function createBridge(namespace: Namespace): HostBridge {
-  const translate = async (request: TranslateRequest): Promise<string> => {
-    const result = await namespace.translate(
+  const translate = async (request: TranslateRequest, signal?: AbortSignal): Promise<string> => {
+    const args = [
       request.sessionId,
       request.path,
       request.text,
@@ -155,7 +159,8 @@ export function createBridge(namespace: Namespace): HostBridge {
       request.promptVersion,
       request.extraInstruction ?? '',
       request.translateComments,
-    )
+    ] as const
+    const result = await (signal === undefined ? namespace.translate(...args) : namespace.translate(...args, signal))
     return unwrap(result).text
   }
   const describe = async (): Promise<DescribeView> => unwrap(await namespace.describe())

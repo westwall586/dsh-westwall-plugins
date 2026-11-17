@@ -6,6 +6,7 @@ import { CLIENT_CONTRIBUTION, DESCRIPTORS, createBridge, type Namespace } from '
 
 const DESCRIPTOR_KEY = '@deepseek-ai/dsh-typert-protocol/remote-methods'
 
+/** Descriptor parameters: business fields only. The cancel signal never enters the wire. */
 const WIRE_PARAMETERS: Record<string, string[]> = {
   describe: [],
   translate: [
@@ -22,6 +23,12 @@ const WIRE_PARAMETERS: Record<string, string[]> = {
     'extraInstruction', 'aligned',
   ],
   translationLoad: ['sessionId', 'path', 'lang'],
+}
+
+/** Host method parameters: the wire names, plus the Gateway-injected signal on translate. */
+const HOST_PARAMETERS: Record<string, string[]> = {
+  ...WIRE_PARAMETERS,
+  translate: [...WIRE_PARAMETERS.translate, 'signal'],
 }
 
 function parameterNames(method: Function): string[] {
@@ -54,8 +61,8 @@ test('Host 描述符声明全部直连方法', () => {
   }
 })
 
-test('每个声明的方法都是原型实例方法，参数名与线名一致', () => {
-  for (const [name, expected] of Object.entries(WIRE_PARAMETERS)) {
+test('每个声明的方法都是原型实例方法，参数名与声明顺序一致', () => {
+  for (const [name, expected] of Object.entries(HOST_PARAMETERS)) {
     const method = (ActiveMarkdown.prototype as unknown as Record<string, unknown>)[name]
     assert.equal(typeof method, 'function', `${name} 是实例方法`)
     assert.ok(Object.hasOwn(ActiveMarkdown.prototype, name), `${name} 声明在原型上`)
@@ -87,6 +94,12 @@ test('客户端描述符与 Host 的线参数逐项一致', () => {
       assert.equal(parameter.name, parameter.wire)
       assert.equal(parameter.source, 'json')
       assert.equal(parameter.codec, descriptor.result)
+    }
+    const cancellation = (descriptor as { cancellation?: unknown }).cancellation
+    if (descriptor.method === 'translate') {
+      assert.deepEqual(cancellation, { parameter: 'signal' })
+    } else {
+      assert.equal(cancellation, undefined, `${descriptor.method} 不声明取消`)
     }
   }
 })
@@ -176,6 +189,25 @@ test('桥接方法按 Host 的线序传参', async () => {
 
   await bridge.load({ sessionId: 's1', path: 'a.md', lang: 'zh' })
   assert.deepEqual(calls.at(-1), { method: 'translationLoad', args: ['s1', 'a.md', 'zh'] })
+})
+
+test('取消信号只在提供时追加到 translate 参数末尾', async () => {
+  const { namespace, calls } = recordingNamespace()
+  const bridge = createBridge(namespace)
+  const controller = new AbortController()
+
+  await bridge.translate({
+    sessionId: 's1', path: 'a.md', text: '原文', lang: 'zh', promptVersion: 'v1', translateComments: true,
+  }, controller.signal)
+  assert.deepEqual(calls.at(-1), {
+    method: 'translate',
+    args: ['s1', 'a.md', '原文', 'zh', '', '', 'v1', '', true, controller.signal],
+  })
+
+  await bridge.translate({
+    sessionId: 's1', path: 'a.md', text: '原文', lang: 'zh', promptVersion: 'v1', translateComments: true,
+  })
+  assert.equal(calls.at(-1)!.args.length, 9)
 })
 
 test('补充要求随本次运行上线，缺省的模型与要求以空串上线', async () => {

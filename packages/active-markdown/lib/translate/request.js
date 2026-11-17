@@ -72,9 +72,9 @@ export function resolveModel(input) {
     }
     return { provider, model };
 }
-async function maxTokensFor(llm, provider, model) {
+async function maxTokensFor(llm, provider, model, signal) {
     try {
-        return await resolveMaxTokens({ llm, provider, model });
+        return await resolveMaxTokens({ llm, provider, model, ...(signal === undefined ? {} : { signal }) });
     }
     catch (error) {
         throw new TranslateError('provider-unknown', `无法解析翻译模型 ${provider}/${model}：${errorText(error)}`);
@@ -90,7 +90,7 @@ export async function translateRequest(input) {
         ...(request.model === undefined ? {} : { model: request.model }),
         readDefault: input.readDefault,
     });
-    const maxTokens = await maxTokensFor(input.llm, provider, model);
+    const maxTokens = await maxTokensFor(input.llm, provider, model, input.signal);
     const system = buildSystemPrompt({
         lang: request.lang,
         translateComments: request.translateComments,
@@ -103,6 +103,7 @@ export async function translateRequest(input) {
         maxTokens,
         system,
         text: request.text,
+        ...(input.signal === undefined ? {} : { signal: input.signal }),
     });
     if (result.kind === 'failed')
         throw new TranslateError('model-failed', result.message);

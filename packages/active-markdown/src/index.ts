@@ -122,6 +122,7 @@ export default class ActiveMarkdown extends TypertRemoteService {
     promptVersion?: string,
     extraInstruction?: string,
     translateComments?: boolean,
+    signal?: AbortSignal,
   ): Promise<TranslateView> {
     const request: TranslateInput = {
       sessionId,
@@ -139,6 +140,7 @@ export default class ActiveMarkdown extends TypertRemoteService {
         llm: this.llm(),
         readDefault: () => this.readDefaultSelection(),
         request,
+        ...(signal === undefined ? {} : { signal }),
       }),
     )
   }

@@ -11,7 +11,7 @@ import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
 import { countSourceLines, extraInstructionHash, normalizeSource, sha1Hex, sha256Hex } from "./digest.js";
-import { errorText, requireLanguage, requireSessionId, requireText } from "./boundary.js";
+import { errorText, requireLanguage, requireSessionId, requireText, requireTranslatedText } from "./boundary.js";
 import { resolveModel, TranslateError } from "./request.js";
 export const STORE_ROOT = '.dsh-active-markdown';
 export const TRANSLATE_ROOT = `${STORE_ROOT}/translate`;
@@ -114,7 +114,7 @@ export function createTranslationStore(deps) {
         async save(input) {
             const sessionId = requireSessionId(input.sessionId);
             const text = requireText(input.text, '原文');
-            const translated = requireText(input.translated, '译文');
+            const translated = requireTranslatedText(input.translated);
             const lang = requireLanguage(input.lang);
             const workspace = await deps.workspaceOf(sessionId);
             if (workspace === null)

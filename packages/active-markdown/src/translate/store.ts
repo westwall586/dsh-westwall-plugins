@@ -11,7 +11,7 @@ import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, extname, isAbsolute, relative, resolve, sep } from 'node:path'
 import { z } from 'zod'
 import { countSourceLines, extraInstructionHash, normalizeSource, sha1Hex, sha256Hex } from './digest.ts'
-import { errorText, requireLanguage, requireSessionId, requireText } from './boundary.ts'
+import { errorText, requireLanguage, requireSessionId, requireText, requireTranslatedText } from './boundary.ts'
 import { resolveModel, TranslateError, type ModelSelection } from './request.ts'
 
 export const STORE_ROOT = '.dsh-active-markdown'
@@ -190,7 +190,7 @@ export function createTranslationStore(deps: StoreDeps): TranslationStore {
     async save(input) {
       const sessionId = requireSessionId(input.sessionId)
       const text = requireText(input.text, '原文')
-      const translated = requireText(input.translated, '译文')
+      const translated = requireTranslatedText(input.translated)
       const lang = requireLanguage(input.lang)
       const workspace = await deps.workspaceOf(sessionId)
       if (workspace === null) throw new TranslateError('unknown-session', `未知会话：${sessionId}`)

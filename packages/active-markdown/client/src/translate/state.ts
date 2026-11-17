@@ -1,11 +1,5 @@
-/**
- * One translation's lifecycle in one tab. The state says where a ready result
- * came from, because that decides whether it can be saved and whether the
- * source moving on is the reader's business. Line counts are measured from the
- * texts themselves: the client is the only checker, so alignment is derived
- * here and never taken from stored metadata.
- */
-import { countLines } from './plan.ts'
+/** One translation's lifecycle in one tab. */
+import { alignOf, aligned, type Alignment } from './verify.ts'
 
 /**
  * The identity of the run that produced a translation. It travels with the
@@ -22,20 +16,19 @@ export interface PromptRun {
 }
 
 /**
- * Where a ready translation came from. Only a mirrored file can be stale, and
- * only a dismissed notice stops being shown, so the two facts live together.
+ * Whether the workspace already holds this translation. Only a mirrored file
+ * can be stale, and only a dismissed notice stops being shown, so the two facts
+ * live together; a translation that is not persisted has neither.
  */
-export type TranslationSource =
+export type Persistence =
+  | { readonly kind: 'unsaved' }
   | { readonly kind: 'saved', readonly stale: boolean, readonly dismissed: boolean }
-  | { readonly kind: 'cache' }
-  | { readonly kind: 'run' }
 
 export type ReadyTranslation = {
   readonly status: 'ready'
   readonly text: string
-  readonly sourceLines: number
-  readonly translatedLines: number
-  readonly source: TranslationSource
+  readonly alignment: Alignment
+  readonly persistence: Persistence
   readonly run: PromptRun
 }
 
@@ -48,21 +41,20 @@ export type TranslationState =
 
 /**
  * Build a finished translation from its text and the source it belongs to.
- * @param input - the translated text, the source it was made from, and where it came from.
- * @returns the ready state with both line counts measured locally.
+ * @param input - the translated text, the source it was made from, and whether it is persisted.
+ * @returns the ready state with line counts and the heading comparison measured locally.
  */
 export function readyState(input: {
   text: string
   sourceText: string
-  source: TranslationSource
+  persistence: Persistence
   run: PromptRun
 }): ReadyTranslation {
   return {
     status: 'ready',
     text: input.text,
-    sourceLines: countLines(input.sourceText),
-    translatedLines: countLines(input.text),
-    source: input.source,
+    alignment: alignOf(input.sourceText, input.text),
+    persistence: input.persistence,
     run: input.run,
   }
 }
@@ -74,33 +66,32 @@ export function translatedText(state: TranslationState): string | undefined {
   return undefined
 }
 
-/** True when the translated text can be paired with the source line by line. */
+/** True when a finished translation passed both line and heading checks. */
 export function lineAligned(state: TranslationState): boolean {
-  if (state.status === 'running') return state.partial !== undefined
-  return state.status === 'ready' && state.sourceLines === state.translatedLines
+  return state.status === 'ready' && aligned(state.alignment)
 }
 
-/** The ready translation 保存 may write: one this tab produced, or one a mirrored file already holds. */
+/** The ready translation 保存 may write: one the workspace does not hold yet. */
 export function saveable(state: TranslationState): ReadyTranslation | undefined {
-  return state.status === 'ready' && state.source.kind !== 'cache' ? state : undefined
+  return state.status === 'ready' && state.persistence.kind === 'unsaved' ? state : undefined
 }
 
 /** The saved file predates the source, and the reader has not dismissed that. */
 export function staleNoticeOf(state: TranslationState): boolean {
   return state.status === 'ready'
-    && state.source.kind === 'saved'
-    && state.source.stale
-    && !state.source.dismissed
+    && state.persistence.kind === 'saved'
+    && state.persistence.stale
+    && !state.persistence.dismissed
 }
 
 /** The reader acknowledged the source change; the translated text keeps showing. */
 export function dismissStale(state: TranslationState): TranslationState {
-  if (state.status !== 'ready' || state.source.kind !== 'saved') return state
-  return { ...state, source: { ...state.source, dismissed: true } }
+  if (state.status !== 'ready' || state.persistence.kind !== 'saved') return state
+  return { ...state, persistence: { ...state.persistence, dismissed: true } }
 }
 
 /** A mirrored file now corresponds to this translation, so the source is current again. */
 export function markSaved(state: TranslationState): TranslationState {
   if (state.status !== 'ready') return state
-  return { ...state, source: { kind: 'saved', stale: false, dismissed: false } }
+  return { ...state, persistence: { kind: 'saved', stale: false, dismissed: false } }
 }

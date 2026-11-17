@@ -82,6 +82,32 @@ test('一次调用返回整篇译文，行数与原文一致', async () => {
   assert.deepEqual(calls[0].messages, [{ role: 'user', content: [{ type: 'text', text: SOURCE }] }])
 })
 
+test('取消信号原样传到模型解析与 llm.stream，缺省时不上线', async () => {
+  const controller = new AbortController()
+  const calls: LlmCallOptions[] = []
+  const resolutions: Array<AbortSignal | undefined> = []
+  const llm: LlmLike = {
+    async resolveModelInfo(_provider, _model, signal) {
+      resolutions.push(signal)
+      return {}
+    },
+    stream(callOptions) {
+      calls.push(callOptions)
+      return (async function* produce() {
+        yield { type: 'text-delta', text: '译文' }
+      })()
+    },
+  }
+
+  await translateRequest({ llm, readDefault: () => DEFAULT_SELECTION, request: request(), signal: controller.signal })
+  assert.equal(resolutions[0], controller.signal)
+  assert.equal(calls[0].signal, controller.signal)
+
+  await translateRequest({ llm, readDefault: () => DEFAULT_SELECTION, request: request() })
+  assert.equal(resolutions[1], undefined)
+  assert.equal(calls[1].signal, undefined)
+})
+
 test('目标语言 code 映射成 label，注释策略进入 system prompt', async () => {
   const { llm, calls } = fakeLlm({ chunks: ['译文'] })
   await translateRequest({

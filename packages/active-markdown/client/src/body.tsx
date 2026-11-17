@@ -1,7 +1,7 @@
 /** The document body: read, fallbacks, and the rendered Markdown. */
 import * as React from 'react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { ContextMenuTarget, DescribeView, HostBridge, Translate, WorkspaceFilesRemote } from './context.ts'
+import type { ContextMenuTarget, DescribeView, HostBridge, Translate, TranslationMeta, WorkspaceFilesRemote } from './context.ts'
 import { createImageResolver, type ImageResolver } from './images.ts'
 import { classifyLink } from './links.ts'
 import { parseDocument } from './markdown/blocks.ts'
@@ -22,6 +22,7 @@ import {
   type ReadyTranslation,
   type TranslationState,
 } from './translate/state.ts'
+import { aligned } from './translate/verify.ts'
 
 /** The renderer branch of the owner's content union. */
 export interface RendererContent {
@@ -119,6 +120,30 @@ function formatBytes(bytes: number | undefined): string {
   return `${bytes} B`
 }
 
+/** The run identity a stored record gives back, with the session's current prompt version as fallback. */
+function storedRun(meta: TranslationMeta, promptVersion: string, translateComments: boolean, extraInstruction = ''): PromptRun {
+  return {
+    promptVersion: meta.promptVersion || promptVersion,
+    extraInstruction,
+    lang: meta.lang,
+    provider: meta.provider,
+    model: meta.model,
+    translateComments,
+  }
+}
+
+function alignmentText(ready: ReadyTranslation, t: Translate): string {
+  const { alignment } = ready
+  if (alignment.sourceLines !== alignment.translatedLines) {
+    return t('translate.unaligned', { translated: alignment.translatedLines, source: alignment.sourceLines })
+  }
+  const broken = alignment.headingBreak
+  if (broken === null) return t('translate.aligned', { lines: alignment.translatedLines })
+  if (broken.kind === 'missing') return t('translate.heading.missing', { line: broken.source.line })
+  if (broken.kind === 'extra') return t('translate.heading.extra', { line: broken.translated.line })
+  return t('translate.heading.mismatch', { line: broken.source.line })
+}
+
 /**
  * Draw one Markdown preview tab.
  * @param props - owner supplies the address, content protocol state, and locale.
@@ -139,6 +164,13 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
   const [toast, setToast] = useState<string | null>(null)
   const peekPanel = useRef<HTMLDivElement | null>(null)
   const requestToken = useRef(0)
+  const runController = useRef<AbortController | null>(null)
+
+  const stopRun = useCallback((): void => {
+    runController.current?.abort()
+    runController.current = null
+    requestToken.current += 1
+  }, [])
   const renderer = content.kind === 'renderer' ? content : undefined
   const rendererRef = useRef(renderer)
   rendererRef.current = renderer
@@ -164,15 +196,8 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
         restored = readyState({
           text: saved.text,
           sourceText,
-          source: { kind: 'saved', stale: saved.stale, dismissed: false },
-          run: {
-            promptVersion: saved.meta.promptVersion || described.promptVersion,
-            extraInstruction: '',
-            lang: saved.meta.lang || settings.lang,
-            provider: saved.meta.provider,
-            model: saved.meta.model,
-            translateComments: settings.translateComments,
-          },
+          persistence: { kind: 'saved', stale: saved.stale, dismissed: false },
+          run: storedRun(saved.meta, described.promptVersion, settings.translateComments),
         })
       } else {
         const cached = await bridge.cacheGet({
@@ -186,15 +211,8 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
           restored = readyState({
             text: cached.text,
             sourceText,
-            source: { kind: 'cache' },
-            run: {
-              promptVersion: described.promptVersion,
-              extraInstruction: '',
-              lang: cached.meta.lang || settings.lang,
-              provider: cached.meta.provider,
-              model: cached.meta.model,
-              translateComments: settings.translateComments,
-            },
+            persistence: { kind: 'unsaved' },
+            run: storedRun(cached.meta, described.promptVersion, settings.translateComments),
           })
         }
       }
@@ -229,9 +247,9 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
     return () => {
       controller.abort()
       // A new revision or an unmount also ends any chunk loop still in flight.
-      requestToken.current += 1
+      stopRun()
     }
-  }, [sessionId, path, revision, readBytes, t, restoreTranslation])
+  }, [sessionId, path, revision, readBytes, t, restoreTranslation, stopRun])
 
   // Report the version only once the content is committed: the owner restores
   // the tab's scroll offset as soon as it has a version, and it needs the
@@ -369,15 +387,18 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
     extraInstruction: string,
     reuseStored: boolean,
   ): void => {
+    stopRun()
     setPeek(null)
     setSave({ status: 'idle' })
-    const token = ++requestToken.current
     const sourceLines = normalize(document.text).split('\n')
     const plan = planTranslation(document.text, parseDocument(document.text).blocks)
     if (plan.kind === 'too-large') {
       setTranslation({ status: 'too-large', lineCount: plan.lineCount })
       return
     }
+    const token = ++requestToken.current
+    const controller = new AbortController()
+    runController.current = controller
     const chunks = plan.ranges.length
     setTranslation({ status: 'running', chunk: 1, chunks })
     void (async () => {
@@ -406,7 +427,12 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
           }).catch(() => null)
           if (token !== requestToken.current) return
           if (cached !== null) {
-            setTranslation(readyState({ text: cached.text, sourceText: document.text, source: { kind: 'run' }, run }))
+            setTranslation(readyState({
+              text: cached.text,
+              sourceText: document.text,
+              persistence: { kind: 'unsaved' },
+              run: storedRun(cached.meta, described.promptVersion, settings.translateComments, extraInstruction),
+            }))
             return
           }
         }
@@ -425,7 +451,7 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
             promptVersion: described.promptVersion,
             extraInstruction,
             translateComments: settings.translateComments,
-          }))
+          }, controller.signal))
           if (token !== requestToken.current) return
           // Land every finished chunk at once: the unfinished ones keep their source lines,
           // so the page shows a growing Chinese document at constant line count.
@@ -434,7 +460,7 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
           setTranslation({ status: 'running', chunk: index + 2 > chunks ? chunks : index + 2, chunks, partial })
         }
         const text = assembleTranslation(plan.ranges, sourceLines, replies)
-        const ready = readyState({ text, sourceText: document.text, source: { kind: 'run' }, run })
+        const ready = readyState({ text, sourceText: document.text, persistence: { kind: 'unsaved' }, run })
         setTranslation(ready)
         // Fire and forget: a lost cache write costs one re-translation later, and
         // must never change what the reader is looking at.
@@ -447,16 +473,18 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
           promptVersion: run.promptVersion,
           translateComments: run.translateComments,
           extraInstruction: run.extraInstruction,
-          aligned: ready.sourceLines === ready.translatedLines,
-          sourceLines: ready.sourceLines,
-          translatedLines: ready.translatedLines,
+          aligned: aligned(ready.alignment),
+          sourceLines: ready.alignment.sourceLines,
+          translatedLines: ready.alignment.translatedLines,
         }).catch((error: unknown) => console.warn('[active-markdown] cache write failed', error))
       } catch (error) {
         if (token !== requestToken.current) return
         setTranslation({ status: 'failed', message: error instanceof Error ? error.message : String(error) })
+      } finally {
+        if (runController.current === controller) runController.current = null
       }
     })()
-  }, [host, sessionId, path])
+  }, [host, sessionId, path, stopRun])
 
   const chooseView = useCallback((next: View) => {
     setView(next)
@@ -482,6 +510,14 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
     translateDocument({ text: state.text, absolutePath: state.absolutePath }, nextInstruction, false)
   }, [state, translateDocument])
 
+  const cancelTranslation = useCallback(() => {
+    stopRun()
+    setTranslation({ status: 'idle' })
+    setView('source')
+    setPeek(null)
+    setSave({ status: 'idle' })
+  }, [stopRun])
+
   const saveTranslation = useCallback(() => {
     const ready = saveable(translation)
     if (ready === undefined || state.status !== 'ready' || sessionId === undefined || path === undefined) return
@@ -499,7 +535,7 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
           ...(ready.run.model === undefined ? {} : { model: ready.run.model }),
           promptVersion: ready.run.promptVersion,
           extraInstruction: ready.run.extraInstruction,
-          aligned: ready.sourceLines === ready.translatedLines,
+          aligned: aligned(ready.alignment),
         })
         setTranslation(current => (current.status === 'ready' && current.text === ready.text ? markSaved(current) : current))
         setSave({ status: 'idle' })
@@ -559,6 +595,11 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
                 {t('translate.retranslate')}
               </button>
             ) : null}
+            {translation.status === 'running' ? (
+              <button type="button" className="am-toolbar-toggle" onClick={cancelTranslation}>
+                {t('translate.cancel')}
+              </button>
+            ) : null}
             <div className="am-toolbar-status" role="status">
               {translation.status === 'running' && (
                 <>
@@ -571,11 +612,7 @@ export function Body({ resourceAddress, content, readBytes, openResource, host, 
               {translation.status === 'too-large' && (
                 <span className="am-toolbar-error">{t('translate.tooLarge', { lines: translation.lineCount })}</span>
               )}
-              {translation.status === 'ready' && (translation.sourceLines === translation.translatedLines
-                ? t('translate.aligned', { lines: translation.translatedLines })
-                : staleNoticeOf(translation)
-                  ? null
-                  : t('translate.unaligned', { translated: translation.translatedLines, source: translation.sourceLines }))}
+              {translation.status === 'ready' && !staleNoticeOf(translation) && alignmentText(translation, t)}
               {translation.status === 'failed' && (
                 <>
                   <span className="am-toolbar-error">{t('translate.failed', { message: translation.message })}</span>

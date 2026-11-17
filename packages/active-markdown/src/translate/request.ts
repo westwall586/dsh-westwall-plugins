@@ -155,9 +155,9 @@ export function resolveModel(input: {
   return { provider, model }
 }
 
-async function maxTokensFor(llm: LlmLike, provider: string, model: string): Promise<number> {
+async function maxTokensFor(llm: LlmLike, provider: string, model: string, signal?: AbortSignal): Promise<number> {
   try {
-    return await resolveMaxTokens({ llm, provider, model })
+    return await resolveMaxTokens({ llm, provider, model, ...(signal === undefined ? {} : { signal }) })
   } catch (error) {
     throw new TranslateError(
       'provider-unknown',
@@ -171,6 +171,7 @@ export async function translateRequest(input: {
   readonly llm: LlmLike | null
   readonly readDefault: () => ModelSelection | null
   readonly request: TranslateInput
+  readonly signal?: AbortSignal
 }): Promise<TranslateView> {
   const request = validateInput(input.request)
   if (input.llm === null) throw new TranslateError('llm-unavailable', '模型服务不可用')
@@ -180,7 +181,7 @@ export async function translateRequest(input: {
     ...(request.model === undefined ? {} : { model: request.model }),
     readDefault: input.readDefault,
   })
-  const maxTokens = await maxTokensFor(input.llm, provider, model)
+  const maxTokens = await maxTokensFor(input.llm, provider, model, input.signal)
   const system = buildSystemPrompt({
     lang: request.lang,
     translateComments: request.translateComments,
@@ -194,6 +195,7 @@ export async function translateRequest(input: {
     maxTokens,
     system,
     text: request.text,
+    ...(input.signal === undefined ? {} : { signal: input.signal }),
   })
   if (result.kind === 'failed') throw new TranslateError('model-failed', result.message)
   if (result.text.trim() === '') throw new TranslateError('model-failed', '模型没有返回译文')

@@ -26,6 +26,7 @@ export interface LlmCallOptions {
   readonly temperature?: number
   readonly maxTokens?: number
   readonly purpose?: string
+  readonly signal?: AbortSignal
 }
 
 export interface LlmFailure {
@@ -54,12 +55,13 @@ export interface ResolveMaxTokensInput {
   readonly llm: LlmLike
   readonly provider: string
   readonly model: string
+  readonly signal?: AbortSignal
 }
 
 /** Prefer the model's disclosed output cap; 8192 is only the fallback. */
 export async function resolveMaxTokens(input: ResolveMaxTokensInput): Promise<number> {
   if (typeof input.llm.resolveModelInfo !== 'function') return FALLBACK_MAX_TOKENS
-  const info = await input.llm.resolveModelInfo(input.provider, input.model)
+  const info = await input.llm.resolveModelInfo(input.provider, input.model, input.signal)
   const disclosed = info?.defaultMaxTokens
   return typeof disclosed === 'number' && Number.isSafeInteger(disclosed) && disclosed > 0
     ? disclosed
@@ -73,6 +75,7 @@ export interface CallTranslationInput {
   readonly maxTokens: number
   readonly system: string
   readonly text: string
+  readonly signal?: AbortSignal
 }
 
 export type CallTranslationResult =
@@ -104,6 +107,7 @@ export async function callTranslation(input: CallTranslationInput): Promise<Call
       temperature: 0,
       maxTokens: input.maxTokens,
       purpose: TRANSLATE_PURPOSE,
+      signal: input.signal,
     })) {
       if (chunk.type === 'text-delta' && typeof chunk.text === 'string') {
         sawText = true

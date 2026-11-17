@@ -30,7 +30,7 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
 export default class ActiveMarkdown extends TypertRemoteService {
     static Config: unknown;
     constructor(ctx: Context);
-    translate(sessionId: string, path: string, text: string, lang: string, provider?: string, model?: string, promptVersion?: string, extraInstruction?: string, translateComments?: boolean): Promise<TranslateView>;
+    translate(sessionId: string, path: string, text: string, lang: string, provider?: string, model?: string, promptVersion?: string, extraInstruction?: string, translateComments?: boolean, signal?: AbortSignal): Promise<TranslateView>;
     describe(): DescribeView;
     /** Read an automatic cache entry without touching the model. */
     cacheGet(text: string, lang: string, provider?: string, model?: string, promptVersion?: string, extraInstruction?: string, translateComments?: boolean): Promise<CachedTranslation | null>;

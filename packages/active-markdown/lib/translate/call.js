@@ -10,7 +10,7 @@ export const FALLBACK_MAX_TOKENS = 8192;
 export async function resolveMaxTokens(input) {
     if (typeof input.llm.resolveModelInfo !== 'function')
         return FALLBACK_MAX_TOKENS;
-    const info = await input.llm.resolveModelInfo(input.provider, input.model);
+    const info = await input.llm.resolveModelInfo(input.provider, input.model, input.signal);
     const disclosed = info?.defaultMaxTokens;
     return typeof disclosed === 'number' && Number.isSafeInteger(disclosed) && disclosed > 0
         ? disclosed
@@ -40,6 +40,7 @@ export async function callTranslation(input) {
             temperature: 0,
             maxTokens: input.maxTokens,
             purpose: TRANSLATE_PURPOSE,
+            signal: input.signal,
         })) {
             if (chunk.type === 'text-delta' && typeof chunk.text === 'string') {
                 sawText = true;

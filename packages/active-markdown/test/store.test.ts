@@ -8,7 +8,6 @@ import { Context } from '@deepseek-ai/cordis'
 
 import ActiveMarkdown from '../src/index.ts'
 import {
-  CACHE_VALUE_MAX_BYTES,
   createMemoryCacheStore,
   createTranslationCache,
   type CacheGetInput,
@@ -17,6 +16,7 @@ import {
   type StorageDomainFacility,
   type TranslationCache,
 } from '../src/translate/cache.ts'
+import { MAX_TRANSLATED_BYTES } from '../src/translate/boundary.ts'
 import { PROMPT_VERSION } from '../src/translate/prompt.ts'
 import { TranslateError, type TranslateErrorCode } from '../src/translate/request.ts'
 import {
@@ -281,14 +281,21 @@ test('未知会话在写入前就被拒绝', async (t) => {
   )
 })
 
-test('超过 64 KiB 的译文跳过缓存，其余照常命中', async (t) => {
+test('超过旧 64 KiB 上限的译文照常命中，只有译文自己的 4 MiB 边界拒绝', async (t) => {
   const h = await harness(t)
+  const long = '译'.repeat(70_000)
 
-  assert.deepEqual(await cachePut(h.cache, { translated: 'x'.repeat(CACHE_VALUE_MAX_BYTES + 1) }), {})
-  assert.equal(await cacheGet(h.cache), null)
+  assert.deepEqual(await cachePut(h.cache, { translated: long }), {})
+  assert.equal(((await cacheGet(h.cache)) as { text: string }).text, long)
 
-  assert.deepEqual(await cachePut(h.cache, { translated: '译'.repeat(1024) }), {})
-  assert.equal(((await cacheGet(h.cache)) as { text: string }).text, '译'.repeat(1024))
+  await assert.rejects(
+    cachePut(h.cache, { translated: 'x'.repeat(MAX_TRANSLATED_BYTES + 1) }),
+    isCode('text-too-large'),
+  )
+  await assert.rejects(
+    save(h.store, { translated: 'x'.repeat(MAX_TRANSLATED_BYTES + 1) }),
+    isCode('text-too-large'),
+  )
 })
 
 test('保存后原文未变不算过期，原文一改就标过期且旧译文仍可读', async (t) => {

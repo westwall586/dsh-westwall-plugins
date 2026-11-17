@@ -25,7 +25,7 @@ export default class ActiveMarkdown extends TypertRemoteService {
     constructor(ctx) {
         super(ctx, 'activeMarkdown');
     }
-    async translate(sessionId, path, text, lang, provider, model, promptVersion, extraInstruction, translateComments) {
+    async translate(sessionId, path, text, lang, provider, model, promptVersion, extraInstruction, translateComments, signal) {
         const request = {
             sessionId,
             path,
@@ -41,6 +41,7 @@ export default class ActiveMarkdown extends TypertRemoteService {
             llm: this.llm(),
             readDefault: () => this.readDefaultSelection(),
             request,
+            ...(signal === undefined ? {} : { signal }),
         }));
     }
     describe() {

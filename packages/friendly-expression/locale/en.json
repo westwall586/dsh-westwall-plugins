@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Friendly expression",
-    "description": "Agent replies sprawl and flow diagrams often arrive as ASCII boxes. An editable expression prompt sets the style, and Mermaid fences render as zoomable diagrams."
+    "description": "Agent replies sprawl and flow diagrams often arrive as ASCII boxes. An editable expression contract constrains wording and structure, and Mermaid fences render as zoomable diagrams."
   },
   "settings.nav": "Friendly expression",
   "settings.title": "Friendly expression",

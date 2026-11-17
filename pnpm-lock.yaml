@@ -15,7 +15,7 @@ importers:
         specifier: 0.1.0
         version: link:packages/feed-ultra
       '@westwall/dsh-friendly-expression':
-        specifier: 0.0.1
+        specifier: 0.1.0
         version: link:packages/friendly-expression
       '@westwall/dsh-jira-worklogs':
         specifier: 0.1.0

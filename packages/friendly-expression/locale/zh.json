@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "友好表达",
-    "description": "Agent 回复容易堆砌跑题，流程图常用 ASCII 方框。用可编辑的表达提示词约束风格，并把 Mermaid 围栏渲染成可缩放的图。"
+    "description": "Agent 回复容易堆砌跑题，流程图常用 ASCII 方框。用可编辑的受控表达约束措辞与结构，并把 Mermaid 围栏渲染成可缩放的图。"
   },
   "settings.nav": "友好表达",
   "settings.title": "友好表达",

@@ -11,7 +11,7 @@
 | [jira-worklogs](jira-worklogs/README.md) | Jira 工时记录：月历缺口、日详情、Git 素材，就地起草并确认后写入 Jira | 草稿 · 推荐本地安装 |
 | [feed-ultra](feed-ultra/README.md) | 资讯工作台：RSS、GitHub 榜单、每日早报与 X 书签按天阅读，渠道定时与 AI 翻译 | 草稿 · 推荐本地安装 |
 | [web-clipper](web-clipper/README.md) | 网页剪藏：桌面版侧栏浏览器一键把当前页作为 Markdown 附件加入会话，并在可配置目录保存可读副本 | 草稿 · 推荐本地安装 |
-| [friendly-expression](friendly-expression/README.md) | 友好表达：可编辑的表达提示词约束回复风格，并把 Mermaid 渲染成可缩放的图 | 草稿 · 推荐本地安装 |
+| [friendly-expression](friendly-expression/README.md) | 友好表达：可编辑的受控表达约束措辞与结构，并把 Mermaid 渲染成可缩放的图 | v0.1 · npm 安装 |
 
 新增插件后把这一行补上。
 

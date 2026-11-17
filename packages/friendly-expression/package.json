@@ -1,8 +1,23 @@
 {
   "name": "@westwall/dsh-friendly-expression",
-  "version": "0.0.1",
-  "private": true,
-  "description": "友好表达：可编辑的表达提示词约束回复风格，并把 Mermaid 围栏渲染成可缩放的图。",
+  "version": "0.1.0",
+  "description": "友好表达：可编辑的受控表达约束 Agent 的措辞与结构，并把 Mermaid 围栏渲染成可缩放的图。",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/westwall586/dsh-westwall-plugins.git",
+    "directory": "packages/friendly-expression"
+  },
+  "homepage": "https://github.com/westwall586/dsh-westwall-plugins/tree/main/packages/friendly-expression#readme",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "mermaid",
+    "diagram",
+    "prompt",
+    "tone",
+    "expression"
+  ],
   "type": "module",
   "engines": {
     "node": ">=22.19.0"
@@ -57,7 +72,11 @@
     "locale",
     "icon.svg",
     "README.md",
-    "docs"
+    "docs",
+    "icon-180.png",
+    "icon-512.png",
+    "assets",
+    "screenshots.json"
   ],
   "license": "Apache-2.0",
   "publishConfig": {

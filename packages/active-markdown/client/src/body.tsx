@@ -17,7 +17,7 @@ import {
   type Anchor,
 } from './annotate/model.ts'
 import { ANNOTATION_POPOVER_WIDTH, AnnotationPopover } from './annotate/popover.tsx'
-import { placePopover } from './annotate/position.ts'
+import { centerDelta, placePanelBelow, placePopover, revealDelta, type PanelPlacement } from './annotate/position.ts'
 import {
   atomIndexAt,
   captureAnchor,
@@ -49,6 +49,7 @@ import { diffBlocks, tocEntries, updatedSections, type DocumentDiff } from './ma
 import { componentLabel, componentOf, type Block } from './markdown/model.ts'
 import { MarkdownView, type ComponentContext } from './markdown/render.tsx'
 import { MarkdownToc } from './markdown/toc.tsx'
+import { activeAnchorOf, tocRows } from './markdown/toc-model.ts'
 import {
   registerSelectionHandler,
   SELECTION_MENU_KIND,
@@ -174,14 +175,6 @@ type ToolbarError =
   | { kind: 'save', message: string }
   | { kind: 'translate', message: string }
   | { kind: 'too-large', message: string }
-
-/** The contents popover's viewport placement. */
-interface TocPlacement {
-  left: number
-  top: number
-  width: number
-  maxHeight: number
-}
 
 interface UndoState {
   annotation: Annotation
@@ -456,7 +449,9 @@ export function Body({
   const [latest, setLatest] = useState<ReviewLatestView | null>(null)
   const [updateCursor, setUpdateCursor] = useState(0)
   const [tocOpen, setTocOpen] = useState(false)
-  const [tocPlacement, setTocPlacement] = useState<TocPlacement | null>(null)
+  const [tocPlacement, setTocPlacement] = useState<PanelPlacement | null>(null)
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(EMPTY_ANCHORS)
+  const [activeToc, setActiveToc] = useState<string | undefined>(undefined)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editor, setEditor] = useState<Editor | null>(null)
   const [undo, setUndo] = useState<UndoState | null>(null)
@@ -469,6 +464,9 @@ export function Body({
   const [described, setDescribed] = useState<DescribeView | null>(null)
   const tocButton = useRef<HTMLButtonElement | null>(null)
   const tocPanel = useRef<HTMLDivElement | null>(null)
+  const toolbar = useRef<HTMLDivElement | null>(null)
+  const pointerOver = useRef(false)
+  const revealCenter = useRef(false)
   const errorChip = useRef<HTMLButtonElement | null>(null)
   const editorPanel = useRef<HTMLDivElement | null>(null)
   const editorHeight = useRef(ANNOTATION_ESTIMATE_HEIGHT)
@@ -694,6 +692,15 @@ export function Body({
   // The contents follow whatever Markdown is on screen: translation gets its own entries.
   const toc = useMemo(() => tocEntries(displayed.blocks), [displayed])
 
+  const toggleFold = useCallback((anchor: string): void => {
+    setCollapsed((current) => {
+      const next = new Set(current)
+      if (!next.delete(anchor)) next.add(anchor)
+      return next
+    })
+  }, [])
+  const rows = useMemo(() => tocRows(toc, collapsed, activeToc), [toc, collapsed, activeToc])
+
   const jumpToSection = useCallback((anchor: string): void => {
     const node = Array.from(container.current?.querySelectorAll<HTMLElement>('[data-anchor]') ?? [])
       .find(element => element.getAttribute('data-anchor') === anchor)
@@ -751,28 +758,98 @@ export function Body({
     setUpdateCursor(next)
   }, [updateCursor])
 
+  useEffect(() => {
+    setCollapsed(EMPTY_ANCHORS)
+    setActiveToc(undefined)
+  }, [path, view])
+
   useLayoutEffect(() => {
     if (!tocOpen) {
       setTocPlacement(null)
       return
     }
     const button = tocButton.current
-    if (button === null) return
+    const pane = container.current
+    if (button === null || pane === null) return
+    revealCenter.current = true
     const place = (): void => {
-      const rect = button.getBoundingClientRect()
-      const width = Math.min(320, window.innerWidth - 16)
-      const placement = placePopover(rect, { width, height: 320 }, { width: window.innerWidth, height: window.innerHeight })
-      setTocPlacement({
-        left: placement.left,
-        top: placement.top,
-        width,
-        maxHeight: Math.min(420, window.innerHeight - placement.top - 8),
-      })
+      const buttonRect = button.getBoundingClientRect()
+      const paneRect = pane.getBoundingClientRect()
+      const left = Math.min(Math.max(0, paneRect.left), window.innerWidth)
+      const top = Math.min(Math.max(0, paneRect.top), window.innerHeight)
+      const right = Math.min(Math.max(0, paneRect.right), window.innerWidth)
+      const bottom = Math.min(Math.max(0, paneRect.bottom), window.innerHeight)
+      setTocPlacement(placePanelBelow(buttonRect, { left, top, width: Math.max(0, right - left), height: Math.max(0, bottom - top) }))
     }
     place()
     window.addEventListener('resize', place)
-    return () => window.removeEventListener('resize', place)
+    const observer = new ResizeObserver(place)
+    observer.observe(pane)
+    return () => {
+      window.removeEventListener('resize', place)
+      observer.disconnect()
+    }
   }, [tocOpen, toc, view])
+
+  useLayoutEffect(() => {
+    if (!tocOpen) return
+    const pane = container.current
+    if (pane === null) return
+    let frame = 0
+    const measure = (): void => {
+      const tops = new Map<string, number>()
+      for (const element of pane.querySelectorAll<HTMLElement>('[data-anchor]')) {
+        const anchor = element.getAttribute('data-anchor')
+        if (anchor !== null) tops.set(anchor, element.getBoundingClientRect().top)
+      }
+      // A jump parks the heading 12px below the sticky bar (scroll-margin 56 vs 44),
+      // so the threshold needs that gap plus a little slack to claim it current.
+      const bar = toolbar.current
+      const threshold = (bar === null ? 0 : bar.getBoundingClientRect().bottom) + 16
+      setActiveToc(activeAnchorOf(toc, tops, threshold))
+    }
+    const paint = (): void => {
+      frame = 0
+      measure()
+    }
+    const schedule = (): void => {
+      if (frame === 0) frame = requestAnimationFrame(paint)
+    }
+    measure()
+    const scrollport = scrollportOf(pane)
+    scrollport?.addEventListener('scroll', schedule, { passive: true })
+    window.addEventListener('scroll', schedule, { passive: true })
+    window.addEventListener('resize', schedule)
+    const observer = new ResizeObserver(schedule)
+    observer.observe(pane)
+    return () => {
+      if (frame !== 0) cancelAnimationFrame(frame)
+      scrollport?.removeEventListener('scroll', schedule)
+      window.removeEventListener('scroll', schedule)
+      window.removeEventListener('resize', schedule)
+      observer.disconnect()
+    }
+  }, [tocOpen, toc])
+
+  useLayoutEffect(() => {
+    if (!tocOpen || tocPlacement === null) return
+    const current = rows.find(row => row.isCurrent)
+    const panel = tocPanel.current
+    if (panel === null) return
+    if (current === undefined || pointerOver.current) {
+      revealCenter.current = false
+      return
+    }
+    const rowElement = Array.from(panel.querySelectorAll<HTMLElement>('[data-toc-anchor]'))
+      .find(element => element.getAttribute('data-toc-anchor') === current.anchor)
+    if (rowElement === undefined) return
+    const panelRect = panel.getBoundingClientRect()
+    const rowRect = rowElement.getBoundingClientRect()
+    const panelGeometry = { left: panelRect.left, top: panelRect.top, width: panelRect.width, height: panelRect.height }
+    const rowGeometry = { left: rowRect.left, top: rowRect.top, width: rowRect.width, height: rowRect.height }
+    panel.scrollTop += revealCenter.current ? centerDelta(panelGeometry, rowGeometry) : revealDelta(panelGeometry, rowGeometry)
+    revealCenter.current = false
+  }, [tocOpen, tocPlacement, activeToc, rows])
 
   useEffect(() => {
     if (!tocOpen) return
@@ -783,7 +860,10 @@ export function Body({
       setTocOpen(false)
     }
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setTocOpen(false)
+      if (event.key !== 'Escape') return
+      const focused = document.activeElement
+      if (focused instanceof Node && tocPanel.current?.contains(focused) === true) tocButton.current?.focus()
+      setTocOpen(false)
     }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
@@ -1626,7 +1706,7 @@ export function Body({
       )}
       {state.status === 'ready' && (
         <>
-          <div className="am-toolbar">
+          <div className="am-toolbar" ref={toolbar}>
             {view === 'source' ? (
               <>
                 <button
@@ -1760,13 +1840,19 @@ export function Body({
               ref={tocPanel}
               className="am-toc-popover"
               style={{ left: tocPlacement.left, top: tocPlacement.top, width: tocPlacement.width, maxHeight: tocPlacement.maxHeight }}
+              onPointerEnter={() => { pointerOver.current = true }}
+              onPointerLeave={() => { pointerOver.current = false }}
             >
               <MarkdownToc
-                entries={toc}
+                rows={rows}
+                collapsed={collapsed}
                 updated={view === 'source' ? updatedAnchors : EMPTY_ANCHORS}
                 label={t('toc.label')}
                 updatedLabel={t('toc.updated')}
+                expandLabel={t('toc.expand')}
+                collapseLabel={t('toc.collapse')}
                 onJump={jumpToSection}
+                onToggle={toggleFold}
               />
             </div>
           ) : null}

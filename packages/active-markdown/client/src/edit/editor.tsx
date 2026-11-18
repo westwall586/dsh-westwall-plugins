@@ -51,7 +51,7 @@ const theme = EditorView.theme({
   '&': {
     height: '100%',
     color: 'var(--dsw-alias-label-primary)',
-    backgroundColor: 'var(--dsw-alias-bg-layer-1)',
+    backgroundColor: 'transparent',
     fontFamily: 'var(--dsh-font-family-code)',
     fontSize: 'var(--dsh-code-font-size)',
   },
@@ -64,7 +64,7 @@ const theme = EditorView.theme({
   },
   '.cm-activeLine': { backgroundColor: 'color-mix(in srgb, var(--dsw-alias-link) 5%, transparent)' },
   '.cm-gutters': {
-    backgroundColor: 'var(--dsw-alias-bg-layer-1)',
+    backgroundColor: 'transparent',
     color: 'var(--dsw-alias-label-tertiary)',
     borderRight: '0.5px solid var(--dsw-alias-border-l1)',
   },

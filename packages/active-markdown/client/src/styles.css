@@ -1232,15 +1232,18 @@
   overflow-wrap: anywhere;
 }
 
+/* Editing takes the pane edge to edge: the toolbar sits flat and CodeMirror
+   fills the rest, so no card, inset, or gap separates it from the sidebar. */
 [data-active-markdown][data-editing] {
-  padding-bottom: 0;
+  padding: 0;
+}
+
+[data-active-markdown][data-editing] .am-toolbar {
+  margin: 0;
 }
 
 [data-active-markdown] .am-edit-editor {
   overflow: hidden;
-  border: 0.5px solid var(--dsw-alias-border-l1);
-  border-radius: 8px;
-  background: var(--dsw-alias-bg-layer-1);
 }
 
 [data-active-markdown] .am-edit-editor .cm-editor {

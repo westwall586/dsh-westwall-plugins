@@ -2136,7 +2136,7 @@ export function Body({
                 <button
                   ref={tocButton}
                   type="button"
-                  className="am-toolbar-button"
+                  className="am-toolbar-button am-toolbar-button--quiet"
                   aria-label={t('toc.label')}
                   aria-expanded={tocOpen}
                   title={t('toc.label')}
@@ -2148,18 +2148,6 @@ export function Body({
                   {updatedAnchors.size === 0 ? null : <span className="am-toolbar-dot" aria-hidden="true" />}
                 </button>
                 <span className="am-toolbar-spacer" />
-                {showEditAction ? (
-                  <button
-                    type="button"
-                    className="am-toolbar-button"
-                    aria-label={t('edit.action')}
-                    title={t('edit.action')}
-                    onClick={() => { void enterEdit() }}
-                  >
-                    <EditIcon />
-                    <span className="am-toolbar-label">{t('edit.action')}</span>
-                  </button>
-                ) : null}
                 <button
                   type="button"
                   className="am-toolbar-button am-toolbar-button--quiet"
@@ -2170,6 +2158,18 @@ export function Body({
                   <GlobeIcon />
                   <span className="am-toolbar-label">{t('translate.entry')}</span>
                 </button>
+                {showEditAction ? (
+                  <button
+                    type="button"
+                    className="am-toolbar-button am-toolbar-button--quiet"
+                    aria-label={t('edit.action')}
+                    title={t('edit.action')}
+                    onClick={() => { void enterEdit() }}
+                  >
+                    <EditIcon />
+                    <span className="am-toolbar-label">{t('edit.action')}</span>
+                  </button>
+                ) : null}
                 {diff.counts.updated > 0 ? (
                   <>
                     <span className="am-toolbar-rule" />
@@ -2184,7 +2184,7 @@ export function Body({
                 <span className="am-toolbar-rule" />
                 <button
                   type="button"
-                  className="am-toolbar-button"
+                  className="am-toolbar-button am-toolbar-button--quiet"
                   aria-label={`${t('annotate.drawer.title')} ${annotationList.length}`}
                   title={t('annotate.drawer.title')}
                   aria-expanded={drawerOpen}
@@ -2213,7 +2213,7 @@ export function Body({
                 <button
                   ref={tocButton}
                   type="button"
-                  className="am-toolbar-button"
+                  className="am-toolbar-button am-toolbar-button--quiet"
                   aria-label={t('toc.label')}
                   aria-expanded={tocOpen}
                   title={t('toc.label')}

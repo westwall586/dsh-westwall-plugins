@@ -321,11 +321,6 @@ function formatBytes(bytes: number | undefined): string {
   return `${bytes} B`
 }
 
-/** Line-ending style alone must not turn into a diff. */
-function normalizeDocumentText(text: string): string {
-  return text.replace(/\r\n/g, '\n').replace(/\n$/, '')
-}
-
 /** The run identity a stored record gives back, with the session's current prompt version as fallback. */
 function storedRun(meta: TranslationMeta, promptVersion: string, translateComments: boolean, extraInstruction = ''): PromptRun {
   return {
@@ -598,9 +593,7 @@ export function Body({
   const baselineText = latest?.text ?? null
   const sameAsBaseline = baselineText !== null
     && state.status === 'ready'
-    && normalizeDocumentText(baselineText) === normalizeDocumentText(currentText)
-  // Only parse and diff when the normalized texts differ: equal text means no
-  // updates, and a baseline outside the source view has nothing to mark.
+    && normalize(baselineText) === normalize(currentText)
   const baselineParsed = useMemo<ParsedDocument>(
     () => (baselineText === null || sameAsBaseline ? EMPTY_PARSED : parseDocument(baselineText)),
     [baselineText, sameAsBaseline],
@@ -618,12 +611,12 @@ export function Body({
   const dismissedHere = dismissed !== null
     && latest !== null
     && dismissed.roundId === latest.roundId
-    && dismissed.text === normalizeDocumentText(currentText)
+    && dismissed.text === normalize(currentText)
   const showDiffNotice = diffActive && view === 'source' && diff.counts.updated > 0 && !dismissedHere
 
   const dismissDiff = useCallback((): void => {
     if (latest === null || state.status !== 'ready') return
-    setDismissed({ roundId: latest.roundId, text: normalizeDocumentText(state.text) })
+    setDismissed({ roundId: latest.roundId, text: normalize(state.text) })
   }, [latest, state])
 
   const jumpToSection = useCallback((anchor: string): void => {
@@ -1458,7 +1451,7 @@ export function Body({
               components={componentContext}
               lineNumbers={showGutter}
               t={t}
-              diff={view === 'source' ? diff : undefined}
+              diff={view === 'source' && diffActive ? diff : undefined}
             />
           </RenderBoundary>
         </>

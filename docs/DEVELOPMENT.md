@@ -129,22 +129,27 @@ dsh plugin --profile <profile> add link:$(pwd)/packages/<name>
 
 ## 开发闭环
 
-单人维护：**开分支、不开 PR**。PR 与网页合并省掉，`main` 由维护者确认后直接接收推送。
+单人维护：**worktree + ff-only 合并，不开 PR**。默认在 worktree 上开发，自测通过就合 `main`；桌面端验收在合并之后。
 
-1. 从最新 `main` 开分支：`git switch -c feat/<name>-<短描述>`。
-2. 改源码，跑完整自检：
+1. 从最新 `main` 开 worktree 与分支：
+   ```sh
+   git worktree add .agents/worktrees/<任务> -b feat/<name>-<短描述>
+   ```
+   新 worktree 是干净 checkout，第一次要 `pnpm install --prefer-offline`。
+2. 在 worktree 里改源码，跑完整自检：
    ```sh
    pnpm -r build && pnpm -r typecheck && pnpm -r test && pnpm aggregate:check
    ```
    有浏览器半体的改动，再做 [Web 端实测](#web-自主测试)。
-3. 在分支上提交（Conventional Commits），**不要**推 `main`。
-4. 向维护者汇报：分支名、改动的文件、跑过的命令、Web 实测结论（含截图路径）。
-5. 维护者确认后合入并推送：
+3. 在分支上提交（Conventional Commits）。
+4. 自测全绿后合入并推送，不用再等确认：
    ```sh
-   git switch main && git merge --ff-only <分支> && git push origin main
-   git branch -d <分支>
+   git switch main && git merge --ff-only feat/<name>-<短描述> && git push origin main
+   git worktree remove .agents/worktrees/<任务> && git branch -d feat/<name>-<短描述>
    ```
    只用 `--ff-only`：分支必须基于最新 `main`，冲突时先在分支上 `git rebase main`，不要用 merge commit。
+5. 维护者在桌面端验收。验出问题：小修按同样流程补分支再合；整块不可用时 `git revert -m 1 <合并提交>`。
+6. 文档类改动（`docs/`、`*.md`、注释与规则）不建 worktree，直接在 `main` 提交推送。
 
 CI 只在推送 `main` 时运行（`.github/workflows/ci.yml`），它是推送前的最后一道闸门，所以在本地跑绿之前不要推 `main`。
 

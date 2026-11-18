@@ -31,8 +31,10 @@
 - 发布只针对打磨到位的包，tag 形如 `dsh-<name>@<version>`；一个 tag 只发一个包
 - 公开仓库：文档与代码里不写邮箱、账号凭据、token、本机绝对路径
 - 提交信息用 Conventional Commits
-- **开发在分支上，不开 PR**：一个任务一个分支（如 `feat/<name>-<短描述>`），从最新 `main` 拉出；验证通过并经维护者确认后，`git merge --ff-only` 合入 `main` 并直接推送，然后删除分支。单人维护，不经过 GitHub PR 与网页合并
-- **Agent 不得把未确认的改动推送到 `main`**：维护者确认之前只能提交到分支，汇报只给分支名与证据
+- **默认在 worktree 上开发，自测通过就合 `main`**：代码改动在 `.agents/worktrees/<任务>` 的 `feat/<name>-<短描述>` 分支上做，从最新 `main` 拉出。主 checkout 只跑桌面端与发布，不放半成品：桌面 App 的插件是 `link:` 到它的，半成品会在下次重启时被用户看到
+- **合并闸门是自测，不是人工确认**：分支上跑该包的 `typecheck` / `test` / `build` 与 `pnpm aggregate:check`；有浏览器半体的改动再按 [Web 端实测](docs/DEVELOPMENT.md#web-自主测试) 走一遍关键路径。全绿后 `git merge --ff-only` 进 `main` 并推送，当轮删掉 worktree 与分支。桌面端验证由维护者在合并之后做，是验收而不是闸门
+- **文档类改动直接进 `main`**：只改 `docs/`、`*.md`、注释与规则、不产生构建产物的改动，不建 worktree 与分支，直接在 `main` 提交推送
+- **仍需先问维护者**：发版 tag、强推、删除用户数据、改动维护者的 desktop profile
 - **Web 端实测必须用 Web profile**：`dsh --profile web ...` 启动，从控制台 `dsh web: <URL>?token=<token>` 一行取完整地址访问；不要自己拼端口、不要直接打开不带 token 的地址（会 401）。步骤见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#web-自主测试)
 - 版本规则、分发矩阵、兼容性策略以 `docs/decisions.md` 为权威说明
 

@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>04 批注抽屉</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;-webkit-font-smoothing:antialiased;background:#fff}
+.pane{position:relative;width:720px;height:860px;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden;background:#fff;color:#0f1115;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;font-size:13px}
+.tabs{flex:none;display:flex;align-items:center;gap:4px;height:34px;padding:0 8px;background:#f9fafb;border-bottom:.5px solid rgba(0,0,0,.08)}
+.tab{display:inline-flex;align-items:center;gap:7px;height:25px;padding:0 9px;border:.5px solid rgba(0,0,0,.1);border-radius:7px;background:#fff;font-size:12px}
+.tab--off{border-color:transparent;background:transparent;color:#81858c}
+.tab i{font-style:normal;color:#a9aeb5;font-size:12px;line-height:1}
+.tico{width:15px;height:15px;border-radius:4px;background:#4176e6;color:#fff;font-size:8px;line-height:15px;text-align:center;font-weight:600}
+.hdr{flex:none;display:flex;align-items:center;gap:2px;height:34px;padding:0 6px 0 14px;border-bottom:.5px solid rgba(0,0,0,.1)}
+.path{font-size:12.5px;color:#31363d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-right:10px}
+.sp{flex:1 1 auto}
+.ib{display:inline-flex;align-items:center;justify-content:center;height:24px;min-width:24px;padding:0 5px;border:0;border-radius:6px;background:transparent;color:#61666b}
+.sel{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 7px;border:.5px solid transparent;border-radius:6px;background:rgba(38,49,72,.06);color:#0f1115;font-size:12px;white-space:nowrap}
+.am{flex:none;display:flex;align-items:center;gap:8px;height:46px;padding:0 12px;border-bottom:.5px solid rgba(0,0,0,.1);background:#fff}
+.tbtn{position:relative;flex:none;display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 10px;border:.5px solid rgba(0,0,0,.12);border-radius:6px;background:#fff;color:#3c424a;font:inherit;font-size:12px;white-space:nowrap}
+.tbtn--quiet{border-color:transparent;background:transparent;color:#61666b}
+.tbtn--on{border-color:rgba(65,118,230,.3);background:rgba(65,118,230,.07);color:#2f56b8}
+.count{min-width:15px;height:15px;padding:0 4px;border-radius:8px;background:rgba(38,49,72,.08);color:#5b6169;font-size:10.5px;line-height:15px;text-align:center}
+.dot{position:absolute;top:4px;right:4px;width:5px;height:5px;border-radius:50%;background:#4176e6}
+.chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 9px;border:.5px solid rgba(65,118,230,.26);border-radius:999px;background:rgba(65,118,230,.06);color:#2f56b8;font-size:11.5px;white-space:nowrap}
+.chip .cd{width:5px;height:5px;border-radius:50%;background:#4176e6}
+.primary{flex:none;display:inline-flex;align-items:center;justify-content:center;height:28px;padding:0 12px;border:.5px solid #2f5fd0;border-radius:6px;background:#2f5fd0;color:#fff;font:inherit;font-size:12px;white-space:nowrap}
+.vrule{flex:none;width:1px;height:18px;margin:0 2px;background:rgba(0,0,0,.12)}
+.iconbtn{flex:none;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:0;border-radius:6px;background:transparent;color:#61666b}
+.body{position:relative;flex:1 1 auto;min-height:0;overflow:hidden}
+.doc{padding:22px 30px 26px 44px;font-size:15px;line-height:1.75;color:#232a33}
+.doc h1{font-size:24px;line-height:1.35;font-weight:600;margin:0 0 7px}
+.meta{font-size:12px;color:#7c828a;margin:0 0 18px}
+.doc h2{font-size:18px;line-height:1.45;font-weight:600;margin:20px 0 5px}
+.doc h3{font-size:15px;line-height:1.5;font-weight:600;margin:13px 0 4px}
+.doc p{margin:0 0 10px}
+code{font-family:'SF Mono',Menlo,monospace;font-size:12.5px;background:#f7f8fa;border:.5px solid rgba(0,0,0,.06);border-radius:4px;padding:1px 4px}
+.blk{position:relative}
+.blk.up::before{content:'';position:absolute;left:-18px;top:5px;width:3px;height:16px;border-radius:2px;background:#4176e6}
+.hl{background:#e7eefc;box-shadow:0 0 0 2px #e7eefc;border-radius:2px}
+.scrim{position:absolute;inset:0;z-index:8;background:rgba(15,23,42,.14)}
+.drawer{position:absolute;top:0;right:0;bottom:0;z-index:9;display:flex;flex-direction:column;width:360px;border-left:.5px solid rgba(0,0,0,.14);background:#fff;box-shadow:-10px 0 28px rgba(16,24,40,.12)}
+.dh{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:.5px solid rgba(0,0,0,.1)}
+.dh b{font-size:13px;font-weight:600}
+.dh .cn{padding:0 6px;border-radius:8px;background:#f1f3f5;color:#5b6169;font-size:10.5px}
+.dh .x{margin-left:auto;color:#8a9099;font-size:14px;line-height:1}
+.dl{flex:1 1 auto;overflow:hidden;padding:4px 14px 12px}
+.di{padding:10px 0;border-bottom:.5px solid rgba(0,0,0,.08)}
+.di-h{display:flex;align-items:center;gap:7px;margin-bottom:4px}
+.seq{width:18px;height:18px;border-radius:5px;background:#eaf0fe;color:#2f56b8;font-size:9.5px;line-height:18px;text-align:center}
+.di-h em{font-style:normal;font-size:10.5px;color:#8a9099}
+.di-q{margin:0 0 5px;padding-left:7px;border-left:2px solid #e1e6ec;color:#6b727b;font-size:11px;line-height:1.55;max-height:38px;overflow:hidden}
+.di-b{font-size:12px;line-height:1.65;color:#232a33;margin:0 0 6px}
+.di-a{display:flex;gap:10px;font-size:10.5px;color:#2f56b8}
+.di-a .rm{margin-left:auto;color:#a0443b}
+.df{flex:none;padding:10px 14px 12px;border-top:.5px solid rgba(0,0,0,.1);background:#fff}
+.df .hint{font-size:10.5px;color:#8a9099;margin:0 0 7px}
+.df .row{display:flex;align-items:center;gap:8px}
+.df .clear{font-size:10.5px;color:#8a9099}
+.df .primary{flex:1;height:32px;font-size:12.5px}
+</style>
+</helmet>
+<div class="pane">
+  <div class="tabs">
+    <span class="tab tab--off">文件</span>
+    <span class="tab"><span class="tico">M↓</span>P2b-CHANGES-TECH<i>✕</i></span>
+    <span class="ib" style="font-size:14px;color:#9aa0a8">+</span>
+    <span class="sp"></span>
+    <span class="ib" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2.5" y="3" width="11" height="10" rx="1.5"/><path d="M8 3v10"/></svg></span>
+    <span class="ib" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M6 2.5H2.5V6M10 13.5h3.5V10"/></svg></span>
+  </div>
+
+  <div class="hdr">
+    <span class="path">/docs/designs/active-markdown/P2b-CHANGES-TECH.md</span>
+    <span class="sp"></span>
+    <button class="sel" type="button">可交互 Markdown
+      <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M2.5 4.5 6 8l3.5-3.5"/></svg>
+    </button>
+    <button class="ib" type="button" aria-label="刷新"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M13 8a5 5 0 1 1-1.6-3.7"/><path d="M13 2.5V5h-2.5"/></svg></button>
+    <button class="ib" type="button" aria-label="在应用中打开"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M9 3h4v4"/><path d="M13 3 7.5 8.5"/><path d="M12 10.5V12a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 12V5.5A1.5 1.5 0 0 1 4 4h1.5"/></svg></button>
+  </div>
+
+  <div class="am">
+    <button class="tbtn" type="button">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M3 4h10M5 8h8M7 12h6"/></svg>
+      目录<span class="dot"></span>
+    </button>
+    <span class="sp"></span>
+    <button class="tbtn tbtn--quiet" type="button">翻译</button>
+    <span class="vrule"></span>
+    <button class="chip" type="button">
+      <span class="cd"></span>更新 3 处
+    </button>
+    <span class="vrule"></span>
+    <button class="tbtn tbtn--on" type="button">批注 <span class="count">3</span></button>
+    <button class="primary" type="button">加入对话</button>
+  </div>
+
+  <div class="body">
+    <div class="doc">
+      <h1>Active Markdown P2b 技术方案：块级更新标记</h1>
+      <div class="meta">2026-11-18 · 设计定稿 · Web 实机复核通过</div>
+
+      <h2>3. 基线</h2>
+      <h3 class="blk up">3.1 什么是基线</h3>
+      <p class="blk">基线是最近一次已发送、且留下了全文快照的审阅轮次。发送后，Host 把当时的 <code>.md</code> 存成一份快照；之后打开文档时，拿这份快照和最新全文做块级 <code>diff</code>。</p>
+      <p class="blk"><span class="hl">只标记本次批注提交后仍存在且被更新的段落与组件，并在目录里标出被更新的章节。</span></p>
+
+      <h3 class="blk up">3.2 为什么最新一轮快照缺失时不回退</h3>
+      <p class="blk">如果最新一轮没有快照，就不显示更新，而不是退回到更早的轮次。否则基线会悄悄变旧，读者看到的「更新」可能来自两次反馈之前。</p>
+
+      <h2 class="blk up">4. Host 接口</h2>
+      <p>只加一个只读接口：<code>reviewLatest</code> 返回最近一次已发送轮次的快照与元数据；缺失就返回空，不向更早的轮次回退。</p>
+    </div>
+
+    <div class="scrim"></div>
+
+    <div class="drawer">
+      <div class="dh"><b>批注</b><span class="cn">3</span><span class="x">✕</span></div>
+      <div class="dl">
+        <div class="di">
+          <div class="di-h"><span class="seq">1</span><em>第 24 行</em></div>
+          <div class="di-q">基线是最近一次已发送、且留下了全文快照的审阅轮次。</div>
+          <div class="di-b">这里补一句：快照缺失就不显示更新，不要回退。</div>
+          <div class="di-a"><span>定位</span><span>编辑</span><span class="rm">删除</span></div>
+        </div>
+        <div class="di">
+          <div class="di-h"><span class="seq">2</span><em>第 27 行</em></div>
+          <div class="di-q">只标记本次批注提交后仍存在且被更新的段落与组件。</div>
+          <div class="di-b">「渲染语义」建议补一个例子，说明换行和列表符号不算变化。</div>
+          <div class="di-a"><span>定位</span><span>编辑</span><span class="rm">删除</span></div>
+        </div>
+        <div class="di">
+          <div class="di-h"><span class="seq">3</span><em>第 40 行</em></div>
+          <div class="di-q">4. Host 接口</div>
+          <div class="di-b">接口名建议和正文里的 reviewLatest 统一，别一处大写一处小写。</div>
+          <div class="di-a"><span>定位</span><span>编辑</span><span class="rm">删除</span></div>
+        </div>
+      </div>
+      <div class="df">
+        <p class="hint">加入输入框后按 Enter 发送；3 条会一起带上。</p>
+        <div class="row">
+          <span class="clear">清空</span>
+          <span class="sp"></span>
+          <button class="primary" type="button">加入对话 · 3</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":720,"height":860}}'>
+class Component extends DCLogic {
+  renderVals() { return {} }
+}
+</script>
+</body>
+</html>

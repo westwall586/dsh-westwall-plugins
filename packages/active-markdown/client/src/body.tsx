@@ -17,6 +17,7 @@ import {
   type Anchor,
 } from './annotate/model.ts'
 import { ANNOTATION_POPOVER_WIDTH, AnnotationPopover } from './annotate/popover.tsx'
+import { placePopover } from './annotate/position.ts'
 import {
   atomIndexAt,
   captureAnchor,
@@ -58,7 +59,6 @@ import { READ_CAP, loadDocument, sessionFileOf } from './source.ts'
 import { InstructionAsk } from './translate/ask.tsx'
 import { assembleTranslation, normalize, planTranslation } from './translate/plan.ts'
 import {
-  dismissStale,
   lineAligned,
   markSaved,
   readyState,
@@ -142,11 +142,46 @@ interface Peek {
   above: boolean
 }
 
-/** The annotation editor's target and its fixed placement. */
+/** Where the anchored panel sat when it opened, and the scroll baseline it follows. */
+interface EditorOrigin {
+  left: number
+  top: number
+  height: number
+  scrollTop: number
+  scrollport: HTMLElement | null
+}
+
+interface EditorPlacement {
+  left: number
+  top: number
+  above: boolean
+}
+
+/** The data half of the editor, before its anchor is measured. */
+type EditorTarget =
+  | { mode: 'new-text', anchor: Anchor }
+  | { mode: 'new-block', block: Block }
+  | { mode: 'edit', annotation: Annotation }
+
+/** The annotation editor's target, its anchor, and its measured placement. */
 type Editor =
-  | { mode: 'new-text', anchor: Anchor, left: number, top: number }
-  | { mode: 'new-block', block: Block, left: number, top: number }
-  | { mode: 'edit', annotation: Annotation, left: number, top: number }
+  | ({ mode: 'new-text', anchor: Anchor, origin: EditorOrigin } & EditorPlacement)
+  | ({ mode: 'new-block', block: Block, origin: EditorOrigin } & EditorPlacement)
+  | ({ mode: 'edit', annotation: Annotation, origin: EditorOrigin } & EditorPlacement)
+
+/** The one error the toolbar shows as a chip; the full text lives in its popover. */
+type ToolbarError =
+  | { kind: 'save', message: string }
+  | { kind: 'translate', message: string }
+  | { kind: 'too-large', message: string }
+
+/** The contents popover's viewport placement. */
+interface TocPlacement {
+  left: number
+  top: number
+  width: number
+  maxHeight: number
+}
 
 interface UndoState {
   annotation: Annotation
@@ -161,6 +196,7 @@ interface Notice {
 
 const EMPTY_PARSED: ParsedDocument = { blocks: [] }
 const EMPTY_DIFF: DocumentDiff = { statuses: [], counts: { updated: 0 } }
+const EMPTY_ANCHORS: ReadonlySet<string> = new Set()
 const ANNOTATION_HIGHLIGHT = 'am-annotation'
 const UNDO_WINDOW_MS = 6000
 const PIN_STEP = 18
@@ -169,6 +205,8 @@ const PEEK_GAP = 6
 /** Room below the clicked line needed before the panel goes underneath it. */
 const PEEK_HEIGHT = 64
 const PEEK_WIDTH = 340
+/** The editor's measured height is not known before it renders; this keeps it on screen. */
+const ANNOTATION_ESTIMATE_HEIGHT = 240
 
 /** Nearest ancestor that scrolls the preview, or null when the document scrolls. */
 function scrollportOf(element: HTMLElement | null): HTMLElement | null {
@@ -191,7 +229,7 @@ function lineElement(root: HTMLElement | null, line: number, blockId?: string): 
   return root.querySelector<HTMLElement>(`[data-line="${line}"]`)
 }
 
-/** The text line an event target belongs to; components and gutters return null. */
+/** The text line an event target belongs to; components return null. */
 function closestLineElement(node: Node | null): HTMLElement | null {
   if (node === null) return null
   const element = node instanceof Element ? node : node.parentElement
@@ -333,16 +371,55 @@ function storedRun(meta: TranslationMeta, promptVersion: string, translateCommen
   }
 }
 
-function alignmentText(ready: ReadyTranslation, t: Translate): string {
-  const { alignment } = ready
-  if (alignment.sourceLines !== alignment.translatedLines) {
-    return t('translate.unaligned', { translated: alignment.translatedLines, source: alignment.sourceLines })
-  }
-  const broken = alignment.headingBreak
-  if (broken === null) return t('translate.aligned', { lines: alignment.translatedLines })
-  if (broken.kind === 'missing') return t('translate.heading.missing', { line: broken.source.line })
-  if (broken.kind === 'extra') return t('translate.heading.extra', { line: broken.translated.line })
-  return t('translate.heading.mismatch', { line: broken.source.line })
+/** Place a fixed editor from its anchor, flipping above when the space below is short. */
+function placeEditor(left: number, top: number, height: number, popoverHeight = ANNOTATION_ESTIMATE_HEIGHT): EditorPlacement {
+  return placePopover(
+    { left, top, width: 0, height },
+    { width: ANNOTATION_POPOVER_WIDTH, height: popoverHeight },
+    { width: window.innerWidth, height: window.innerHeight },
+  )
+}
+
+function TocIcon(): ReactNode {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true">
+      <path d="M3 4h10M5 8h8M7 12h6" />
+    </svg>
+  )
+}
+
+function GlobeIcon(): ReactNode {
+  return (
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true">
+      <circle cx="8" cy="8" r="5.5" />
+      <path d="M2.8 8h10.4M8 2.5c1.6 1.6 2.4 3.4 2.4 5.5S9.6 12.4 8 13.5C6.4 12.4 5.6 10.6 5.6 8S6.4 4.1 8 2.5Z" />
+    </svg>
+  )
+}
+
+function CommentIcon(): ReactNode {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true">
+      <path d="M3 3.5h10v7H8.2L5.5 13v-2.5H3z" />
+    </svg>
+  )
+}
+
+function BackIcon(): ReactNode {
+  return (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
+      <path d="M9.5 3.5 5 8l4.5 4.5" />
+    </svg>
+  )
+}
+
+function AlertIcon(): ReactNode {
+  return (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
+      <circle cx="8" cy="8" r="5.5" />
+      <path d="M8 5v3.5M8 11v.5" />
+    </svg>
+  )
 }
 
 /**
@@ -370,7 +447,6 @@ export function Body({
   const container = useRef<HTMLDivElement | null>(null)
   const [view, setView] = useState<View>('source')
   const [translation, setTranslation] = useState<TranslationState>({ status: 'idle' })
-  const [lineNumbers, setLineNumbers] = useState(false)
   const [peek, setPeek] = useState<Peek | null>(null)
   /** The instruction the last re-translate ran with; the popover reopens with it. */
   const [instruction, setInstruction] = useState('')
@@ -378,8 +454,9 @@ export function Body({
   const [save, setSave] = useState<SaveState>({ status: 'idle' })
   const [notice, setNotice] = useState<Notice | null>(null)
   const [latest, setLatest] = useState<ReviewLatestView | null>(null)
-  const [dismissed, setDismissed] = useState<{ roundId: string, text: string } | null>(null)
+  const [updateCursor, setUpdateCursor] = useState(0)
   const [tocOpen, setTocOpen] = useState(false)
+  const [tocPlacement, setTocPlacement] = useState<TocPlacement | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editor, setEditor] = useState<Editor | null>(null)
   const [undo, setUndo] = useState<UndoState | null>(null)
@@ -387,6 +464,14 @@ export function Body({
   const [instanceId] = useState(() => newAnnotationId())
   const [attachBusy, setAttachBusy] = useState(false)
   const [attachError, setAttachError] = useState<string | null>(null)
+  const [errorOpen, setErrorOpen] = useState(false)
+  const [errorPlacement, setErrorPlacement] = useState<{ left: number, top: number } | null>(null)
+  const [described, setDescribed] = useState<DescribeView | null>(null)
+  const tocButton = useRef<HTMLButtonElement | null>(null)
+  const tocPanel = useRef<HTMLDivElement | null>(null)
+  const errorChip = useRef<HTMLButtonElement | null>(null)
+  const editorPanel = useRef<HTMLDivElement | null>(null)
+  const editorHeight = useRef(ANNOTATION_ESTIMATE_HEIGHT)
   const peekPanel = useRef<HTMLDivElement | null>(null)
   const requestToken = useRef(0)
   const reviewToken = useRef(0)
@@ -568,7 +653,6 @@ export function Body({
 
   useEffect(() => {
     setLatest(null)
-    setDismissed(null)
     setTocOpen(false)
   }, [documentKey])
 
@@ -607,17 +691,8 @@ export function Body({
     () => new Set(updatedSections(parsed.blocks, diff.statuses)),
     [parsed, diff],
   )
-  const toc = useMemo(() => tocEntries(parsed.blocks), [parsed])
-  const dismissedHere = dismissed !== null
-    && latest !== null
-    && dismissed.roundId === latest.roundId
-    && dismissed.text === normalize(currentText)
-  const showDiffNotice = diffActive && view === 'source' && diff.counts.updated > 0 && !dismissedHere
-
-  const dismissDiff = useCallback((): void => {
-    if (latest === null || state.status !== 'ready') return
-    setDismissed({ roundId: latest.roundId, text: normalize(state.text) })
-  }, [latest, state])
+  // The contents follow whatever Markdown is on screen: translation gets its own entries.
+  const toc = useMemo(() => tocEntries(displayed.blocks), [displayed])
 
   const jumpToSection = useCallback((anchor: string): void => {
     const node = Array.from(container.current?.querySelectorAll<HTMLElement>('[data-anchor]') ?? [])
@@ -630,7 +705,130 @@ export function Body({
   // the only display path that stays true in that workspace.
   const displayPath = composeSessionId === sessionId ? (path ?? '') : ''
   const peekable = view === 'translated' && lineAligned(translation)
-  const showGutter = lineNumbers && (view === 'source' || peekable)
+
+  const staleTranslation = staleNoticeOf(translation)
+  const toolbarError: ToolbarError | null = save.status === 'failed'
+    ? { kind: 'save', message: save.message }
+    : translation.status === 'failed'
+      ? { kind: 'translate', message: translation.message }
+      : translation.status === 'too-large'
+        ? { kind: 'too-large', message: t('translate.tooLarge', { lines: translation.lineCount }) }
+        : null
+  const langCode = translation.status === 'ready' ? translation.run.lang : described?.settings.lang
+  const langLabel = described?.languages.find(option => option.code === langCode)?.label ?? t('view.translated')
+
+  useEffect(() => {
+    setUpdateCursor(0)
+  }, [diff, view])
+
+  useEffect(() => {
+    let live = true
+    void host().then(bridge => bridge.describe()).then((value) => {
+      if (live) setDescribed(value)
+    }).catch(() => {})
+    return () => { live = false }
+  }, [host])
+
+  useEffect(() => {
+    if (attachError === null || drawerOpen) return
+    setNotice({ text: attachError, undo: false })
+  }, [attachError, drawerOpen])
+
+  useEffect(() => {
+    if (toolbarError === null) setErrorOpen(false)
+  }, [toolbarError])
+
+  const stepUpdate = useCallback((): void => {
+    const targets = container.current?.querySelectorAll<HTMLElement>('[data-diff="updated"]')
+    if (targets === undefined || targets.length === 0) return
+    const next = updateCursor >= targets.length ? 1 : updateCursor + 1
+    const target = targets[next - 1]
+    target.scrollIntoView({ block: 'center' })
+    target.classList.remove('am-diff-flash')
+    void target.offsetWidth
+    target.classList.add('am-diff-flash')
+    window.setTimeout(() => target.classList.remove('am-diff-flash'), 1200)
+    setUpdateCursor(next)
+  }, [updateCursor])
+
+  useLayoutEffect(() => {
+    if (!tocOpen) {
+      setTocPlacement(null)
+      return
+    }
+    const button = tocButton.current
+    if (button === null) return
+    const place = (): void => {
+      const rect = button.getBoundingClientRect()
+      const width = Math.min(320, window.innerWidth - 16)
+      const placement = placePopover(rect, { width, height: 320 }, { width: window.innerWidth, height: window.innerHeight })
+      setTocPlacement({
+        left: placement.left,
+        top: placement.top,
+        width,
+        maxHeight: Math.min(420, window.innerHeight - placement.top - 8),
+      })
+    }
+    place()
+    window.addEventListener('resize', place)
+    return () => window.removeEventListener('resize', place)
+  }, [tocOpen, toc, view])
+
+  useEffect(() => {
+    if (!tocOpen) return
+    const onDown = (event: MouseEvent): void => {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      if (tocPanel.current?.contains(target) === true || tocButton.current?.contains(target) === true) return
+      setTocOpen(false)
+    }
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setTocOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [tocOpen])
+
+  useLayoutEffect(() => {
+    if (!errorOpen) {
+      setErrorPlacement(null)
+      return
+    }
+    const chip = errorChip.current
+    if (chip === null) return
+    const place = (): void => {
+      const rect = chip.getBoundingClientRect()
+      const placement = placePopover(rect, { width: 320, height: 160 }, { width: window.innerWidth, height: window.innerHeight })
+      setErrorPlacement({ left: placement.left, top: placement.top })
+    }
+    place()
+    window.addEventListener('resize', place)
+    return () => window.removeEventListener('resize', place)
+  }, [errorOpen])
+
+  useEffect(() => {
+    if (!errorOpen) return
+    const onDown = (event: MouseEvent): void => {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      if (errorChip.current?.contains(target) === true) return
+      if (target instanceof Element && target.closest('.am-error-popover') !== null) return
+      setErrorOpen(false)
+    }
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setErrorOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [errorOpen])
 
   useEffect(() => {
     if (draftKey !== null) annotations.load(draftKey)
@@ -654,6 +852,13 @@ export function Body({
     })
   }, [sourceLines])
 
+  const openEditorAt = useCallback((target: EditorTarget, anchor: { top: number, left: number, height: number }, left: number): void => {
+    const scrollport = scrollportOf(container.current)
+    const scrollTop = scrollport?.scrollTop ?? window.scrollY
+    const origin: EditorOrigin = { left, top: anchor.top, height: anchor.height, scrollTop, scrollport }
+    setEditor({ ...target, origin, ...placeEditor(left, anchor.top, anchor.height) })
+  }, [])
+
   const onSelectionAction = useCallback((value: SelectionMenuValue, action: SelectionAction): void => {
     if (action === 'copy') {
       const clipboard = navigator.clipboard
@@ -672,13 +877,12 @@ export function Body({
       return
     }
     if (value.anchor === undefined) return
-    setEditor({
-      mode: 'new-text',
-      anchor: value.anchor,
-      left: Math.max(8, Math.min(value.rect.left, window.innerWidth - ANNOTATION_POPOVER_WIDTH - 8)),
-      top: value.rect.bottom + PEEK_GAP,
-    })
-  }, [showSourceRange, t, composerBusy])
+    openEditorAt(
+      { mode: 'new-text', anchor: value.anchor },
+      { top: value.rect.top, left: value.rect.left, height: Math.max(0, value.rect.bottom - value.rect.top) },
+      value.rect.left,
+    )
+  }, [showSourceRange, t, composerBusy, openEditorAt])
 
   // The menu action runs against the body instance that opened it, not the last one mounted.
   useEffect(() => registerSelectionHandler(instanceId, onSelectionAction), [onSelectionAction])
@@ -834,13 +1038,15 @@ export function Body({
 
   const openEditor = useCallback((annotation: Annotation, anchor?: HTMLElement): void => {
     const rect = anchor?.getBoundingClientRect()
-    setEditor({
-      mode: 'edit',
-      annotation,
-      left: rect === undefined ? Math.max(8, window.innerWidth - ANNOTATION_POPOVER_WIDTH - 24) : Math.max(8, Math.min(rect.left, window.innerWidth - ANNOTATION_POPOVER_WIDTH - 8)),
-      top: rect === undefined ? 72 : rect.bottom + PEEK_GAP,
-    })
-  }, [])
+    const left = rect?.left ?? window.innerWidth - ANNOTATION_POPOVER_WIDTH - 24
+    openEditorAt(
+      { mode: 'edit', annotation },
+      rect === undefined
+        ? { top: 72, left, height: 0 }
+        : { top: rect.top, left: rect.left, height: rect.height },
+      left,
+    )
+  }, [openEditorAt])
 
   const openBlockEditor = useCallback((block: Block): void => {
     if (composerBusy) {
@@ -851,13 +1057,59 @@ export function Body({
     const rect = element?.getBoundingClientRect()
     const latest = draftKey === null ? annotationList : annotations.getSnapshot(draftKey).annotations
     const existing = blockAnnotationOf(latest, block.id)
-    const left = rect === undefined
-      ? Math.max(8, window.innerWidth - ANNOTATION_POPOVER_WIDTH - 24)
-      : Math.max(8, Math.min(rect.right - ANNOTATION_POPOVER_WIDTH, window.innerWidth - ANNOTATION_POPOVER_WIDTH - 8))
-    const top = rect === undefined ? 72 : rect.top + 36
-    if (existing !== undefined) setEditor({ mode: 'edit', annotation: existing, left, top })
-    else setEditor({ mode: 'new-block', block, left, top })
-  }, [annotationList, annotations, draftKey, composerBusy, t])
+    const left = rect === undefined ? window.innerWidth - ANNOTATION_POPOVER_WIDTH - 24 : rect.right - ANNOTATION_POPOVER_WIDTH
+    const top = rect === undefined ? 72 : rect.top + 32
+    openEditorAt(
+      existing !== undefined
+        ? { mode: 'edit', annotation: existing }
+        : { mode: 'new-block', block },
+      { top, left, height: 0 },
+      left,
+    )
+  }, [annotationList, annotations, draftKey, composerBusy, t, openEditorAt])
+
+  useLayoutEffect(() => {
+    if (editor === null) return
+    const panel = editorPanel.current
+    if (panel === null) return
+    const place = (): void => {
+      const height = panel.getBoundingClientRect().height
+      if (height > 0) editorHeight.current = height
+      const origin = editor.origin
+      const current = origin.scrollport?.scrollTop ?? window.scrollY
+      const anchorTop = origin.top - (current - origin.scrollTop)
+      const placement = placeEditor(origin.left, anchorTop, origin.height, editorHeight.current)
+      setEditor(currentEditor => currentEditor === null ? null : { ...currentEditor, ...placement })
+    }
+    place()
+    const observer = new ResizeObserver(place)
+    observer.observe(panel)
+    return () => observer.disconnect()
+  }, [editor?.origin])
+
+  useEffect(() => {
+    if (editor === null) return
+    const origin = editor.origin
+    const onScroll = (): void => {
+      const current = origin.scrollport?.scrollTop ?? window.scrollY
+      const top = origin.top - (current - origin.scrollTop)
+      if (top < -origin.height - 32 || top > window.innerHeight + 32) {
+        setEditor(null)
+        return
+      }
+      const placement = placeEditor(origin.left, top, origin.height, editorHeight.current)
+      setEditor(currentEditor => currentEditor === null ? null : { ...currentEditor, ...placement })
+    }
+    origin.scrollport?.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('scroll', onScroll, { passive: true })
+    const close = (): void => setEditor(null)
+    window.addEventListener('resize', close)
+    return () => {
+      origin.scrollport?.removeEventListener('scroll', onScroll)
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', close)
+    }
+  }, [editor?.origin])
 
   const componentContext = useMemo<ComponentContext>(() => ({
     labelOf: (block) => {
@@ -945,7 +1197,7 @@ export function Body({
     setAttachBusy(false)
     if (result.status === 'attached') {
       hub.set({ key: target, pending: result.pending })
-      if (!result.snapshotSaved) setNotice({ text: t('annotate.snapshotMissing'), undo: false })
+      setNotice({ text: result.snapshotSaved ? t('annotate.attachHint') : t('annotate.snapshotMissing'), undo: false })
       return
     }
     setAttachError(result.status === 'failed'
@@ -1102,8 +1354,8 @@ export function Body({
     return () => clearTimeout(undo.timer)
   }, [undo])
 
-  // Pins sit beside the prose at the start line's measured top; they never depend
-  // on the gutter toggle, so annotations stay visible with line numbers off.
+  // Pins sit beside the prose at the start line's measured top, independent of
+  // the view mode.
   useLayoutEffect(() => {
     const root = container.current
     if (root === null || view !== 'source' || state.status !== 'ready' || annotationList.length === 0) {
@@ -1262,6 +1514,13 @@ export function Body({
   }, [host, sessionId, path, stopRun])
 
   const chooseView = useCallback((next: View) => {
+    if (next === 'translated') {
+      setDrawerOpen(false)
+      setEditor(null)
+      setPeek(null)
+      setTocOpen(false)
+      setErrorOpen(false)
+    }
     setView(next)
     if (next !== 'translated' || state.status !== 'ready') return
     if (translation.status === 'ready' || translation.status === 'running' || translation.status === 'too-large') return
@@ -1293,6 +1552,19 @@ export function Body({
     setSave({ status: 'idle' })
   }, [stopRun])
 
+  /** Leaving translation keeps a finished result in memory, but a run in flight is cancelled. */
+  const exitTranslation = useCallback(() => {
+    if (translation.status === 'running') {
+      stopRun()
+      setTranslation({ status: 'idle' })
+    }
+    setView('source')
+    setTocOpen(false)
+    setErrorOpen(false)
+    setPeek(null)
+    setSave({ status: 'idle' })
+  }, [translation.status, stopRun])
+
   const saveTranslation = useCallback(() => {
     const ready = saveable(translation)
     if (ready === undefined || state.status !== 'ready' || sessionId === undefined || path === undefined) return
@@ -1321,6 +1593,12 @@ export function Body({
     })()
   }, [translation, state, sessionId, path, host, t])
 
+  const retryToolbarError = useCallback((): void => {
+    setErrorOpen(false)
+    if (toolbarError?.kind === 'save') saveTranslation()
+    else if (toolbarError?.kind === 'translate') chooseView('translated')
+  }, [toolbarError, saveTranslation, chooseView])
+
   useEffect(() => {
     if (notice === null) return
     const timer = setTimeout(() => setNotice(null), notice.undo ? UNDO_WINDOW_MS : 4000)
@@ -1328,7 +1606,7 @@ export function Body({
   }, [notice])
 
   return (
-    <div className={showGutter ? 'am-root am-linenos' : 'am-root'} ref={container} data-active-markdown>
+    <div className="am-root" ref={container} data-active-markdown>
       {state.status === 'loading' && <div className="am-status" role="status"><span className="am-spinner" aria-hidden="true" />{t('loading')}</div>}
       {state.status === 'too-large' && (
         <EmptyState
@@ -1349,97 +1627,187 @@ export function Body({
       {state.status === 'ready' && (
         <>
           <div className="am-toolbar">
-            <div className="am-seg" role="group" aria-label={t('view.label')}>
-              <button type="button" className="am-seg-button" aria-pressed={view === 'source'} onClick={() => chooseView('source')}>
-                {t('view.source')}
-              </button>
-              <button type="button" className="am-seg-button" aria-pressed={view === 'translated'} onClick={() => chooseView('translated')}>
-                {t('view.translated')}
-              </button>
-            </div>
-            <button type="button" className="am-toolbar-toggle" aria-pressed={lineNumbers} onClick={() => setLineNumbers(value => !value)}>
-              {t('lineNumbers')}
-            </button>
-            {view === 'source' && toc.length > 0 ? (
-              <button type="button" className="am-toolbar-toggle" aria-pressed={tocOpen} onClick={() => setTocOpen(value => !value)}>
-                {t('toc.label')}
-                {updatedAnchors.size === 0 ? null : <span className="am-toolbar-dot" aria-hidden="true" />}
-              </button>
-            ) : null}
-            <button type="button" className="am-toolbar-toggle" aria-pressed={drawerOpen} onClick={() => setDrawerOpen(value => !value)}>
-              {t('annotate.count', { count: annotationList.length })}
-            </button>
-            {saveable(translation) === undefined ? null : (
-              <button type="button" className="am-toolbar-toggle" disabled={save.status === 'busy'} onClick={saveTranslation}>
-                {t('translate.save')}
-              </button>
-            )}
-            {translation.status === 'ready' ? (
-              <button type="button" className="am-toolbar-toggle" onClick={(event) => openAsk(event.currentTarget)}>
-                {t('translate.retranslate')}
-              </button>
-            ) : null}
-            {translation.status === 'running' ? (
-              <button type="button" className="am-toolbar-toggle" onClick={cancelTranslation}>
-                {t('translate.cancel')}
-              </button>
-            ) : null}
-            <div className="am-toolbar-status" role="status">
-              {translation.status === 'running' && (
-                <>
-                  <span className="am-spinner" aria-hidden="true" />
-                  {translation.chunks > 1
-                    ? t('translate.progress', { current: translation.chunk, total: translation.chunks })
-                    : t('translate.running')}
-                </>
-              )}
-              {translation.status === 'too-large' && (
-                <span className="am-toolbar-error">{t('translate.tooLarge', { lines: translation.lineCount })}</span>
-              )}
-              {translation.status === 'ready' && !staleNoticeOf(translation) && alignmentText(translation, t)}
-              {translation.status === 'failed' && (
-                <>
-                  <span className="am-toolbar-error">{t('translate.failed', { message: translation.message })}</span>
-                  <button type="button" className="am-toolbar-action" onClick={() => chooseView('translated')}>
-                    {t('translate.retry')}
+            {view === 'source' ? (
+              <>
+                <button
+                  ref={tocButton}
+                  type="button"
+                  className="am-toolbar-button"
+                  aria-label={t('toc.label')}
+                  aria-expanded={tocOpen}
+                  title={t('toc.label')}
+                  disabled={toc.length === 0}
+                  onClick={() => setTocOpen(value => !value)}
+                >
+                  <TocIcon />
+                  <span className="am-toolbar-label">{t('toc.label')}</span>
+                  {updatedAnchors.size === 0 ? null : <span className="am-toolbar-dot" aria-hidden="true" />}
+                </button>
+                <span className="am-toolbar-spacer" />
+                <button
+                  type="button"
+                  className="am-toolbar-button am-toolbar-button--quiet"
+                  aria-label={t('translate.entry')}
+                  title={t('translate.entry')}
+                  onClick={() => chooseView('translated')}
+                >
+                  <GlobeIcon />
+                  <span className="am-toolbar-label">{t('translate.entry')}</span>
+                </button>
+                {diff.counts.updated > 0 ? (
+                  <>
+                    <span className="am-toolbar-rule" />
+                    <button type="button" className="am-update-chip" title={t('diff.next')} onClick={stepUpdate}>
+                      <span className="am-update-dot" aria-hidden="true" />
+                      {updateCursor === 0 || diff.counts.updated === 1
+                        ? <>{t('diff.chipCount', { count: diff.counts.updated })}<span className="am-update-unit">{t('diff.unit')}</span></>
+                        : t('diff.index', { current: updateCursor, total: diff.counts.updated })}
+                    </button>
+                  </>
+                ) : null}
+                <span className="am-toolbar-rule" />
+                <button
+                  type="button"
+                  className="am-toolbar-button"
+                  aria-label={`${t('annotate.drawer.title')} ${annotationList.length}`}
+                  title={t('annotate.drawer.title')}
+                  aria-expanded={drawerOpen}
+                  onClick={() => setDrawerOpen(value => !value)}
+                >
+                  <CommentIcon />
+                  <span className="am-annotate-label">{t('annotate.drawer.title')}</span>
+                  <span className="am-count">{annotationList.length}</span>
+                </button>
+                <button
+                  type="button"
+                  className={attached ? 'am-primary am-primary--muted' : 'am-primary'}
+                  disabled={annotationList.length === 0 || composerBusy || attachBusy || attached}
+                  title={attached ? t('annotate.attached') : t('annotate.attach')}
+                  onClick={() => { void attachFeedback() }}
+                >
+                  {attached ? t('annotate.attached') : t('annotate.attach')}
+                </button>
+              </>
+            ) : (
+              <>
+                <button type="button" className="am-toolbar-button am-toolbar-button--quiet" onClick={exitTranslation}>
+                  <BackIcon />
+                  {t('view.source')}
+                </button>
+                <button
+                  ref={tocButton}
+                  type="button"
+                  className="am-toolbar-button"
+                  aria-label={t('toc.label')}
+                  aria-expanded={tocOpen}
+                  title={t('toc.label')}
+                  disabled={toc.length === 0}
+                  onClick={() => setTocOpen(value => !value)}
+                >
+                  <TocIcon />
+                  <span className="am-toolbar-label">{t('toc.label')}</span>
+                </button>
+                <span className="am-toolbar-spacer" />
+                <span className="am-lang"><GlobeIcon />{langLabel}</span>
+                {translation.status === 'running' ? (
+                  <>
+                    <span className="am-spinner" aria-hidden="true" />
+                    <span className="am-progress">
+                      {translation.chunks > 1
+                        ? t('translate.progress', { current: translation.chunk, total: translation.chunks })
+                        : t('translate.running')}
+                    </span>
+                    <button type="button" className="am-toolbar-button am-toolbar-button--quiet" onClick={cancelTranslation}>
+                      {t('translate.cancel')}
+                    </button>
+                  </>
+                ) : toolbarError !== null ? (
+                  <button
+                    ref={errorChip}
+                    type="button"
+                    className="am-error-chip"
+                    aria-expanded={errorOpen}
+                    aria-haspopup="dialog"
+                    onClick={() => setErrorOpen(value => !value)}
+                  >
+                    <AlertIcon />
+                    {toolbarError.kind === 'save'
+                      ? t('translate.saveFailedShort')
+                      : toolbarError.kind === 'translate' ? t('translate.failedShort') : t('translate.tooLargeShort')}
                   </button>
-                </>
-              )}
-              {save.status === 'failed' && (
-                <span className="am-toolbar-error">{t('translate.saveFailed', { message: save.message })}</span>
-              )}
-            </div>
+                ) : staleTranslation ? (
+                  <span className="am-stale" title={t('translate.stale')}>{t('translate.staleShort')}</span>
+                ) : null}
+                {translation.status === 'running' ? null : (
+                  <button type="button" className="am-toolbar-button am-toolbar-button--quiet" onClick={(event) => openAsk(event.currentTarget)}>
+                    {t('translate.retranslate')}
+                  </button>
+                )}
+                {translation.status === 'running'
+                  ? <button type="button" className="am-primary" disabled>{t('translate.save')}</button>
+                  : toolbarError?.kind === 'save' || toolbarError?.kind === 'translate'
+                    ? <button type="button" className="am-primary" onClick={retryToolbarError}>{t('translate.retry')}</button>
+                    : translation.status === 'ready'
+                      ? saveable(translation) !== undefined
+                        ? <button type="button" className="am-primary" disabled={save.status === 'busy'} onClick={saveTranslation}>{save.status === 'busy' ? t('translate.saving') : t('translate.save')}</button>
+                        : <button type="button" className="am-primary am-primary--muted" disabled>{t('translate.savedShort')}</button>
+                      : <button type="button" className="am-primary" disabled>{t('translate.save')}</button>}
+              </>
+            )}
           </div>
-          {view === 'source' && tocOpen && toc.length > 0 ? (
-            <MarkdownToc
-              entries={toc}
-              updated={updatedAnchors}
-              label={t('toc.label')}
-              updatedLabel={t('toc.updated')}
-              onJump={jumpToSection}
-            />
-          ) : null}
-          {showDiffNotice ? (
-            <div className="am-notice" role="note">
-              <span className="am-notice-text">
-                {t(diff.counts.updated === 1 ? 'diff.summary.one' : 'diff.summary', { count: diff.counts.updated })}
-              </span>
-              <button type="button" className="am-toolbar-action" onClick={dismissDiff}>
-                {t('diff.dismiss')}
-              </button>
+          {tocOpen && tocPlacement !== null && toc.length > 0 ? (
+            <div
+              ref={tocPanel}
+              className="am-toc-popover"
+              style={{ left: tocPlacement.left, top: tocPlacement.top, width: tocPlacement.width, maxHeight: tocPlacement.maxHeight }}
+            >
+              <MarkdownToc
+                entries={toc}
+                updated={view === 'source' ? updatedAnchors : EMPTY_ANCHORS}
+                label={t('toc.label')}
+                updatedLabel={t('toc.updated')}
+                onJump={jumpToSection}
+              />
             </div>
           ) : null}
-          {staleNoticeOf(translation) && view === 'translated' && (
-            <div className="am-notice" role="note">
-              <span className="am-notice-text">{t('translate.stale')}</span>
-              <button type="button" className="am-toolbar-action" onClick={(event) => openAsk(event.currentTarget)}>
-                {t('translate.retranslate')}
-              </button>
-              <button type="button" className="am-toolbar-action" onClick={() => setTranslation(current => dismissStale(current))}>
-                {t('translate.stale.dismiss')}
-              </button>
+          {errorOpen && toolbarError !== null && errorPlacement !== null ? (
+            <div
+              className="am-error-popover"
+              style={{ left: errorPlacement.left, top: errorPlacement.top }}
+              role="dialog"
+              aria-label={toolbarError.kind === 'save'
+                ? t('translate.saveFailedShort')
+                : toolbarError.kind === 'translate' ? t('translate.failedShort') : t('translate.tooLargeShort')}
+            >
+              <div className="am-error-title">
+                {toolbarError.kind === 'save'
+                  ? t('translate.saveFailedShort')
+                  : toolbarError.kind === 'translate' ? t('translate.failedShort') : t('translate.tooLargeShort')}
+              </div>
+              <div className="am-error-message">{toolbarError.message}</div>
+              <div className="am-error-actions">
+                <button
+                  type="button"
+                  className="am-toolbar-button am-toolbar-button--quiet"
+                  onClick={() => {
+                    const clipboard = navigator.clipboard
+                    if (clipboard === undefined) return
+                    void clipboard.writeText(toolbarError.message)
+                      .then(() => setNotice({ text: t('code.copied'), undo: false }))
+                      .catch(() => {})
+                  }}
+                >
+                  {t('code.copy')}
+                </button>
+                {toolbarError.kind === 'too-large' ? null : (
+                  <button type="button" className="am-toolbar-button" onClick={retryToolbarError}>{t('translate.retry')}</button>
+                )}
+                <button type="button" className="am-toolbar-button am-toolbar-button--quiet" onClick={() => setErrorOpen(false)}>
+                  {t('diff.dismiss')}
+                </button>
+              </div>
             </div>
-          )}
+          ) : null}
           <RenderBoundary
             labels={{ title: t('error.render.title'), body: t('error.render.body'), reload: t('reload') }}
             onReload={reload}
@@ -1449,7 +1817,6 @@ export function Body({
               labels={labels}
               actions={actions}
               components={componentContext}
-              lineNumbers={showGutter}
               t={t}
               diff={view === 'source' && diffActive ? diff : undefined}
             />
@@ -1544,6 +1911,8 @@ export function Body({
         <AnnotationPopover
           left={editor.left}
           top={editor.top}
+          above={editor.above}
+          panelRef={editorPanel}
           quote={editor.mode === 'edit' ? editor.annotation.quote : editor.mode === 'new-block' ? componentContext.labelOf(editor.block) : editor.anchor.quote}
           initial={editor.mode === 'edit' ? editor.annotation.body : ''}
           labels={{
@@ -1576,13 +1945,12 @@ interface DocumentViewProps {
   labels: { copy: string, copied: string, imageFailed: string, annotate: string, edit: string }
   actions: { openLink(href: string): void, resolveImage(src: string): Promise<string | undefined> }
   components: ComponentContext
-  lineNumbers: boolean
   t: Translate
   diff?: DocumentDiff
 }
 
 /** Parse once in the body so annotations and the rendered tree share one block model. */
-function DocumentView({ parsed, labels, actions, components, lineNumbers, t, diff }: DocumentViewProps): ReactNode {
+function DocumentView({ parsed, labels, actions, components, t, diff }: DocumentViewProps): ReactNode {
   return (
     <>
       {parsed.frontmatter === undefined ? null : (
@@ -1591,7 +1959,7 @@ function DocumentView({ parsed, labels, actions, components, lineNumbers, t, dif
           <pre className="am-frontmatter-source">{parsed.frontmatter.source}</pre>
         </section>
       )}
-      <MarkdownView blocks={parsed.blocks} labels={labels} actions={actions} components={components} lineNumbers={lineNumbers} diff={diff} />
+      <MarkdownView blocks={parsed.blocks} labels={labels} actions={actions} components={components} diff={diff} />
     </>
   )
 }

@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>05 窄栏 · 360（阅读 / 翻译）</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;-webkit-font-smoothing:antialiased;background:#eef0f3}
+.sheet{width:760px;height:860px;box-sizing:border-box;padding:10px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;color:#0f1115}
+.cap{position:absolute;top:12px;font-size:11px;color:#565d66}
+.cap b{color:#0f1115;font-weight:600;margin-right:6px}
+.pane{position:absolute;top:38px;width:360px;height:780px;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden;background:#fff;border:.5px solid rgba(0,0,0,.14);border-radius:8px;color:#0f1115;font-size:12px}
+.tabs{flex:none;display:flex;align-items:center;gap:4px;height:34px;padding:0 8px;background:#f9fafb;border-bottom:.5px solid rgba(0,0,0,.08)}
+.tab{display:inline-flex;align-items:center;gap:6px;height:25px;padding:0 8px;border:.5px solid rgba(0,0,0,.1);border-radius:7px;background:#fff;font-size:11.5px;white-space:nowrap;max-width:250px;overflow:hidden}
+.tab i{font-style:normal;color:#a9aeb5;font-size:11px;line-height:1}
+.tico{width:14px;height:14px;border-radius:4px;background:#4176e6;color:#fff;font-size:7px;line-height:14px;text-align:center;font-weight:600;flex:none}
+.hdr{flex:none;display:flex;align-items:center;gap:2px;height:34px;padding:0 4px 0 10px;border-bottom:.5px solid rgba(0,0,0,.1)}
+.path{font-size:11px;color:#31363d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-right:6px;flex:1 1 auto}
+.sp{flex:1 1 auto}
+.ib{display:inline-flex;align-items:center;justify-content:center;height:24px;min-width:24px;padding:0 4px;border:0;border-radius:6px;background:transparent;color:#61666b}
+.am{flex:none;display:flex;align-items:center;gap:8px;height:44px;padding:0 8px;border-bottom:.5px solid rgba(0,0,0,.1);background:#fff}
+.ibtn{position:relative;flex:none;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:.5px solid rgba(0,0,0,.12);border-radius:6px;background:#fff;color:#3c424a}
+.ibtn--quiet{border-color:transparent;background:transparent;color:#61666b}
+.dot{position:absolute;top:4px;right:4px;width:5px;height:5px;border-radius:50%;background:#4176e6}
+.tbtn{position:relative;flex:none;display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 8px;border:.5px solid rgba(0,0,0,.12);border-radius:6px;background:#fff;color:#3c424a;font:inherit;font-size:11.5px;white-space:nowrap}
+.tbtn--quiet{border-color:transparent;background:transparent;color:#61666b}
+.count{min-width:15px;height:15px;padding:0 4px;border-radius:8px;background:rgba(38,49,72,.08);color:#5b6169;font-size:9.5px;line-height:15px;text-align:center}
+.chip{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 8px;border:.5px solid rgba(65,118,230,.26);border-radius:999px;background:rgba(65,118,230,.06);color:#2f56b8;font-size:11px;white-space:nowrap}
+.chip .cd{width:5px;height:5px;border-radius:50%;background:#4176e6}
+.vrule{flex:none;width:1px;height:18px;margin:0 1px;background:rgba(0,0,0,.12)}
+.primary{flex:none;display:inline-flex;align-items:center;justify-content:center;height:28px;padding:0 10px;border:.5px solid #2f5fd0;border-radius:6px;background:#2f5fd0;color:#fff;font:inherit;font-size:11.5px;white-space:nowrap}
+.lang{display:inline-flex;align-items:center;gap:4px;color:#61666b;font-size:11px;white-space:nowrap}
+.body{flex:1 1 auto;min-height:0;overflow:hidden;position:relative}
+.doc{padding:18px 16px 20px 30px;font-size:14px;line-height:1.72;color:#232a33}
+.doc h1{font-size:21px;line-height:1.35;font-weight:600;margin:0 0 6px}
+.meta{font-size:10.5px;color:#7c828a;margin:0 0 14px}
+.doc h2{font-size:16px;line-height:1.45;font-weight:600;margin:16px 0 4px}
+.doc h3{font-size:14px;line-height:1.5;font-weight:600;margin:11px 0 3px}
+.doc p{margin:0 0 9px}
+.doc ul{margin:0 0 10px;padding-left:16px}
+.doc li{margin:1px 0}
+.doc code{font-family:'SF Mono',Menlo,monospace;font-size:11.5px;background:#f7f8fa;border:.5px solid rgba(0,0,0,.06);border-radius:4px;padding:1px 3px}
+.blk{position:relative}
+.blk.up::before{content:'';position:absolute;left:-16px;top:4px;width:3px;height:15px;border-radius:2px;background:#4176e6}
+.hl{background:#e7eefc;box-shadow:0 0 0 2px #e7eefc;border-radius:2px}
+.note{position:absolute;left:10px;bottom:4px;width:740px;font-size:10.5px;color:#6b7178}
+</style>
+</helmet>
+<div class="sheet">
+  <div class="cap" style="left:10px"><b>A · 阅读</b>360 px</div>
+  <div class="cap" style="left:390px"><b>B · 翻译</b>360 px</div>
+
+  <div class="pane" style="left:10px">
+    <div class="tabs">
+      <span class="tab"><span class="tico">M↓</span>P2b-CHANGES-T…<i>✕</i></span>
+      <span class="ib" style="font-size:13px;color:#9aa0a8">+</span>
+      <span class="sp"></span>
+      <span class="ib" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2.5" y="3" width="11" height="10" rx="1.5"/><path d="M8 3v10"/></svg></span>
+    </div>
+    <div class="hdr">
+      <span class="path">P2b-CHANGES-TECH.md</span>
+      <button class="ib" type="button" aria-label="刷新"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M13 8a5 5 0 1 1-1.6-3.7"/><path d="M13 2.5V5h-2.5"/></svg></button>
+    </div>
+
+    <div class="am">
+      <button class="ibtn" type="button" aria-label="目录" title="目录">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M3 4h10M5 8h8M7 12h6"/></svg><span class="dot"></span>
+      </button>
+      <span class="sp"></span>
+      <button class="ibtn ibtn--quiet" type="button" aria-label="翻译" title="翻译">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="8" cy="8" r="5.5"/><path d="M2.8 8h10.4M8 2.5c1.6 1.6 2.4 3.4 2.4 5.5S9.6 12.4 8 13.5C6.4 12.4 5.6 10.6 5.6 8S6.4 4.1 8 2.5Z"/></svg>
+      </button>
+      <span class="vrule"></span>
+      <button class="chip" type="button" title="上次反馈后更新 3 处，跳到下一处"><span class="cd"></span>更新 3 处</button>
+      <span class="vrule"></span>
+      <button class="tbtn" type="button">批注 <span class="count">3</span></button>
+      <button class="primary" type="button">加入对话</button>
+    </div>
+
+    <div class="body">
+      <div class="doc">
+        <h1>Active Markdown P2b 技术方案</h1>
+        <div class="meta">2026-11-18 · 设计定稿</div>
+
+        <h2>3. 基线</h2>
+        <h3 class="blk up">3.1 什么是基线</h3>
+        <p class="blk">基线是最近一次已发送、且留下了全文快照的审阅轮次。发送后，Host 把当时的 <code>.md</code> 存成快照。</p>
+        <p class="blk"><span class="hl">只标记本次批注提交后仍存在且被更新的段落与组件，并在目录里标出被更新的章节。</span></p>
+
+        <h3 class="blk up">3.2 为什么快照缺失时不回退</h3>
+        <p class="blk">最新一轮没有快照就不显示更新，不向更早的轮次回退。否则基线会悄悄变旧。</p>
+
+        <h2 class="blk up">4. Host 接口</h2>
+        <p>只加一个只读接口：<code>reviewLatest</code> 返回快照与元数据；缺失就返回空。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="pane" style="left:390px">
+    <div class="tabs">
+      <span class="tab"><span class="tico">M↓</span>P2b-CHANGES-T…<i>✕</i></span>
+      <span class="ib" style="font-size:13px;color:#9aa0a8">+</span>
+      <span class="sp"></span>
+      <span class="ib" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2.5" y="3" width="11" height="10" rx="1.5"/><path d="M8 3v10"/></svg></span>
+    </div>
+    <div class="hdr">
+      <span class="path">P2b-CHANGES-TECH.md</span>
+      <button class="ib" type="button" aria-label="刷新"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M13 8a5 5 0 1 1-1.6-3.7"/><path d="M13 2.5V5h-2.5"/></svg></button>
+    </div>
+
+    <div class="am">
+      <button class="tbtn tbtn--quiet" type="button">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M9.5 3.5 5 8l4.5 4.5"/></svg>原文
+      </button>
+      <button class="ibtn" type="button" aria-label="目录" title="目录">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M3 4h10M5 8h8M7 12h6"/></svg>
+      </button>
+      <span class="sp"></span>
+      <span class="lang"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="8" cy="8" r="5.5"/><path d="M2.8 8h10.4M8 2.5c1.6 1.6 2.4 3.4 2.4 5.5S9.6 12.4 8 13.5C6.4 12.4 5.6 10.6 5.6 8S6.4 4.1 8 2.5Z"/></svg>中文</span>
+      <button class="tbtn tbtn--quiet" type="button">重新翻译</button>
+      <button class="primary" type="button">保存</button>
+    </div>
+
+    <div class="body">
+      <div class="doc" style="padding-left:16px">
+        <h1>检索管线评审</h1>
+        <div class="meta">译自 Retrieval Pipeline Review · 中文</div>
+
+        <h2>范围</h2>
+        <p>这条流水线把用户问题变成一组排序后的段落。本次评审覆盖本季度有变化的两段：摄取与排序。</p>
+
+        <h2>已知缺口</h2>
+        <ul>
+          <li>分块只按空行切分。</li>
+          <li>排序把时间当作并列时的次级键。</li>
+          <li>删除会重建整个文件的索引。</li>
+        </ul>
+
+        <h2>下一步</h2>
+        <p>先把分块改成按标题切分，再观察召回率的变化。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">窄栏规则：目录 / 翻译收图标；更新、批注、加入对话保留文字；更窄时只把批注收成图标 + 角标。</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":760,"height":860}}'>
+class Component extends DCLogic {
+  renderVals() { return {} }
+}
+</script>
+</body>
+</html>

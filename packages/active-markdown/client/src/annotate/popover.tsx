@@ -15,6 +15,8 @@ export interface AnnotationPopoverLabels {
 export interface AnnotationPopoverProps {
   left: number
   top: number
+  above: boolean
+  panelRef?: React.Ref<HTMLDivElement>
   quote: string
   initial: string
   labels: AnnotationPopoverLabels
@@ -25,6 +27,8 @@ export interface AnnotationPopoverProps {
 export function AnnotationPopover({
   left,
   top,
+  above,
+  panelRef,
   quote,
   initial,
   labels,
@@ -45,7 +49,7 @@ export function AnnotationPopover({
     onSave(body)
   }
   return (
-    <div className="am-annotate" style={{ left, top }} role="dialog" aria-label={labels.title}>
+    <div ref={panelRef} className="am-annotate" style={{ left, top }} data-above={above ? 'true' : 'false'} role="dialog" aria-label={labels.title}>
       <div className="am-annotate-head">{labels.title}</div>
       <div className="am-annotate-quote-label">{labels.quote}</div>
       <blockquote className="am-annotate-quote">{quote}</blockquote>

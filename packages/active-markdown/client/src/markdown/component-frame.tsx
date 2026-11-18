@@ -51,7 +51,6 @@ export function ComponentFrame({
       data-block-id={block.id}
       data-block-type={block.type}
       data-source-line={block.sourceStartLine}
-      data-gutter-line={block.sourceStartLine}
       data-annotated={annotation === undefined ? undefined : ''}
       data-diff={diff}
     >

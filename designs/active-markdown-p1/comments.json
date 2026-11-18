@@ -99,6 +99,40 @@
           "at": "2026-11-16T07:03:12.509Z"
         }
       ]
+    },
+    {
+      "id": "c_652060d399",
+      "anchor": "#dc-root > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(7) > div:nth-of-type(1) > dcfx1sxk8h6:nth-of-type(1) > dct:nth-of-type(58) > dcef6269cb5acdc27338491:nth-of-type(1)",
+      "label": "06 组件与状态 › shape \"目录 翻译 批注 1 加入对话\"",
+      "detail": "ui-states.dc.html: #57:1/6/1 shape \"目录 翻译 批注 1 加入对话\"",
+      "location": {
+        "file": "project/ui-states.dc.html",
+        "board": "ui-states.dc.html"
+      },
+      "status": "open",
+      "createdAt": "2026-11-18T06:02:57.711Z",
+      "updatedAt": "2026-11-18T06:08:23.972Z",
+      "messages": [
+        {
+          "id": "m_8d7fec1e63",
+          "author": {
+            "kind": "user",
+            "name": "johnxi"
+          },
+          "text": "顶栏，居中的这一组按钮很奇怪。 左右两边的是固定的。 然后本来在居中这一组的按钮，靠右排布吧，不同功能区域的可以用竖线做个分组。翻译在更新的前面。整个按照分组来看的话：目录与返回区、翻译区、（源码查看，待实现）、变更查看区，批注管理区。",
+          "at": "2026-11-18T06:02:57.711Z",
+          "editedAt": "2026-11-18T06:05:37.940Z"
+        },
+        {
+          "id": "m_47f2325e48",
+          "author": {
+            "kind": "agent",
+            "name": "agent"
+          },
+          "text": "顶栏已按这条改成靠右分组：去掉居中组，右侧排成 翻译 | 变更 | 批注，用竖线分隔；目录固定最左，加入对话固定最右，翻译在更新前。源码查看（待实现）在翻译与变更之间留位，01 / 04 / 05 / 06 四块都已同步。",
+          "at": "2026-11-18T06:08:23.972Z"
+        }
+      ]
     }
   ]
 }

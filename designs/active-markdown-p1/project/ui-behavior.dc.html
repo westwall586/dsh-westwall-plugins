@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>06 批注弹框 · 翻转与跟随</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;-webkit-font-smoothing:antialiased;background:#eef0f3}
+.sheet{position:relative;width:1240px;height:820px;box-sizing:border-box;padding:20px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;color:#0f1115}
+.sh{display:flex;align-items:baseline;gap:12px;height:24px;margin-bottom:8px}
+.sh b{font-size:13px;font-weight:600}
+.sh span{font-size:11.5px;color:#6b7178}
+.cap{font-size:11.5px;color:#565d66;height:20px;margin-bottom:8px}
+.cap b{color:#0f1115;font-weight:600}
+.pane{width:560px;height:720px;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden;background:#fff;border:.5px solid rgba(0,0,0,.14);border-radius:8px;color:#0f1115;font-size:13px;position:relative}
+.tabs{flex:none;display:flex;align-items:center;gap:4px;height:34px;padding:0 8px;background:#f9fafb;border-bottom:.5px solid rgba(0,0,0,.08)}
+.tab{display:inline-flex;align-items:center;gap:7px;height:25px;padding:0 9px;border:.5px solid rgba(0,0,0,.1);border-radius:7px;background:#fff;font-size:12px;white-space:nowrap}
+.tab--off{border-color:transparent;background:transparent;color:#81858c}
+.tab i{font-style:normal;color:#a9aeb5;font-size:12px;line-height:1}
+.tico{width:15px;height:15px;border-radius:4px;background:#4176e6;color:#fff;font-size:8px;line-height:15px;text-align:center;font-weight:600}
+.hdr{flex:none;display:flex;align-items:center;gap:2px;height:34px;padding:0 4px 0 12px;border-bottom:.5px solid rgba(0,0,0,.1)}
+.path{font-size:12px;color:#31363d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-right:8px}
+.sp{flex:1 1 auto}
+.ib{display:inline-flex;align-items:center;justify-content:center;height:24px;min-width:24px;padding:0 4px;border:0;border-radius:6px;background:transparent;color:#61666b}
+.sel{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 7px;border:.5px solid transparent;border-radius:6px;background:rgba(38,49,72,.06);color:#0f1115;font-size:12px;white-space:nowrap}
+.am{flex:none;display:flex;align-items:center;gap:6px;height:44px;padding:0 8px 0 10px;border-bottom:.5px solid rgba(0,0,0,.08)}
+.seg{display:inline-flex;gap:2px;padding:2px;border-radius:7px;background:#f1f3f5}
+.seg button{height:24px;padding:0 11px;border:0;border-radius:5px;background:transparent;color:#61666b;font:inherit;font-size:12px}
+.seg button[aria-pressed=true]{background:#fff;color:#0f1115;box-shadow:0 .5px 2px rgba(0,0,0,.14)}
+.divider{flex:none;width:1px;height:18px;margin:0 2px;background:rgba(0,0,0,.09)}
+.ibtn{position:relative;flex:none;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:.5px solid transparent;border-radius:6px;background:transparent;color:#51575e}
+.ibtn--on{border-color:rgba(65,118,230,.22);background:rgba(65,118,230,.07);color:#2f56b8}
+.dot{position:absolute;top:5px;right:5px;width:5px;height:5px;border-radius:50%;background:#4176e6}
+.tbtn{position:relative;flex:none;display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 8px;border:.5px solid rgba(0,0,0,.12);border-radius:6px;background:#fff;color:#3c424a;font:inherit;font-size:11.5px;white-space:nowrap}
+.tbtn--quiet{border-color:transparent;background:transparent;color:#61666b}
+.count{min-width:15px;height:15px;padding:0 4px;border-radius:8px;background:rgba(38,49,72,.08);color:#5b6169;font-size:10px;line-height:15px;text-align:center}
+.primary{flex:none;display:inline-flex;align-items:center;justify-content:center;height:28px;padding:0 11px;border:.5px solid #2f5fd0;border-radius:6px;background:#2f5fd0;color:#fff;font:inherit;font-size:11.5px;white-space:nowrap}
+.vrule{flex:none;width:1px;height:18px;margin:0 2px;background:rgba(0,0,0,.12)}
+.chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 9px;border:.5px solid rgba(65,118,230,.26);border-radius:999px;background:rgba(65,118,230,.06);color:#2f56b8;font-size:11.5px;white-space:nowrap}
+.chip .cd{width:5px;height:5px;border-radius:50%;background:#4176e6}
+.body{flex:1 1 auto;min-height:0;overflow:hidden;position:relative;background:#fff}
+.doc{padding:20px 26px 20px 38px;font-size:14px;line-height:1.72;color:#232a33}
+.doc h1{font-size:22px;line-height:1.35;font-weight:600;margin:0 0 6px}
+.meta{font-size:11.5px;color:#7c828a;margin:0 0 12px}
+.doc h2{font-size:18px;line-height:1.45;font-weight:600;margin:18px 0 4px}
+.doc h3{font-size:14.5px;line-height:1.5;font-weight:600;margin:12px 0 3px}
+.doc p{margin:0 0 9px}
+.rel{position:relative}
+.hl{background:#e7eefc;box-shadow:0 0 0 2px #e7eefc;border-radius:2px}
+.pin{position:absolute;right:6px;top:3px;width:22px;height:22px;border:.5px solid #4176e6;border-radius:6px;background:#fff;color:#2f56b8;font-size:11px;line-height:21px;text-align:center;z-index:4}
+.pin::before{content:'';position:absolute;right:22px;top:10px;width:7px;height:1px;background:#b9c8ea}
+.editor{position:absolute;z-index:6;right:28px;width:300px;box-sizing:border-box;padding:9px 11px 10px;border:.5px solid rgba(16,24,40,.16);border-radius:9px;background:#fff;box-shadow:0 14px 36px rgba(16,24,40,.17)}
+.editor.down::after,.editor.up::after{content:'';position:absolute;right:6px;width:9px;height:9px;background:#fff;transform:rotate(45deg)}
+.editor.down::after{bottom:-5px;border-bottom:.5px solid rgba(16,24,40,.16);border-right:.5px solid rgba(16,24,40,.16)}
+.editor.up::after{top:-5px;border-top:.5px solid rgba(16,24,40,.16);border-left:.5px solid rgba(16,24,40,.16)}
+.eh{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.eh b{font-size:12px;font-weight:600}
+.eh span{font-size:10.5px;color:#8a9099}
+.ex{margin-left:auto;color:#8a9099;font-size:13px;line-height:1}
+.eq{margin:0 0 7px;padding-left:8px;border-left:2px solid #dfe4ea;color:#6b727b;font-size:11px;line-height:1.55}
+.eta{width:100%;box-sizing:border-box;height:72px;padding:6px 8px;border:.5px solid rgba(16,24,40,.16);border-radius:6px;color:#232a33;font-family:inherit;font-size:11.5px;line-height:1.6;resize:none}
+.ef{display:flex;align-items:center;gap:6px;margin-top:7px}
+.ef em{flex:1;font-style:normal;font-size:10px;color:#9aa0a8}
+.eb{height:25px;padding:0 9px;border:.5px solid rgba(0,0,0,.14);border-radius:6px;background:#fff;color:#3c424a;font:inherit;font-size:11.5px}
+.eb--p{border-color:#2f5fd0;background:#2f5fd0;color:#fff}
+.ghost{position:absolute;right:28px;width:300px;height:54px;box-sizing:border-box;border:1px dashed #b9c0c8;border-radius:9px;color:#8a9099;font-size:10.5px;line-height:54px;text-align:center;background:rgba(249,250,251,.7)}
+.frame{position:absolute;top:52px}
+</style>
+</helmet>
+<div class="sheet">
+  <div class="sh"><b>批注弹框：锚定 + 翻转 + 跟随</b><span>先量下方，再量上方；都放不下时贴边并让卡片内部滚动。滚动时按锚点重算，而不是固定在视口。</span></div>
+
+  <div class="frame" style="left:20px">
+    <div class="cap"><b>A · 锚点在下半屏</b>　向上展开，卡片底边贴住锚点</div>
+    <div class="pane">
+      <div class="tabs">
+        <span class="tab tab--off">文件</span>
+        <span class="tab"><span class="tico">M↓</span>P2b-CHANGES-T<i>✕</i></span>
+        <span class="sp"></span>
+        <span class="ib" style="font-size:14px;color:#9aa0a8">+</span>
+      </div>
+      <div class="hdr">
+        <span class="path">/docs/designs/active-markdown/P2b-CHANGES-TECH.md</span>
+        <span class="sp"></span>
+        <button class="sel" type="button">可交互 Markdown
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M2.5 4.5 6 8l3.5-3.5"/></svg>
+        </button>
+        <button class="ib" type="button" aria-label="刷新"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M13 8a5 5 0 1 1-1.6-3.7"/><path d="M13 2.5V5h-2.5"/></svg></button>
+      </div>
+      <div class="am">
+        <button class="tbtn" type="button">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M3 4h10M5 8h8M7 12h6"/></svg>
+          目录<span class="dot"></span>
+        </button>
+        <span class="sp"></span>
+        <button class="tbtn tbtn--quiet" type="button">翻译</button>
+        <span class="vrule"></span>
+        <button class="chip" type="button"><span class="cd"></span>更新 3 处</button>
+        <span class="vrule"></span>
+        <button class="tbtn" type="button">批注 <span class="count">2</span></button>
+        <button class="primary" type="button">加入对话</button>
+      </div>
+      <div class="body">
+        <div class="doc">
+          <h1>Active Markdown P2b 技术方案</h1>
+          <div class="meta">2026-11-18 · 设计定稿 · Web 实机复核通过</div>
+          <h2>3. 基线</h2>
+          <h3>3.1 什么是基线</h3>
+          <p>基线是最近一次已发送、且留下了全文快照的审阅轮次。之后打开文档时，拿这份快照和最新全文做块级 diff。</p>
+          <h3>3.2 为什么快照缺失时不回退</h3>
+          <p>如果最新一轮没有快照，就不显示更新，而不是退回到更早的轮次。否则基线会悄悄变旧，读者看到的「更新」可能来自两次反馈之前。</p>
+          <h2>4. Host 接口</h2>
+          <p>只加一个只读接口：reviewLatest 返回最近一次已发送轮次的快照与元数据。</p>
+          <h2>5. 块级 diff</h2>
+          <h3>5.1 块内容键</h3>
+          <p class="rel"><span class="hl">块内容键按渲染语义生成：折叠空白、忽略列表符号与围栏风格。</span><span class="pin" style="top:2px" title="批注 2">2</span></p>
+          <p>文字、链接地址、图片与强调的变化都会换键。</p>
+        </div>
+        <div class="editor down" style="top:360px">
+          <div class="eh"><b>批注 2</b><span>第 41 行</span><span class="ex">✕</span></div>
+          <div class="eq">块内容键按渲染语义生成：折叠空白、忽略列表符号与围栏风格。</div>
+          <textarea class="eta" rows="3">建议补一句：换行、列表符号、围栏风格不算变化，文字与链接地址算。</textarea>
+          <div class="ef"><em>⌘ ↵ 保存</em><button class="eb" type="button">取消</button><button class="eb eb--p" type="button">保存</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="frame" style="left:660px">
+    <div class="cap"><b>B · 文档向下滚动 240px</b>　卡片跟着锚点上移，并翻到锚点下方</div>
+    <div class="pane">
+      <div class="tabs">
+        <span class="tab tab--off">文件</span>
+        <span class="tab"><span class="tico">M↓</span>P2b-CHANGES-T<i>✕</i></span>
+        <span class="sp"></span>
+        <span class="ib" style="font-size:14px;color:#9aa0a8">+</span>
+      </div>
+      <div class="hdr">
+        <span class="path">/docs/designs/active-markdown/P2b-CHANGES-TECH.md</span>
+        <span class="sp"></span>
+        <button class="sel" type="button">可交互 Markdown
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M2.5 4.5 6 8l3.5-3.5"/></svg>
+        </button>
+        <button class="ib" type="button" aria-label="刷新"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M13 8a5 5 0 1 1-1.6-3.7"/><path d="M13 2.5V5h-2.5"/></svg></button>
+      </div>
+      <div class="am">
+        <button class="tbtn" type="button">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M3 4h10M5 8h8M7 12h6"/></svg>
+          目录<span class="dot"></span>
+        </button>
+        <span class="sp"></span>
+        <button class="tbtn tbtn--quiet" type="button">翻译</button>
+        <span class="vrule"></span>
+        <button class="chip" type="button"><span class="cd"></span>更新 3 处</button>
+        <span class="vrule"></span>
+        <button class="tbtn" type="button">批注 <span class="count">2</span></button>
+        <button class="primary" type="button">加入对话</button>
+      </div>
+      <div class="body">
+        <div class="doc" style="margin-top:-212px">
+          <h1>Active Markdown P2b 技术方案</h1>
+          <div class="meta">2026-11-18 · 设计定稿 · Web 实机复核通过</div>
+          <h2>3. 基线</h2>
+          <h3>3.1 什么是基线</h3>
+          <p>基线是最近一次已发送、且留下了全文快照的审阅轮次。之后打开文档时，拿这份快照和最新全文做块级 diff。</p>
+          <h3>3.2 为什么快照缺失时不回退</h3>
+          <p>如果最新一轮没有快照，就不显示更新，而不是退回到更早的轮次。否则基线会悄悄变旧，读者看到的「更新」可能来自两次反馈之前。</p>
+          <h2>4. Host 接口</h2>
+          <p>只加一个只读接口：reviewLatest 返回最近一次已发送轮次的快照与元数据。</p>
+          <h2>5. 块级 diff</h2>
+          <h3>5.1 块内容键</h3>
+          <p class="rel"><span class="hl">块内容键按渲染语义生成：折叠空白、忽略列表符号与围栏风格。</span><span class="pin" style="top:2px" title="批注 2">2</span></p>
+          <p>文字、链接地址、图片与强调的变化都会换键。</p>
+        </div>
+        <div class="editor up" style="top:338px">
+          <div class="eh"><b>批注 2</b><span>第 41 行</span><span class="ex">✕</span></div>
+          <div class="eq">块内容键按渲染语义生成：折叠空白、忽略列表符号与围栏风格。</div>
+          <textarea class="eta" rows="3">建议补一句：换行、列表符号、围栏风格不算变化，文字与链接地址算。</textarea>
+          <div class="ef"><em>⌘ ↵ 保存</em><button class="eb" type="button">取消</button><button class="eb eb--p" type="button">保存</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1240,"height":820}}'>
+class Component extends DCLogic {
+  renderVals() { return {} }
+}
+</script>
+</body>
+</html>

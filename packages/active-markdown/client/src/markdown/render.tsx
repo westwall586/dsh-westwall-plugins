@@ -1,6 +1,6 @@
 /** Render the block tree as themed React elements. */
 import * as React from 'react'
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Inline, Block, ListItem } from './model.ts'
 import { componentOf } from './model.ts'
 import type { DiffStatus, DocumentDiff } from './diff.ts'
@@ -34,7 +34,6 @@ export interface MarkdownViewProps {
   blocks: readonly Block[]
   labels: RenderLabels
   actions: RenderActions
-  lineNumbers: boolean
   components: ComponentContext
   /** Present in the source view once a review baseline differs from the text. */
   diff?: DocumentDiff
@@ -42,27 +41,11 @@ export interface MarkdownViewProps {
 
 /**
  * Render the whole document body.
- * @param props - block tree, labels, line-number toggle, component hooks, and link/image behaviour.
+ * @param props - block tree, labels, component hooks, and link/image behaviour.
  * @returns the rendered article.
  */
-export function MarkdownView({ blocks, labels, actions, lineNumbers, components, diff }: MarkdownViewProps): ReactNode {
+export function MarkdownView({ blocks, labels, actions, components, diff }: MarkdownViewProps): ReactNode {
   const doc = useRef<HTMLElement | null>(null)
-  // Gutter numbers are absolutely positioned inside the article, so their tops
-  // have to be measured after layout and again whenever the prose reflows.
-  useLayoutEffect(() => {
-    const element = doc.current
-    if (element === null || !lineNumbers) return
-    const place = (): void => {
-      const top = element.getBoundingClientRect().top
-      for (const line of element.querySelectorAll<HTMLElement>('[data-gutter-line]')) {
-        line.style.setProperty('--am-line-top', `${line.getBoundingClientRect().top - top}px`)
-      }
-    }
-    place()
-    const observer = new ResizeObserver(place)
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [blocks, lineNumbers])
   return (
     <article ref={doc} className="am-doc" data-active-markdown-doc>
       {blocks.map((block, index) => renderBlock(block, `b${index}`, labels, actions, components, diff?.statuses[index]))}
@@ -82,14 +65,14 @@ function renderBlock(
     case 'heading': {
       const Tag = `h${Math.min(Math.max(block.level, 1), 6)}` as 'h1'
       return (
-        <Tag key={key} className="am-heading" data-block-id={block.id} data-block-type="heading" data-source-line={block.sourceStartLine} data-line={block.sourceStartLine} data-gutter-line={block.sourceStartLine} data-anchor={block.anchor} data-diff={status}>
+        <Tag key={key} className="am-heading" data-block-id={block.id} data-block-type="heading" data-source-line={block.sourceStartLine} data-line={block.sourceStartLine} data-anchor={block.anchor} data-diff={status}>
           {renderInline(block.inline, key, labels, actions)}
         </Tag>
       )
     }
     case 'paragraph': {
       const lines = splitSourceLines(block.inline, block.sourceStartLine)
-      if (block.tight) return <React.Fragment key={key}>{renderLineSpans(lines, key, labels, actions, true, block.id)}</React.Fragment>
+      if (block.tight) return <React.Fragment key={key}>{renderLineSpans(lines, key, labels, actions, block.id)}</React.Fragment>
       const single = lines.length === 1
       return (
         <p
@@ -99,9 +82,9 @@ function renderBlock(
           data-block-type="paragraph"
           data-source-line={block.sourceStartLine}
           data-diff={status}
-          {...(single ? { 'data-line': block.sourceStartLine, 'data-gutter-line': block.sourceStartLine } : {})}
+          {...(single ? { 'data-line': block.sourceStartLine } : {})}
         >
-          {single ? renderInline(lines[0].inline, key, labels, actions) : renderLineSpans(lines, key, labels, actions, true, block.id)}
+          {single ? renderInline(lines[0].inline, key, labels, actions) : renderLineSpans(lines, key, labels, actions, block.id)}
         </p>
       )
     }
@@ -135,7 +118,7 @@ function renderBlock(
         {block.blocks.map((child, index) => renderBlock(child, `${key}-q${index}`, labels, actions, components))}
       </blockquote>
     )
-    case 'divider': return <hr key={key} className="am-divider" data-block-id={block.id} data-block-type="divider" data-source-line={block.sourceStartLine} data-line={block.sourceStartLine} data-gutter-line={block.sourceStartLine} data-diff={status} />
+    case 'divider': return <hr key={key} className="am-divider" data-block-id={block.id} data-block-type="divider" data-source-line={block.sourceStartLine} data-line={block.sourceStartLine} data-diff={status} />
   }
 }
 
@@ -185,17 +168,16 @@ function renderCode(block: Extract<Block, { type: 'code' }>): ReactNode {
   )
 }
 
-/** One element per rendered source line; the first may anchor a gutter number. */
+/** One element per rendered source line. */
 function renderLineSpans(
   lines: readonly SourceLine[],
   key: string,
   labels: RenderLabels,
   actions: RenderActions,
-  gutter: boolean,
   blockId: string,
 ): ReactNode[] {
   return lines.map((line, index) => (
-    <span key={`${key}-l${index}`} data-line={line.line} data-block-id={blockId} {...(gutter && index === 0 ? { 'data-gutter-line': line.line } : {})}>
+    <span key={`${key}-l${index}`} data-line={line.line} data-block-id={blockId}>
       {renderInline(line.inline, `${key}-l${index}`, labels, actions)}
       {line.break === undefined ? null : line.break === 'hard' ? <br /> : ' '}
     </span>

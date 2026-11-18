@@ -6,3 +6,6 @@ coverage/
 
 # local verification scratch space
 .tmp/
+
+# plugin scratch space created when previewing docs in this repo
+.dsh-active-markdown/

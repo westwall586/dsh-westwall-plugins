@@ -4,11 +4,21 @@
     "v": 1,
     "at": "2026-11-16T06:50:00Z"
   },
-  "title": "Active Markdown P1 · 翻译交互线稿",
+  "title": "Active Markdown · 界面线稿",
   "launch": {
-    "view": "canvas"
+    "view": "canvas",
+    "page": "p2-ui"
   },
-  "pages": [],
+  "pages": [
+    {
+      "id": "p1",
+      "name": "P1 · 翻译交互"
+    },
+    {
+      "id": "p2-ui",
+      "name": "P2 · UI 梳理"
+    }
+  ],
   "boards": {
     "01-original.dc.html": {
       "x": 0,
@@ -65,6 +75,62 @@
       "w": 880,
       "h": 980,
       "title": "04 译文 · 点行看原文"
+    },
+    "ui-main.dc.html": {
+      "x": 0,
+      "y": 260,
+      "w": 720,
+      "h": 860,
+      "title": "01 阅读模式 · 目录与加入对话",
+      "page": "p2-ui"
+    },
+    "ui-current.dc.html": {
+      "x": 800,
+      "y": 260,
+      "w": 620,
+      "h": 820,
+      "title": "02 现状 · 六个问题",
+      "page": "p2-ui"
+    },
+    "ui-translation.dc.html": {
+      "x": 0,
+      "y": 1220,
+      "w": 720,
+      "h": 860,
+      "title": "03 翻译模式",
+      "page": "p2-ui"
+    },
+    "ui-drawer.dc.html": {
+      "x": 800,
+      "y": 1220,
+      "w": 720,
+      "h": 860,
+      "title": "04 批注抽屉 · 两条发送路径",
+      "page": "p2-ui"
+    },
+    "ui-narrow.dc.html": {
+      "x": 1600,
+      "y": 1220,
+      "w": 760,
+      "h": 860,
+      "title": "05 窄栏 · 360（阅读 / 翻译）",
+      "page": "p2-ui"
+    },
+    "ui-behavior.dc.html": {
+      "x": 0,
+      "y": 2160,
+      "w": 1240,
+      "h": 820,
+      "title": "06 批注弹框 · 翻转与跟随",
+      "page": "p2-ui"
+    },
+    "ui-states.dc.html": {
+      "x": 1320,
+      "y": 2160,
+      "w": 1240,
+      "h": 980,
+      "title": "07 组件与状态",
+      "page": "p2-ui"
     }
   },
   "order": [
@@ -75,7 +141,14 @@
     "05-unaligned.dc.html",
     "06-retranslate.dc.html",
     "07-saved.dc.html",
-    "08-settings.dc.html"
+    "08-settings.dc.html",
+    "ui-main.dc.html",
+    "ui-current.dc.html",
+    "ui-translation.dc.html",
+    "ui-drawer.dc.html",
+    "ui-narrow.dc.html",
+    "ui-behavior.dc.html",
+    "ui-states.dc.html"
   ],
   "notes": {
     "flow-a": {
@@ -91,6 +164,38 @@
       "text": "② 降级、重翻与保存",
       "kind": "title1",
       "maxW": 3760
+    },
+    "ui-title": {
+      "x": 0,
+      "y": -40,
+      "text": "P2 · UI/UX 梳理",
+      "kind": "title1",
+      "maxW": 2640,
+      "page": "p2-ui"
+    },
+    "ui-problems": {
+      "x": 1480,
+      "y": 250,
+      "w": 360,
+      "text": "现状的六个问题\n\n① 更新块用左色条 + 浅底，和引用块撞脸，正文被染色\n② 顶部提示独占一行，出现时正文下跳 38px\n③ 视图、显示开关、翻译动作、状态挤在同一排，没有层级\n④ 翻译后的按钮临时插入，顺序随状态变化\n⑤ 批注弹框按选区下方排，靠下时溢出；fixed 定位不跟随滚动\n⑥ 状态与错误单行省略，保存失败看不全",
+      "color": "orange",
+      "page": "p2-ui"
+    },
+    "ui-rules": {
+      "x": 1480,
+      "y": 660,
+      "w": 360,
+      "text": "这一轮的结构\n\n· 模式定工具条：阅读 / 翻译 / 源码（后续）\n· 目录最左，加入对话 / 保存最右\n· 右侧按功能区靠右排：翻译 | 变更 | 批注，竖线分隔\n· 批注列表与加入对话并列；抽屉底部再放一次\n· 译文不显示行号与对齐行数；目录用译文自己的 Markdown\n· 窄栏：目录 / 翻译收图标，更新、批注、加入对话留文字",
+      "color": "blue",
+      "page": "p2-ui"
+    },
+    "ui-marks": {
+      "x": 1480,
+      "y": 960,
+      "w": 360,
+      "text": "标记与弹框\n\n· 更新只占行外 3px 刻度，不加底色、不做左边框\n· 目录圆点标章节，更新 chip 负责步进定位\n· 弹框下方不够向上翻，滚动时跟随锚点",
+      "color": "teal",
+      "page": "p2-ui"
     }
   },
   "designSystems": []

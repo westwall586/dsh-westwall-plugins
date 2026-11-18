@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>02 现状 · 六个问题</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;-webkit-font-smoothing:antialiased;background:#fff}
+.pane{position:relative;width:620px;height:820px;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden;background:#fff;color:#0f1115;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;font-size:13px}
+.tabs{flex:none;display:flex;align-items:center;gap:4px;height:34px;padding:0 8px;background:#f9fafb;border-bottom:.5px solid rgba(0,0,0,.08)}
+.tab{display:inline-flex;align-items:center;gap:7px;height:25px;padding:0 9px;border:.5px solid rgba(0,0,0,.1);border-radius:7px;background:#fff;font-size:12px}
+.tab--off{border-color:transparent;background:transparent;color:#81858c}
+.tab i{font-style:normal;color:#a9aeb5;font-size:12px;line-height:1}
+.tico{width:15px;height:15px;border-radius:4px;background:#4176e6;color:#fff;font-size:8px;line-height:15px;text-align:center;font-weight:600}
+.hdr{flex:none;display:flex;align-items:center;gap:2px;height:34px;padding:0 6px 0 12px;border-bottom:.5px solid rgba(0,0,0,.1)}
+.path{font-size:12px;color:#31363d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-right:8px}
+.sp{flex:1 1 auto}
+.ib{display:inline-flex;align-items:center;justify-content:center;height:24px;min-width:24px;padding:0 5px;border:0;border-radius:6px;background:transparent;color:#61666b}
+.sel{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 7px;border:.5px solid transparent;border-radius:6px;background:rgba(38,49,72,.06);color:#0f1115;font-size:12px;white-space:nowrap}
+.am{flex:none;display:flex;align-items:center;gap:6px;height:44px;padding:0 10px;border-bottom:.5px solid rgba(0,0,0,.08)}
+.seg{display:inline-flex;gap:2px;padding:2px;border-radius:7px;background:#f1f3f5}
+.seg button{height:24px;padding:0 11px;border:0;border-radius:5px;background:transparent;color:#61666b;font:inherit;font-size:12px}
+.seg button[aria-pressed=true]{background:#fff;color:#0f1115;box-shadow:0 .5px 2px rgba(0,0,0,.14)}
+.btn{position:relative;flex:none;display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border:.5px solid rgba(0,0,0,.12);border-radius:5px;background:#fff;color:#33383f;font:inherit;font-size:11.5px;white-space:nowrap}
+.btn--ghost{border-color:transparent;color:#61666b}
+.btndot{position:absolute;top:3px;right:3px;width:4px;height:4px;border-radius:50%;background:#4176e6}
+.status{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:6px;margin-left:auto;padding-left:4px;font-size:11.5px;color:#6b7178;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.status em{font-style:normal;overflow:hidden;text-overflow:ellipsis}
+.notice{flex:none;display:flex;align-items:center;gap:8px;margin:10px 12px 0;padding:7px 10px;border:.5px solid rgba(0,0,0,.1);border-radius:7px;background:#fafbfc;color:#61666b;font-size:11.5px}
+.notice .act{margin-left:auto;height:21px;padding:0 7px;border:.5px solid rgba(0,0,0,.1);border-radius:5px;background:#fff;color:#61666b;font:inherit;font-size:11px}
+.body{flex:1 1 auto;min-height:0;overflow:hidden;position:relative}
+.doc{padding:16px 34px 24px 26px;font-size:14.5px;line-height:1.72;color:#232a33}
+.doc h1{font-size:22px;line-height:1.35;font-weight:600;margin:0 0 6px}
+.meta{font-size:11.5px;color:#7c828a;margin:0 0 14px}
+.doc h2{font-size:18px;line-height:1.45;font-weight:600;margin:18px 0 5px}
+.doc h3{font-size:15px;line-height:1.5;font-weight:600;margin:13px 0 4px}
+.doc p{margin:0 0 10px}
+code{font-family:'SF Mono',Menlo,monospace;font-size:12px;background:#f7f8fa;border:.5px solid rgba(0,0,0,.06);border-radius:4px;padding:1px 3px}
+.old{position:relative;margin-left:-10px;padding:1px 8px 1px 10px;border-left:3px solid #8fb0ee;background:#f2f6fe}
+.old p{margin:0 0 8px}
+.hl{background:#e7eefc;box-shadow:0 0 0 2px #e7eefc;border-radius:2px}
+.pin{position:absolute;right:6px;width:21px;height:21px;border:.5px solid #4176e6;border-radius:50%;background:#fff;color:#2f56b8;font-size:10.5px;line-height:20px;text-align:center;z-index:4}
+.badge{position:absolute;z-index:9;width:19px;height:19px;border-radius:50%;background:#c0392b;color:#fff;font-size:10.5px;line-height:19px;text-align:center;box-shadow:0 0 0 3px #fff;font-family:-apple-system,'PingFang SC',sans-serif}
+.editor{position:absolute;z-index:6;left:196px;top:550px;width:320px;box-sizing:border-box;padding:10px 12px 11px;border:.5px solid rgba(16,24,40,.16);border-radius:9px;background:#fff;box-shadow:0 14px 36px rgba(16,24,40,.16)}
+.eh{display:flex;align-items:center;gap:7px;margin-bottom:7px}
+.eh b{font-size:12.5px;font-weight:600}
+.eh span{font-size:11px;color:#8a9099}
+.ex{margin-left:auto;color:#8a9099;font-size:14px;line-height:1}
+.eq{margin:0 0 8px;padding-left:8px;border-left:2px solid #dfe4ea;color:#6b727b;font-size:11.5px;line-height:1.6}
+.eta{width:100%;box-sizing:border-box;height:84px;padding:6px 8px;border:.5px solid rgba(16,24,40,.16);border-radius:6px;color:#232a33;font-family:inherit;font-size:12px;line-height:1.65;resize:none}
+.ef{display:flex;align-items:center;gap:6px;margin-top:8px}
+.ef em{flex:1;font-style:normal;font-size:10.5px;color:#9aa0a8}
+.eb{height:26px;padding:0 10px;border:.5px solid rgba(0,0,0,.14);border-radius:6px;background:#fff;color:#3c424a;font:inherit;font-size:12px}
+.eb--p{border-color:#2f5fd0;background:#2f5fd0;color:#fff}
+.cut{position:absolute;left:0;right:0;bottom:0;z-index:7;border-top:1.5px dashed #c0392b;background:rgba(192,57,43,.03);height:22px;color:#c0392b;font-size:10px;line-height:22px;text-align:center;letter-spacing:.04em}
+</style>
+</helmet>
+<div class="pane">
+  <div class="tabs">
+    <span class="tab tab--off">文件</span>
+    <span class="tab"><span class="tico">M↓</span>P2b-CHANGES-T<i>✕</i></span>
+    <span class="ib" style="font-size:14px;color:#9aa0a8">+</span>
+    <span class="sp"></span>
+    <span class="ib" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2.5" y="3" width="11" height="10" rx="1.5"/><path d="M8 3v10"/></svg></span>
+    <span class="ib" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M6 2.5H2.5V6M10 13.5h3.5V10"/></svg></span>
+  </div>
+
+  <div class="hdr">
+    <span class="path">/docs/designs/active-markdown/P2b-CHANGES-TECH.md</span>
+    <span class="sp"></span>
+    <button class="sel" type="button">可交互 Markdown
+      <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M2.5 4.5 6 8l3.5-3.5"/></svg>
+    </button>
+    <button class="ib" type="button" aria-label="刷新"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M13 8a5 5 0 1 1-1.6-3.7"/><path d="M13 2.5V5h-2.5"/></svg></button>
+    <button class="ib" type="button" aria-label="在应用中打开"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M9 3h4v4"/><path d="M13 3 7.5 8.5"/><path d="M12 10.5V12a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 12V5.5A1.5 1.5 0 0 1 4 4h1.5"/></svg></button>
+  </div>
+
+  <div class="am">
+    <div class="seg" role="group" aria-label="视图">
+      <button type="button" aria-pressed="true">原文</button>
+      <button type="button" aria-pressed="false">译文</button>
+    </div>
+    <button class="btn btn--ghost" type="button" aria-pressed="false">行号</button>
+    <button class="btn" type="button" aria-pressed="false">目录<span class="btndot"></span></button>
+    <button class="btn" type="button" aria-pressed="false">批注 0</button>
+    <button class="btn" type="button">保存</button>
+    <button class="btn" type="button">重新翻译</button>
+    <div class="status"><em>保存失败：工作区内的文档请使用相对路径，当前地址是绝对路径…</em></div>
+  </div>
+
+  <div class="notice">
+    <span>上次反馈后更新了 3 处</span>
+    <button class="act" type="button">关闭</button>
+  </div>
+
+  <div class="body">
+    <div class="doc">
+      <h1>Active Markdown P2b 技术方案：块级更新标记</h1>
+      <div class="meta">2026-11-18 · 设计定稿 · Web 实机复核通过</div>
+
+      <h2>3. 基线</h2>
+      <div class="old" style="margin-top:2px;margin-bottom:10px">
+        <h3 style="margin-top:1px">3.1 什么是基线</h3>
+        <p>基线是最近一次已发送、且留下了全文快照的审阅轮次。之后打开文档时，拿这份快照和最新全文做块级 diff。</p>
+      </div>
+      <p>只标记本次批注提交后仍存在且被更新的段落与组件，并在目录里标出被更新的章节。</p>
+
+      <div class="old" style="margin-bottom:10px">
+        <h3 style="margin-top:1px">3.2 为什么最新一轮快照缺失时不回退</h3>
+        <p>如果最新一轮没有快照，就不显示更新，而不是退回到更早的轮次。否则基线会悄悄变旧。</p>
+      </div>
+
+      <div class="old" style="margin-bottom:10px;padding-top:2px;padding-bottom:2px">
+        <h2 style="margin:2px 0 0;font-size:17px">4. Host 接口</h2>
+      </div>
+      <p>只加一个只读接口：<code>reviewLatest</code> 返回最近一次已发送轮次的快照与元数据。</p>
+
+      <h2>5. 块级 diff</h2>
+      <h3>5.1 块内容键</h3>
+      <p>块内容键按渲染语义生成：折叠空白、忽略列表符号与围栏风格；文字、链接地址、图片与强调的变化都会换键。<span class="hl">这里的「渲染语义」需要一条可读的定义。</span></p>
+      <span class="pin" style="top:530px" title="批注 2">2</span>
+    </div>
+
+    <div class="editor">
+      <div class="eh"><b>批注 2</b><span>第 41 行</span><span class="ex">✕</span></div>
+      <div class="eq">这里的「渲染语义」需要一条可读的定义。</div>
+      <textarea class="eta" rows="4">建议补一句：换行、列表符号、围栏风格不算变化，文字与链接地址算。</textarea>
+      <div class="ef"><em>⌘ ↵ 保存</em><button class="eb" type="button">取消</button><button class="eb eb--p" type="button">保存</button></div>
+    </div>
+
+    <div class="cut">视口底边 · 弹框的按钮与输入区被裁掉</div>
+  </div>
+
+  <span class="badge" style="left:8px;top:292px">1</span>
+  <span class="badge" style="left:8px;top:124px">2</span>
+  <span class="badge" style="left:8px;top:76px">3</span>
+  <span class="badge" style="left:376px;top:76px">4</span>
+  <span class="badge" style="left:588px;top:76px">6</span>
+  <span class="badge" style="left:180px;top:790px">5</span>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":620,"height":820}}'>
+class Component extends DCLogic {
+  renderVals() { return {} }
+}
+</script>
+</body>
+</html>

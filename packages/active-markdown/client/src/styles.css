@@ -1,10 +1,9 @@
 [data-active-markdown] {
   --am-pad-x: clamp(24px, 4%, 56px);
-  --am-gutter: 46px;
-  --am-pad-left: var(--am-pad-x);
   position: relative;
+  container-type: inline-size;
   box-sizing: border-box;
-  padding: 20px var(--am-pad-x) 72px var(--am-pad-left);
+  padding: 20px var(--am-pad-x) 72px;
   color: var(--dsw-alias-label-primary);
   font-size: var(--dsh-content-font-size);
   line-height: 1.7;
@@ -16,28 +15,37 @@
   background-color: color-mix(in srgb, var(--dsw-alias-link) 18%, transparent);
 }
 
-/* One marker for every updated block: a left stripe plus a wash, painted with
-   background layers so toggling it never changes the block's size. */
+/* A block's change mark lives in the margin: a short tick at the block start.
+   No wash or left border, so an updated paragraph never reads as a quote. */
 [data-active-markdown] [data-diff='updated'] {
-  background-image:
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--dsw-alias-link) 60%, transparent) 0 3px,
-      transparent 3px
-    ),
-    linear-gradient(
-      color-mix(in srgb, var(--dsw-alias-link) 6%, transparent),
-      color-mix(in srgb, var(--dsw-alias-link) 6%, transparent)
-    );
+  position: relative;
 }
 
-/* A divider has no content box for the wash, so its one line takes the mark. */
-[data-active-markdown] hr[data-diff='updated'] {
-  border-top-color: color-mix(in srgb, var(--dsw-alias-link) 60%, transparent);
+[data-active-markdown] [data-diff='updated']::before {
+  content: '';
+  position: absolute;
+  left: -14px;
+  top: 0.32em;
+  width: 3px;
+  height: 1.05em;
+  border-radius: 2px;
+  background: var(--dsw-alias-link);
+  pointer-events: none;
 }
 
-[data-active-markdown].am-linenos {
-  --am-pad-left: calc(var(--am-pad-x) + var(--am-gutter));
+[data-active-markdown] .am-diff-flash::before {
+  animation: am-diff-flash 1.2s ease-out;
+}
+
+@keyframes am-diff-flash {
+  0%, 45% {
+    transform: scaleY(1.35);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--dsw-alias-link) 22%, transparent);
+  }
+  100% {
+    transform: scaleY(1);
+    box-shadow: 0 0 0 0 transparent;
+  }
 }
 
 [data-active-markdown] *,
@@ -55,37 +63,8 @@
   margin-top: 0;
 }
 
-/* One stripe at the pane edge, one measured number per block start. */
 .am-doc {
   position: relative;
-}
-
-[data-active-markdown].am-linenos .am-doc::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: calc(-1 * var(--am-pad-left));
-  width: var(--am-gutter);
-  background: var(--dsw-alias-bg-layer-2);
-  border-right: 0.5px solid var(--dsw-alias-border-l1);
-  pointer-events: none;
-}
-
-[data-active-markdown].am-linenos [data-gutter-line]::before {
-  content: attr(data-gutter-line);
-  position: absolute;
-  top: var(--am-line-top, 0px);
-  left: calc(-1 * var(--am-pad-left));
-  width: var(--am-gutter);
-  padding-right: 8px;
-  box-sizing: border-box;
-  color: var(--dsw-alias-label-tertiary);
-  font-family: var(--dsh-font-family-code);
-  font-size: 11px;
-  line-height: inherit;
-  text-align: right;
-  pointer-events: none;
 }
 
 .am-heading {
@@ -412,76 +391,25 @@
   z-index: 3;
   display: flex;
   align-items: center;
-  gap: 12px;
-  /* The bar keeps the page inset even when the gutter widens the prose's left padding. */
-  margin: -20px calc(-1 * var(--am-pad-x)) 20px calc(-1 * var(--am-pad-x));
-  padding: 8px var(--am-pad-x);
+  gap: 8px;
+  height: 44px;
+  margin: -20px calc(-1 * var(--am-pad-x)) 20px;
+  padding: 0 12px;
   background: var(--dsw-alias-bg-layer-1);
   border-bottom: 0.5px solid var(--dsw-alias-border-l1);
 }
 
-.am-seg {
+.am-toolbar-spacer {
+  flex: 1 1 auto;
+}
+
+.am-toolbar-button {
+  position: relative;
+  flex: none;
   display: inline-flex;
-  gap: 2px;
-  padding: 2px;
-  border-radius: var(--dsw-radius-sm);
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-
-.am-seg-button {
-  height: 24px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--dsw-alias-label-secondary);
-  font: inherit;
-  font-size: 0.92em;
-  cursor: pointer;
-}
-
-.am-seg-button[aria-pressed='true'] {
-  background: var(--dsw-alias-bg-layer-1);
-  color: var(--dsw-alias-label-primary);
-  box-shadow: 0 0.5px 2px var(--dsw-alias-border-l3);
-}
-
-.am-toolbar-status {
-  display: flex;
   align-items: center;
-  gap: 8px;
-  min-width: 0;
-  margin-left: auto;
-  color: var(--dsw-alias-label-tertiary);
-  font-size: 0.85em;
-}
-
-.am-toolbar-error {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.am-toolbar-action {
-  flex: none;
-  height: 22px;
-  padding: 0 8px;
-  border: 0.5px solid var(--dsw-alias-border-l2);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--dsw-alias-label-secondary);
-  font: inherit;
-  font-size: 1em;
-  cursor: pointer;
-}
-
-.am-toolbar-action:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-
-.am-toolbar-toggle {
-  flex: none;
-  height: 24px;
+  gap: 5px;
+  height: 28px;
   padding: 0 8px;
   border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: 6px;
@@ -489,35 +417,253 @@
   color: var(--dsw-alias-label-secondary);
   font: inherit;
   font-size: 0.92em;
+  white-space: nowrap;
   cursor: pointer;
 }
 
-.am-toolbar-toggle[aria-pressed='true'] {
+.am-toolbar-button:hover,
+.am-toolbar-button[aria-expanded='true'] {
   background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-primary);
+}
+
+.am-toolbar-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.am-toolbar-button--quiet {
+  border-color: transparent;
+}
+
+.am-toolbar-label {
+  min-width: 0;
 }
 
 .am-toolbar-dot {
-  display: inline-block;
+  position: absolute;
+  top: 4px;
+  right: 4px;
   width: 6px;
   height: 6px;
-  margin-left: 6px;
   border-radius: 50%;
   background: var(--dsw-alias-link);
-  vertical-align: middle;
 }
 
-/* Contents scroll in their own box under the toolbar and never narrow the prose. */
-.am-toc {
+.am-toolbar-rule {
+  flex: none;
+  width: 1px;
+  height: 18px;
+  margin: 0 2px;
+  background: var(--dsw-alias-border-l2);
+}
+
+.am-count {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 0.9em;
+  line-height: 16px;
+  text-align: center;
+}
+
+.am-primary {
+  flex: none;
+  height: 28px;
+  padding: 0 12px;
+  border: 0.5px solid var(--dsw-alias-link);
+  border-radius: 6px;
+  background: var(--dsw-alias-link);
+  color: #fff;
+  font: inherit;
+  font-size: 0.92em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.am-primary:hover {
+  background: color-mix(in srgb, var(--dsw-alias-link) 86%, #000);
+  border-color: color-mix(in srgb, var(--dsw-alias-link) 86%, #000);
+}
+
+.am-primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.am-primary--muted {
+  border-color: var(--dsw-alias-border-l2);
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  opacity: 1;
+}
+
+.am-update-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 66px;
+  height: 26px;
+  padding: 0 9px;
+  border: 0.5px solid color-mix(in srgb, var(--dsw-alias-link) 28%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dsw-alias-link) 8%, transparent);
+  color: var(--dsw-alias-link);
+  font: inherit;
+  font-size: 0.85em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.am-update-chip:hover {
+  background: color-mix(in srgb, var(--dsw-alias-link) 14%, transparent);
+}
+
+.am-update-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--dsw-alias-link);
+}
+
+.am-lang {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
+.am-progress {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
+.am-stale {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
+.am-error-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 9px;
+  border: 0.5px solid color-mix(in srgb, #d92d20 35%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, #d92d20 8%, transparent);
+  color: #b42318;
+  font: inherit;
+  font-size: 0.85em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.am-error-popover {
+  position: fixed;
+  z-index: 40;
+  box-sizing: border-box;
+  width: min(320px, calc(100vw - 16px));
+  padding: 12px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: 0 12px 32px color-mix(in srgb, #000 16%, transparent);
+  color: var(--dsw-alias-label-primary);
+  font-size: 0.9em;
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+}
+
+.am-error-title {
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.am-error-message {
+  color: var(--dsw-alias-label-secondary);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.am-error-actions {
   display: flex;
-  flex-direction: column;
-  max-height: min(50vh, 320px);
-  margin: -10px 0 14px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.am-toc-popover {
+  position: fixed;
+  z-index: 26;
+  box-sizing: border-box;
   padding: 6px;
   overflow-y: auto;
   border: 0.5px solid var(--dsw-alias-border-l2);
-  border-radius: 8px;
-  background: var(--dsw-alias-bg-layer-2);
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: 0 10px 30px color-mix(in srgb, #000 14%, transparent);
+}
+
+.am-toc {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+@container (max-width: 440px) {
+  .am-toolbar {
+    gap: 6px;
+    padding: 0 8px;
+  }
+
+  .am-toolbar-label {
+    display: none;
+  }
+
+  .am-toolbar-button {
+    padding: 0 6px;
+  }
+
+  .am-toolbar-rule {
+    margin: 0;
+  }
+}
+
+@container (max-width: 350px) {
+  .am-update-unit {
+    display: none;
+  }
+
+  .am-update-chip {
+    min-width: 58px;
+  }
+}
+
+@container (max-width: 330px) {
+  .am-annotate-label {
+    display: none;
+  }
+
+  .am-toolbar {
+    gap: 4px;
+    padding: 0 6px;
+  }
 }
 
 .am-toc-entry {
@@ -867,6 +1013,29 @@
   font-size: 0.9em;
 }
 
+.am-annotate::after {
+  content: '';
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  background: var(--dsw-alias-bg-layer-2);
+  transform: rotate(45deg);
+}
+
+.am-annotate[data-above='false']::after {
+  top: -5px;
+  left: 24px;
+  border-top: 0.5px solid var(--dsw-alias-border-l2);
+  border-left: 0.5px solid var(--dsw-alias-border-l2);
+}
+
+.am-annotate[data-above='true']::after {
+  bottom: -5px;
+  left: 24px;
+  border-right: 0.5px solid var(--dsw-alias-border-l2);
+  border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+}
+
 .am-annotate-head {
   margin-bottom: 6px;
   font-weight: 600;
@@ -936,11 +1105,6 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
-.am-toolbar-toggle:disabled {
-  opacity: 0.55;
-  cursor: default;
-}
-
 /* Fixed, so the popover is placed by viewport coordinates and escapes the prose. */
 .am-ask {
   position: fixed;
@@ -997,25 +1161,6 @@
 .am-ask-button:hover {
   background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-primary);
-}
-
-/* The source-update notice and the stale-translation notice share this row. */
-.am-notice {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0 0 14px;
-  padding: 8px 12px;
-  border: 0.5px solid var(--dsw-alias-border-l2);
-  border-radius: 8px;
-  background: var(--dsw-alias-bg-layer-2);
-  color: var(--dsw-alias-label-secondary);
-  font-size: 0.9em;
-}
-
-.am-notice-text {
-  flex: 1;
-  min-width: 0;
 }
 
 .am-toast {

@@ -178,7 +178,7 @@
 }
 
 .am-component[data-component='code'] {
-  background: var(--dsw-alias-markdown-code-block);
+  background-color: var(--dsw-alias-markdown-code-block);
 }
 
 .am-component[data-annotated] {

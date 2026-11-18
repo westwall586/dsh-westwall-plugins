@@ -180,7 +180,7 @@ window.__ModuleLoader__.load({ id: '@westwall/dsh-active-markdown', factory(requ
 }
 
 .am-component[data-component='code'] {
-  background: var(--dsw-alias-markdown-code-block);
+  background-color: var(--dsw-alias-markdown-code-block);
 }
 
 .am-component[data-annotated] {

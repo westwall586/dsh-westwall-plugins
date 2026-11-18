@@ -148,6 +148,7 @@ dsh plugin --profile <profile> add link:$(pwd)/packages/<name>
    git worktree remove .agents/worktrees/<任务> && git branch -d feat/<name>-<短描述>
    ```
    只用 `--ff-only`：分支必须基于最新 `main`，冲突时先在分支上 `git rebase main`，不要用 merge commit。
+   清理也可以一条命令做：`node scripts/worktree-clean.mjs --apply`。它只删已合入 `main`、在 `.agents/worktrees/` 下且没有未提交改动的 worktree，再删因此空出来的分支；不带 `--apply` 只列出来。
 5. 维护者在桌面端验收。验出问题：小修按同样流程补分支再合；整块不可用时把这段提交整体回滚：
    ```sh
    git revert --no-commit <改动前的提交>..HEAD && git commit -m "revert: 回滚 <任务>"

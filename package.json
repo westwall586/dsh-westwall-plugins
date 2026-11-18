@@ -24,7 +24,9 @@
     "create-plugin": "node scripts/create-plugin.mjs",
     "build": "pnpm -r --if-present build",
     "typecheck": "pnpm -r --if-present typecheck",
-    "test": "pnpm -r --if-present test"
+    "test": "pnpm -r --if-present test",
+    "worktree:clean": "node scripts/worktree-clean.mjs",
+    "worktree:clean:apply": "node scripts/worktree-clean.mjs --apply"
   },
   "engines": {
     "node": ">=22.19.0",

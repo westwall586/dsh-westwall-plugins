@@ -49,6 +49,7 @@ node -e 'const fs=require("fs");for(const d of fs.readdirSync("packages")){const
 pnpm install                       # 装齐 workspace 依赖
 pnpm create-plugin <name> [id]     # 生成新插件包并重生成聚合清单
 pnpm -r build && pnpm -r test      # 构建 + 单元测试
+node scripts/worktree-clean.mjs    # 列出已合并的 worktree 与分支；--apply 才删
 node scripts/smoke-install.mjs <spec>   # 装 → 启动 → 校验 → 摘除还原
 ```
 

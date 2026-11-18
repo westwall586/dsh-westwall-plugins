@@ -67,7 +67,7 @@ P2a 在「加入输入框」时把 `state.text` 写成 `reviews/pending/<roundId
 
 1. 用 `documentMirror(workspace, path)` 找到该文档的轮次目录。
 2. 只读该目录下成对的 `<roundId>.json` + `<roundId>.md`；缺任一个都不算。
-3. `meta.sourcePath` 必须与请求的规范绝对路径相同，防止镜像目录命名碰撞或文件改名后读到别人的轮次。
+3. `meta.sourcePath` 必须与 `documentMirror(workspace, path).sourcePath` 相同（工作区内是相对路径，工作区外是绝对路径），防止镜像目录命名碰撞或文件改名后读到别人的轮次。
 4. 按 `meta.createdAt` 降序，时间相同再按文件 mtime 降序。
 5. 取第一条；它带 `snapshotMissing` 或 `.md` 读不到时返回 `null`，不继续找。
 6. pending 目录不参与。

@@ -30,6 +30,13 @@ import type {
   TranslationSaveRequest,
 } from './context.ts'
 import type { Annotation, AnnotationDraft, AnnotationSaveView, PendingReview } from './annotate/model.ts'
+import type {
+  EditCheckRequest,
+  EditCheckResult,
+  WriteIntent,
+  WriteTextRequest,
+  WriteTextResult,
+} from './edit/model.ts'
 
 const JSON_CODEC = {
   mode: 'strict' as const,
@@ -64,6 +71,8 @@ const WIRE = {
   reviewCommit: ['sessionId', 'path', 'roundId', 'sentText'],
   reviewDetach: ['sessionId', 'path', 'roundId'],
   reviewLatest: ['sessionId', 'path'],
+  editCheck: ['sessionId', 'path', 'bytes'],
+  writeText: ['sessionId', 'path', 'text', 'intent'],
 } as const
 
 function descriptor(method: keyof typeof WIRE) {
@@ -95,6 +104,8 @@ export const DESCRIPTORS = [
   descriptor('reviewCommit'),
   descriptor('reviewDetach'),
   descriptor('reviewLatest'),
+  descriptor('editCheck'),
+  descriptor('writeText'),
 ]
 
 export const CLIENT_CONTRIBUTION = { package: 'active-markdown', descriptors: DESCRIPTORS }
@@ -209,6 +220,17 @@ export interface Namespace {
     sessionId: string,
     path: string,
   ): Promise<RemoteOutcome<ReviewLatestView | null>>
+  editCheck(
+    sessionId: string,
+    path: string,
+    bytes: number,
+  ): Promise<RemoteOutcome<EditCheckResult>>
+  writeText(
+    sessionId: string,
+    path: string,
+    text: string,
+    intent: WriteIntent,
+  ): Promise<RemoteOutcome<WriteTextResult>>
 }
 
 /** Value-level facade so the Body never touches wire shapes. */
@@ -292,6 +314,10 @@ export function createBridge(namespace: Namespace): HostBridge {
     unwrap(await namespace.reviewDetach(request.sessionId, request.path, request.roundId))
   const reviewLatest = async (request: ReviewLatestRequest): Promise<ReviewLatestView | null> =>
     unwrap(await namespace.reviewLatest(request.sessionId, request.path)) ?? null
+  const editCheck = async (request: EditCheckRequest): Promise<EditCheckResult> =>
+    unwrap(await namespace.editCheck(request.sessionId, request.path, request.bytes))
+  const writeText = async (request: WriteTextRequest): Promise<WriteTextResult> =>
+    unwrap(await namespace.writeText(request.sessionId, request.path, request.text, request.intent))
   return {
     translate,
     describe,
@@ -307,6 +333,8 @@ export function createBridge(namespace: Namespace): HostBridge {
     reviewCommit,
     reviewDetach,
     reviewLatest,
+    editCheck,
+    writeText,
   }
 }
 

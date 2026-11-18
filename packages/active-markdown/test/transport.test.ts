@@ -32,6 +32,8 @@ const WIRE_PARAMETERS: Record<string, string[]> = {
   reviewCommit: ['sessionId', 'path', 'roundId', 'sentText'],
   reviewDetach: ['sessionId', 'path', 'roundId'],
   reviewLatest: ['sessionId', 'path'],
+  editCheck: ['sessionId', 'path', 'bytes'],
+  writeText: ['sessionId', 'path', 'text', 'intent'],
 }
 
 /** Host method parameters: the wire names, plus the Gateway-injected signal on translate. */
@@ -219,6 +221,14 @@ function recordingNamespace(answers: Answers = {}): { namespace: Namespace, call
         ? { ok: true, value: { roundId: 'r1', createdAt: '2026-11-17T00:00:00.000Z', text: '基线全文' } }
         : { ok: true }
     },
+    async editCheck(...args: unknown[]) {
+      record('editCheck', args)
+      return { ok: true, value: { status: 'ok', absolutePath: '/w/a.md', version: 'v1' } }
+    },
+    async writeText(...args: unknown[]) {
+      record('writeText', args)
+      return { ok: true, value: { status: 'saved', absolutePath: '/w/a.md', version: 'v2', bytes: 4 } }
+    },
   }
   return { namespace, calls }
 }
@@ -329,6 +339,27 @@ test('基线桥接按线序传参，没有可比较轮次时返回 null', async 
 
   const empty = createBridge(recordingNamespace().namespace)
   assert.equal(await empty.reviewLatest({ sessionId: 's1', path: '/w/a.md' }), null)
+})
+
+test('编辑桥接按 Host 的线序传参，写入结果原样返回', async () => {
+  const { namespace, calls } = recordingNamespace()
+  const bridge = createBridge(namespace)
+
+  const check = await bridge.editCheck({ sessionId: 's1', path: 'a.md', bytes: 10 })
+  assert.deepEqual(check, { status: 'ok', absolutePath: '/w/a.md', version: 'v1' })
+  assert.deepEqual(calls.at(-1), { method: 'editCheck', args: ['s1', 'a.md', 10] })
+
+  const saved = await bridge.writeText({
+    sessionId: 's1',
+    path: 'a.md',
+    text: '新文本',
+    intent: { kind: 'replace', version: 'v1' },
+  })
+  assert.deepEqual(saved, { status: 'saved', absolutePath: '/w/a.md', version: 'v2', bytes: 4 })
+  assert.deepEqual(calls.at(-1), {
+    method: 'writeText',
+    args: ['s1', 'a.md', '新文本', { kind: 'replace', version: 'v1' }],
+  })
 })
 
 test('取消信号只在提供时追加到 translate 参数末尾', async () => {

@@ -1,6 +1,7 @@
 /** Structural client contract. The plugin does not import DSH client packages. */
 import type { ComponentType } from 'react'
 import type { Annotation, AnnotationDraft, AnnotationSaveView, PendingReview } from './annotate/model.ts'
+import type { EditCheckRequest, EditCheckResult, WriteTextRequest, WriteTextResult } from './edit/model.ts'
 
 /** Namespace-bound translator. */
 export interface Translate {
@@ -313,6 +314,10 @@ export interface HostBridge {
   reviewCommit(request: ReviewCommitRequest): Promise<ReviewCommitView>
   reviewDetach(request: ReviewDetachRequest): Promise<ReviewDetachView>
   reviewLatest(request: ReviewLatestRequest): Promise<ReviewLatestView | null>
+  /** Whether this session may edit the document, and its version token. */
+  editCheck(request: EditCheckRequest): Promise<EditCheckResult>
+  /** Write the editor's draft behind the caller's intent. */
+  writeText(request: WriteTextRequest): Promise<WriteTextResult>
 }
 
 /** The plugin-page config form surface, declared structurally. */

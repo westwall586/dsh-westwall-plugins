@@ -42,6 +42,20 @@ import type {
   UseInput,
   WorkspaceFilesRemote,
 } from './context.ts'
+import { SourceEditor } from './edit/editor.tsx'
+import {
+  canEnterEdit,
+  conflictFileName,
+  lineTarget,
+  MAX_EDIT_BYTES,
+  sameText,
+  saveOutcomeOf,
+  type EditCheckResult,
+  type WriteIntent,
+  type WriteTextResult,
+} from './edit/model.ts'
+import { ConflictPanel, EditBanner, EditToolbar, useEditCommand } from './edit/panel.tsx'
+import { dirty as draftDirty, editReduce, sessionOf, type EditEvent, type EditState } from './edit/state.ts'
 import { createImageResolver, type ImageResolver } from './images.ts'
 import { classifyLink } from './links.ts'
 import { parseDocument, type ParsedDocument } from './markdown/blocks.ts'
@@ -125,7 +139,7 @@ interface Ask {
 
 type BodyState =
   | { status: 'loading' }
-  | { status: 'ready', text: string, absolutePath: string, version: string }
+  | { status: 'ready', text: string, absolutePath: string, version: string, bytes: number }
   | { status: 'too-large', limit: number }
   | { status: 'not-text' }
   | { status: 'failed', code: string, message: string }
@@ -185,6 +199,8 @@ interface UndoState {
 interface Notice {
   text: string
   undo: boolean
+  /** An absolute path the toast can copy, shown with its own action. */
+  copyPath?: string
 }
 
 const EMPTY_PARSED: ParsedDocument = { blocks: [] }
@@ -398,6 +414,15 @@ function CommentIcon(): ReactNode {
   )
 }
 
+function EditIcon(): ReactNode {
+  return (
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true">
+      <path d="m3 13 1-3.2 7.1-7.1 2.2 2.2L6.2 12 3 13Z" />
+      <path d="m9.8 3.2 2.2 2.2" />
+    </svg>
+  )
+}
+
 function BackIcon(): ReactNode {
   return (
     <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
@@ -462,6 +487,13 @@ export function Body({
   const [errorOpen, setErrorOpen] = useState(false)
   const [errorPlacement, setErrorPlacement] = useState<{ left: number, top: number } | null>(null)
   const [described, setDescribed] = useState<DescribeView | null>(null)
+  const [edit, setEdit] = useState<EditState>({ status: 'reading' })
+  const [editability, setEditability] = useState<EditCheckResult | null>(null)
+  const [editError, setEditError] = useState<string | null>(null)
+  const [editErrorSaveAs, setEditErrorSaveAs] = useState(true)
+  const [editSeq, setEditSeq] = useState(0)
+  const [adopt, setAdopt] = useState<{ text: string, token: number }>({ text: '', token: 0 })
+  const [exitConfirm, setExitConfirm] = useState(false)
   const tocButton = useRef<HTMLButtonElement | null>(null)
   const tocPanel = useRef<HTMLDivElement | null>(null)
   const toolbar = useRef<HTMLDivElement | null>(null)
@@ -474,6 +506,18 @@ export function Body({
   const requestToken = useRef(0)
   const reviewToken = useRef(0)
   const runController = useRef<AbortController | null>(null)
+  const editCheckToken = useRef(0)
+  const adoptToken = useRef(0)
+  const savedEcho = useRef<string | null>(null)
+  const restoreLine = useRef<number | undefined>(undefined)
+  const docKeyRef = useRef<string | null>(null)
+  const editHost = useRef<HTMLDivElement | null>(null)
+  const stateRef = useRef(state)
+  stateRef.current = state
+  const editRef = useRef(edit)
+  editRef.current = edit
+  const translationRef = useRef(translation)
+  translationRef.current = translation
 
   const stopRun = useCallback((): void => {
     runController.current?.abort()
@@ -486,9 +530,29 @@ export function Body({
   const revision = renderer?.revision ?? 0
   const sessionId = file?.sessionId
   const path = file?.path
+  // The tab keeps its identity across a revision reload; the edit phase does not.
+  const documentKey = useMemo(
+    () => (!composeSessionId || path === undefined ? null : `${composeSessionId}\u0000${path}`),
+    [composeSessionId, path],
+  )
   const phase = useInput(state => state.phase)
   const inputAttachmentIds = useInput(state => state.attachmentIds)
   const composerBusy = phase === 'sending' || phase === 'submitting'
+
+  /** Reduce and keep the ref in step, so a save can read the draft it just changed. */
+  const applyEdit = useCallback((event: EditEvent): EditState => {
+    const next = editReduce(editRef.current, event)
+    editRef.current = next
+    setEdit(next)
+    return next
+  }, [])
+
+  const handleEditError = useCallback((message: string): void => {
+    setEditErrorSaveAs(true)
+    setEditError(t('edit.saveFailed', { message }))
+  }, [t])
+
+  const editCommand = useEditCommand({ host, onEvent: applyEdit, onError: handleEditError })
 
   /**
    * The stored translation a reopened document can show without a model call.
@@ -540,36 +604,99 @@ export function Body({
     }
     const controller = new AbortController()
     requestToken.current += 1
-    setView('source')
-    setTranslation({ status: 'idle' })
-    setInstruction('')
-    setAsk(null)
-    setSave({ status: 'idle' })
-    setEditor(null)
-    setDrawerOpen(false)
-    setUndo(null)
-    setNotice(null)
-    setPinTops({})
-    setPeek(null)
-    setAttachBusy(false)
-    setAttachError(null)
-    setState({ status: 'loading' })
+    const documentChanged = docKeyRef.current !== documentKey
+    if (documentChanged) {
+      docKeyRef.current = documentKey
+      savedEcho.current = null
+      setView('source')
+      setTranslation({ status: 'idle' })
+      setInstruction('')
+      setAsk(null)
+      setSave({ status: 'idle' })
+      setEditor(null)
+      setDrawerOpen(false)
+      setUndo(null)
+      setNotice(null)
+      setPinTops({})
+      setPeek(null)
+      setAttachBusy(false)
+      setAttachError(null)
+      setState({ status: 'loading' })
+      setEdit({ status: 'reading' })
+      editRef.current = { status: 'reading' }
+      setEditability(null)
+      setEditError(null)
+      setExitConfirm(false)
+    } else if (stateRef.current.status !== 'ready') {
+      setState({ status: 'loading' })
+    }
     void loadDocument(readBytes, { sessionId, path }, controller.signal).then((result) => {
       if (controller.signal.aborted) return
-      if (result.status === 'ready') {
-        setState({ status: 'ready', text: result.text, absolutePath: result.absolutePath, version: result.version })
-        restoreTranslation(result.text, requestToken.current)
+      if (result.status !== 'ready') {
+        // An external reload that fails while editing must not unmount the draft.
+        if (documentChanged || editRef.current.status === 'reading') {
+          setState(result)
+          rendererRef.current?.failed()
+        }
         return
       }
-      setState(result)
-      rendererRef.current?.failed()
+      const ready: BodyState = {
+        status: 'ready',
+        text: result.text,
+        absolutePath: result.absolutePath,
+        version: result.version,
+        bytes: result.bytes,
+      }
+      const current = stateRef.current
+      // Our own save lands here once the owner bumps the revision: the version
+      // matches the token we just wrote, so adopt it without touching the view.
+      if (savedEcho.current !== null && savedEcho.current === result.version) {
+        savedEcho.current = null
+        setState(ready)
+        return
+      }
+      if (!documentChanged && current.status === 'ready' && current.version === result.version && sameText(current.text, result.text)) {
+        setState(ready)
+        return
+      }
+      const phase = editRef.current
+      if (phase.status !== 'reading') {
+        setState(ready)
+        setTranslation({ status: 'idle' })
+        setInstruction('')
+        if (phase.status === 'editing') {
+          if (!draftDirty(phase.session)) {
+            adoptToken.current += 1
+            setAdopt({ text: result.text, token: adoptToken.current })
+          }
+          applyEdit({ type: 'external', text: result.text, version: result.version })
+        }
+        setEditability({ status: 'ok', absolutePath: result.absolutePath, version: result.version })
+        return
+      }
+      // A revision that arrived while reading is an ordinary external update.
+      setView('source')
+      setTranslation({ status: 'idle' })
+      setInstruction('')
+      setAsk(null)
+      setSave({ status: 'idle' })
+      setEditor(null)
+      setDrawerOpen(false)
+      setUndo(null)
+      setNotice(null)
+      setPinTops({})
+      setPeek(null)
+      setAttachBusy(false)
+      setAttachError(null)
+      setState(ready)
+      restoreTranslation(result.text, requestToken.current)
     })
     return () => {
       controller.abort()
       // A new revision or an unmount also ends any chunk loop still in flight.
       stopRun()
     }
-  }, [sessionId, path, revision, readBytes, t, restoreTranslation, stopRun])
+  }, [sessionId, path, revision, readBytes, t, restoreTranslation, stopRun, documentKey, applyEdit])
 
   // Report the version only once the content is committed: the owner restores
   // the tab's scroll offset as soon as it has a version, and it needs the
@@ -578,6 +705,23 @@ export function Body({
     if (state.status !== 'ready') return
     rendererRef.current?.loaded(state.version)
   }, [state, revision])
+
+  const readyVersion = state.status === 'ready' ? state.version : undefined
+  const readyBytes = state.status === 'ready' ? state.bytes : 0
+
+  // Every new version answers the entry question again: a policy switch or an
+  // external resize decides whether the 编辑 button exists at all.
+  useEffect(() => {
+    if (sessionId === undefined || path === undefined || readyVersion === undefined) {
+      setEditability(null)
+      return
+    }
+    const token = (editCheckToken.current += 1)
+    void editCommand.check(sessionId, path, readyBytes).then((result) => {
+      if (token !== editCheckToken.current) return
+      setEditability(result ?? { status: 'unsupported', reason: 'fs' })
+    })
+  }, [sessionId, path, readyVersion, readyBytes, editCommand.check])
 
   const resolver = useMemo<ImageResolver | undefined>(() => {
     if (state.status !== 'ready' || sessionId === undefined) return undefined
@@ -644,11 +788,6 @@ export function Body({
   const attached = pendingReview !== null && inputAttachmentIds.includes(pendingReview.draftAttachmentId)
 
   // A tab keeps its diff state across a reload; another document starts clean.
-  const documentKey = useMemo(
-    () => (!composeSessionId || path === undefined ? null : `${composeSessionId}\u0000${path}`),
-    [composeSessionId, path],
-  )
-
   useEffect(() => {
     setLatest(null)
     setTocOpen(false)
@@ -969,7 +1108,7 @@ export function Body({
 
   useEffect(() => {
     const root = container.current
-    if (root === null || state.status !== 'ready') return
+    if (root === null || state.status !== 'ready' || edit.status !== 'reading') return
     const openSelectionMenu = (event: MouseEvent, value: SelectionMenuValue): void => {
       if (!openMenu({ kind: SELECTION_MENU_KIND, value }, { x: event.clientX, y: event.clientY })) return
       event.preventDefault()
@@ -1057,7 +1196,7 @@ export function Body({
     }
     root.addEventListener('contextmenu', onContextMenu)
     return () => root.removeEventListener('contextmenu', onContextMenu)
-  }, [state.status, view, sourceAtoms, translatedAtoms, componentRanges, peekable, openMenu, t])
+  }, [state.status, edit.status, view, sourceAtoms, translatedAtoms, componentRanges, peekable, openMenu, t])
 
   // A long source line can make the panel taller than the estimate; flip it once
   // the measured height says it would leave the viewport.
@@ -1679,14 +1818,304 @@ export function Body({
     else if (toolbarError?.kind === 'translate') chooseView('translated')
   }, [toolbarError, saveTranslation, chooseView])
 
+  /** The source line the reading view is showing at its top edge. */
+  const visibleSourceLine = useCallback((): number => {
+    const blocks = parsed.blocks
+    if (blocks.length === 0) return 1
+    const root = container.current
+    if (root === null) return blocks[0]!.sourceStartLine
+    const reference = (toolbar.current?.getBoundingClientRect().bottom ?? 0) + 8
+    for (const block of blocks) {
+      const element = lineElement(root, block.sourceStartLine, block.id)
+      if (element !== null && element.getBoundingClientRect().bottom > reference) return block.sourceStartLine
+    }
+    return blocks[blocks.length - 1]!.sourceStartLine
+  }, [parsed])
+
+  const editMessageOf = useCallback((result: WriteTextResult): string => {
+    const outcome = saveOutcomeOf(result)
+    switch (outcome.kind) {
+      case 'denied':
+        return outcome.mode === 'read-only' ? t('edit.readOnly') : t('edit.denied', { mode: outcome.mode })
+      case 'too-large': return t('edit.tooLarge')
+      case 'exists': return t('edit.exists')
+      case 'unsupported': return t('edit.unsupported')
+      case 'saved':
+      case 'stale': return ''
+    }
+  }, [t])
+
+  /** A successful write of the original file becomes the new reading state. */
+  const rememberSavedOriginal = useCallback((
+    text: string,
+    result: Extract<WriteTextResult, { status: 'saved' }>,
+  ): void => {
+    // A restore already in flight belongs to the old source text.
+    stopRun()
+    savedEcho.current = result.version
+    setState({ status: 'ready', text, absolutePath: result.absolutePath, version: result.version, bytes: result.bytes })
+    setEditability({ status: 'ok', absolutePath: result.absolutePath, version: result.version })
+    setExitConfirm(false)
+    setEditError(null)
+    if (translationRef.current.status !== 'idle') {
+      setTranslation({ status: 'idle' })
+      setNotice({ text: t('edit.translationStale'), undo: false })
+    }
+  }, [t, stopRun])
+
+  const enterEdit = useCallback(async (): Promise<void> => {
+    const ready = stateRef.current
+    if (ready.status !== 'ready' || sessionId === undefined || path === undefined) return
+    if (view === 'translated') {
+      setView('source')
+      return
+    }
+    const pendingCount = pendingReview?.annotations.length ?? 0
+    const result = await editCommand.check(sessionId, path, ready.bytes)
+    const check: EditCheckResult = result ?? { status: 'unsupported', reason: 'fs' }
+    setEditability(check)
+    const entry = canEnterEdit({ view, pending: pendingCount, gate: { check, bytes: ready.bytes } })
+    if (!entry.ok) {
+      switch (entry.reason) {
+        case 'pending':
+          setNotice({ text: t('edit.pending', { count: pendingCount }), undo: false })
+          return
+        case 'translated':
+          setView('source')
+          return
+        case 'too-large':
+          setNotice({ text: t('edit.tooLarge'), undo: false })
+          return
+        case 'read-only':
+          setNotice({ text: t('edit.readOnly'), undo: false })
+          return
+        case 'unchecked':
+        case 'unsupported':
+          setNotice({ text: t('edit.unsupported'), undo: false })
+          return
+        case 'outside':
+          return
+      }
+    }
+    savedEcho.current = null
+    setTocOpen(false)
+    setPeek(null)
+    setEditor(null)
+    setDrawerOpen(false)
+    setAsk(null)
+    setErrorOpen(false)
+    setNotice(null)
+    setEditError(null)
+    setExitConfirm(false)
+    setAdopt({ text: ready.text, token: 0 })
+    applyEdit({ type: 'enter', text: ready.text, version: ready.version, line: visibleSourceLine() })
+    setEditSeq(sequence => sequence + 1)
+  }, [sessionId, path, view, pendingReview, editCommand, t, visibleSourceLine, applyEdit])
+
+  const requestSave = useCallback((): void => {
+    const current = editRef.current
+    const ready = stateRef.current
+    if (current.status === 'reading' || current.status === 'saving') return
+    if (ready.status !== 'ready' || sessionId === undefined || path === undefined) return
+    const fromConflict = current.status === 'conflict'
+    const text = current.session.draft
+    restoreLine.current = current.session.cursorLine
+    setEditError(null)
+    setExitConfirm(false)
+    const intent: WriteIntent = { kind: 'replace', version: current.session.version }
+    void (async () => {
+      const result = await editCommand.save(sessionId, path, text, intent)
+      if (result === undefined) {
+        applyEdit({ type: fromConflict ? 'conflict-back' : 'write-failed' })
+        return
+      }
+      if (result.status === 'saved') {
+        rememberSavedOriginal(text, result)
+        return
+      }
+      if (result.status === 'stale') return
+      applyEdit({ type: fromConflict ? 'conflict-back' : 'write-failed' })
+      setEditErrorSaveAs(result.status !== 'denied')
+      setEditError(editMessageOf(result))
+    })()
+  }, [sessionId, path, editCommand, applyEdit, rememberSavedOriginal, editMessageOf])
+
+  const leaveEdit = useCallback((): void => {
+    const current = editRef.current
+    if (current.status === 'reading') return
+    restoreLine.current = current.session.cursorLine
+    setExitConfirm(false)
+    setEditError(null)
+    applyEdit({ type: 'exit' })
+  }, [applyEdit])
+
+  const requestExit = useCallback((): void => {
+    const current = editRef.current
+    if (current.status === 'reading' || current.status === 'saving') return
+    // Esc over the conflict panel only closes it; the draft must survive.
+    if (current.status === 'conflict') {
+      setExitConfirm(false)
+      applyEdit({ type: 'conflict-close' })
+      return
+    }
+    if (draftDirty(current.session)) {
+      setExitConfirm(true)
+      return
+    }
+    leaveEdit()
+  }, [applyEdit, leaveEdit])
+
+  const reloadFromConflict = useCallback((): void => {
+    restoreLine.current = undefined
+    setExitConfirm(false)
+    setEditError(null)
+    applyEdit({ type: 'exit' })
+    rendererRef.current?.reload()
+  }, [applyEdit])
+
+  const overwriteConflict = useCallback((): void => {
+    const current = editRef.current
+    if (current.status !== 'conflict' || sessionId === undefined || path === undefined) return
+    const text = current.session.draft
+    restoreLine.current = current.session.cursorLine
+    setEditError(null)
+    void (async () => {
+      const result = await editCommand.save(sessionId, path, text, { kind: 'overwrite' })
+      if (result === undefined) {
+        applyEdit({ type: 'conflict-back' })
+        return
+      }
+      if (result.status === 'saved') {
+        rememberSavedOriginal(text, result)
+        return
+      }
+      applyEdit({ type: 'conflict-back' })
+      setEditErrorSaveAs(result.status !== 'denied')
+      setEditError(editMessageOf(result))
+    })()
+  }, [sessionId, path, editCommand, applyEdit, rememberSavedOriginal, editMessageOf])
+
+  const saveAsCopy = useCallback((): void => {
+    const current = editRef.current
+    const ready = stateRef.current
+    if (current.status === 'reading' || current.status === 'saving') return
+    if (ready.status !== 'ready' || sessionId === undefined) return
+    const fromConflict = current.status === 'conflict'
+    const text = current.session.draft
+    restoreLine.current = current.session.cursorLine
+    setEditError(null)
+    void (async () => {
+      const stamp = new Date()
+      const taken = new Set<string>()
+      const back = (): void => {
+        applyEdit({ type: fromConflict ? 'conflict-back' : 'write-failed' })
+      }
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        const target = conflictFileName(ready.absolutePath, stamp, taken)
+        const result = await editCommand.save(sessionId, target, text, { kind: 'create' })
+        if (result === undefined) {
+          back()
+          return
+        }
+        if (result.status === 'saved') {
+          setNotice({
+            text: t('edit.savedAs', { path: result.absolutePath }),
+            undo: false,
+            copyPath: result.absolutePath,
+          })
+          setExitConfirm(false)
+          setEditError(null)
+          rendererRef.current?.reload()
+          return
+        }
+        if (result.status === 'exists') {
+          taken.add(target)
+          taken.add(result.absolutePath)
+          continue
+        }
+        back()
+        setEditErrorSaveAs(result.status !== 'denied')
+        setEditError(editMessageOf(result))
+        return
+      }
+      back()
+      setEditErrorSaveAs(true)
+      setEditError(t('edit.saveFailed', { message: t('edit.exists') }))
+    })()
+  }, [sessionId, editCommand, applyEdit, editMessageOf, t])
+
+  const onEditorUpdate = useCallback((text: string, cursorLine: number): void => {
+    const current = editRef.current
+    if (current.status !== 'editing') return
+    if (current.session.draft === text && current.session.cursorLine === cursorLine) return
+    applyEdit({ type: 'change', text, cursorLine })
+  }, [applyEdit])
+
+  const onEditorSave = useCallback((text: string, cursorLine: number): void => {
+    const current = editRef.current
+    if (current.status !== 'editing' && current.status !== 'conflict') return
+    if (current.session.draft !== text || current.session.cursorLine !== cursorLine) {
+      applyEdit({ type: 'change', text, cursorLine })
+    }
+    requestSave()
+  }, [applyEdit, requestSave])
+
+  // The editor fills the pane between the toolbar and the bottom edge; the
+  // reading position comes back from the line the cursor was last on.
+  useLayoutEffect(() => {
+    if (edit.status !== 'reading') return
+    const line = restoreLine.current
+    if (line === undefined) return
+    restoreLine.current = undefined
+    const target = lineTarget(parsed.blocks, line)
+    if (target === undefined) return
+    const root = container.current
+    const element = lineElement(root, target.sourceStartLine, target.id)
+    if (element === null) return
+    const port = scrollportOf(root)
+    if (port === null) {
+      element.scrollIntoView({ block: 'start' })
+      return
+    }
+    port.scrollTop += element.getBoundingClientRect().top - port.getBoundingClientRect().top - 52
+  }, [edit.status, parsed])
+
+  useLayoutEffect(() => {
+    if (editSeq === 0) return
+    const host = editHost.current
+    const root = container.current
+    if (host === null || root === null) return
+    const port = scrollportOf(root)
+    if (port === null) return
+    port.scrollTop += host.getBoundingClientRect().top - port.getBoundingClientRect().top - 44
+  }, [editSeq])
+
   useEffect(() => {
     if (notice === null) return
-    const timer = setTimeout(() => setNotice(null), notice.undo ? UNDO_WINDOW_MS : 4000)
+    const timer = setTimeout(
+      () => setNotice(null),
+      notice.copyPath === undefined ? (notice.undo ? UNDO_WINDOW_MS : 4000) : 8000,
+    )
     return () => clearTimeout(timer)
   }, [notice])
 
+  const editPhase = edit.status !== 'reading'
+  const editSessionValue = sessionOf(edit)
+  const editDirty = editSessionValue !== undefined && draftDirty(editSessionValue)
+  const editBusy = edit.status === 'saving'
+  const editLineCount = editSessionValue === undefined ? 0 : editSessionValue.draft.split('\n').length
+  const editBytes = state.status === 'ready' ? state.bytes : 0
+  const showEditAction = state.status === 'ready'
+    && view === 'source'
+    && editability?.status === 'ok'
+    && editBytes <= MAX_EDIT_BYTES
+  const editFileName = state.status === 'ready'
+    ? (state.absolutePath.replace(/\\/g, '/').split('/').pop() ?? '')
+    : (path ?? '')
+  const editExternal = editSessionValue?.external === true
+
   return (
-    <div className="am-root" ref={container} data-active-markdown>
+    <div className="am-root" ref={container} data-active-markdown data-editing={editPhase ? 'true' : undefined}>
       {state.status === 'loading' && <div className="am-status" role="status"><span className="am-spinner" aria-hidden="true" />{t('loading')}</div>}
       {state.status === 'too-large' && (
         <EmptyState
@@ -1707,7 +2136,22 @@ export function Body({
       {state.status === 'ready' && (
         <>
           <div className="am-toolbar" ref={toolbar}>
-            {view === 'source' ? (
+            {editPhase ? (
+              <EditToolbar
+                dirty={editDirty}
+                saving={editBusy}
+                lineCount={editLineCount}
+                labels={{
+                  save: t('edit.save'),
+                  saving: t('edit.saving'),
+                  exit: t('edit.exit'),
+                  lines: t('edit.lines'),
+                  dirty: t('edit.dirty'),
+                }}
+                onSave={requestSave}
+                onExit={requestExit}
+              />
+            ) : view === 'source' ? (
               <>
                 <button
                   ref={tocButton}
@@ -1724,6 +2168,18 @@ export function Body({
                   {updatedAnchors.size === 0 ? null : <span className="am-toolbar-dot" aria-hidden="true" />}
                 </button>
                 <span className="am-toolbar-spacer" />
+                {showEditAction ? (
+                  <button
+                    type="button"
+                    className="am-toolbar-button"
+                    aria-label={t('edit.action')}
+                    title={t('edit.action')}
+                    onClick={() => { void enterEdit() }}
+                  >
+                    <EditIcon />
+                    <span className="am-toolbar-label">{t('edit.action')}</span>
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="am-toolbar-button am-toolbar-button--quiet"
@@ -1835,7 +2291,7 @@ export function Body({
               </>
             )}
           </div>
-          {tocOpen && tocPlacement !== null && toc.length > 0 ? (
+          {!editPhase && tocOpen && tocPlacement !== null && toc.length > 0 ? (
             <div
               ref={tocPanel}
               className="am-toc-popover"
@@ -1856,7 +2312,7 @@ export function Body({
               />
             </div>
           ) : null}
-          {errorOpen && toolbarError !== null && errorPlacement !== null ? (
+          {!editPhase && errorOpen && toolbarError !== null && errorPlacement !== null ? (
             <div
               className="am-error-popover"
               style={{ left: errorPlacement.left, top: errorPlacement.top }}
@@ -1894,22 +2350,81 @@ export function Body({
               </div>
             </div>
           ) : null}
-          <RenderBoundary
-            labels={{ title: t('error.render.title'), body: t('error.render.body'), reload: t('reload') }}
-            onReload={reload}
-          >
-            <DocumentView
-              parsed={displayed}
-              labels={labels}
-              actions={actions}
-              components={componentContext}
-              t={t}
-              diff={view === 'source' && diffActive ? diff : undefined}
-            />
-          </RenderBoundary>
+          {editPhase ? (
+            <>
+              {exitConfirm ? (
+                <EditBanner
+                  text={t('edit.exitConfirm')}
+                  primary={{ label: t('edit.discard'), run: leaveEdit, danger: true }}
+                  secondary={{ label: t('edit.conflict.close'), run: () => setExitConfirm(false) }}
+                />
+              ) : null}
+              {editError === null ? null : (
+                <EditBanner
+                  text={editError}
+                  primary={editErrorSaveAs ? { label: t('edit.conflict.saveAs'), run: saveAsCopy } : undefined}
+                  secondary={{ label: t('diff.dismiss'), run: () => setEditError(null) }}
+                />
+              )}
+              {editExternal && !exitConfirm ? (
+                <EditBanner
+                  text={t('edit.external')}
+                  secondary={{
+                    label: t('edit.conflict.close'),
+                    run: () => applyEdit({ type: 'external-dismiss' }),
+                  }}
+                />
+              ) : null}
+              <div className="am-edit-shell" ref={editHost}>
+                <SourceEditor
+                  key={editSeq}
+                  initialText={editSessionValue?.draft ?? ''}
+                  entryLine={editSessionValue?.entryLine ?? 1}
+                  adopt={adopt}
+                  readOnly={editBusy || edit.status === 'conflict'}
+                  label={`${t('edit.action')} ${editFileName}`}
+                  onUpdate={onEditorUpdate}
+                  onSave={onEditorSave}
+                  onExit={requestExit}
+                />
+              </div>
+              <ConflictPanel
+                open={edit.status === 'conflict'}
+                busy={editBusy}
+                labels={{
+                  title: t('edit.conflict.title'),
+                  body: t('edit.conflict.body'),
+                  reload: t('edit.conflict.reload'),
+                  overwrite: t('edit.conflict.overwrite'),
+                  overwriteWarning: t('edit.conflict.overwriteConfirm'),
+                  saveAs: t('edit.conflict.saveAs'),
+                  close: t('edit.conflict.close'),
+                  cancel: t('annotate.cancel'),
+                }}
+                onReload={reloadFromConflict}
+                onOverwrite={overwriteConflict}
+                onSaveAs={saveAsCopy}
+                onClose={() => applyEdit({ type: 'conflict-close' })}
+              />
+            </>
+          ) : (
+            <RenderBoundary
+              labels={{ title: t('error.render.title'), body: t('error.render.body'), reload: t('reload') }}
+              onReload={reload}
+            >
+              <DocumentView
+                parsed={displayed}
+                labels={labels}
+                actions={actions}
+                components={componentContext}
+                t={t}
+                diff={view === 'source' && diffActive ? diff : undefined}
+              />
+            </RenderBoundary>
+          )}
         </>
       )}
-      {view === 'source' ? (
+      {view === 'source' && !editPhase ? (
         <div className="am-pins">
           {annotationList.map(annotation => (
             annotation.kind !== 'text' || pinTops[annotation.id] === undefined
@@ -1959,7 +2474,7 @@ export function Body({
         />
       )}
       <AnnotationDrawer
-        open={drawerOpen}
+        open={drawerOpen && !editPhase}
         annotations={annotationList}
         readOnly={view === 'translated'}
         located={located}
@@ -1993,7 +2508,7 @@ export function Body({
         onAttach={() => { void attachFeedback() }}
         onRemoveAttachment={() => { void removeAttachment() }}
       />
-      {editor === null ? null : (
+      {editor === null || editPhase ? null : (
         <AnnotationPopover
           left={editor.left}
           top={editor.top}
@@ -2017,7 +2532,25 @@ export function Body({
         : (
           <div className="am-toast" role="status">
             <span>{notice.text}</span>
-            {notice.undo && undo !== null
+            {notice.copyPath === undefined
+              ? null
+              : (
+                <button
+                  type="button"
+                  className="am-toast-action"
+                  onClick={() => {
+                    const copy = notice.copyPath
+                    const clipboard = navigator.clipboard
+                    if (copy === undefined || clipboard === undefined) return
+                    void clipboard.writeText(copy)
+                      .then(() => setNotice({ text: t('code.copied'), undo: false }))
+                      .catch(() => {})
+                  }}
+                >
+                  {t('edit.copyPath')}
+                </button>
+              )}
+            {notice.undo && undo !== null && !editPhase
               ? <button type="button" className="am-toast-action" onClick={undoDelete}>{t('annotate.undo')}</button>
               : null}
           </div>

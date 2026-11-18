@@ -1,12 +1,5 @@
-/**
- * The guarded write channel for the preview's source editor. The Host owns the
- * session's sandbox policy and version token; the client only picks an intent.
- * Every refusal is a return value, because a thrown error would reach the wire
- * as a Remote code the client cannot branch on.
- */
 import { Buffer } from 'node:buffer'
 
-/** The largest document the source editor accepts, client and Host alike. */
 export const MAX_EDIT_BYTES = 1024 * 1024
 
 export type EditMode = 'read-only' | 'workspace-write' | 'danger-full-access'
@@ -69,13 +62,11 @@ interface EditWriteOutcomeLike {
 
 type EditExpectedLike = { kind: 'createIfAbsent' } | { kind: 'replaceIfVersion', version: string }
 
-/** The sandbox policy the plugin passes back to `writeText`, declared structurally. */
 export interface EditSandboxPolicyLike {
   readonly mode: EditMode
   readonly workspaceRoot: string
 }
 
-/** The subset of `ctx.fs` the edit channel uses. */
 export interface EditFsLike {
   resolve(path: string, opts?: { cwd?: string, signal?: AbortSignal }): Promise<EditTargetLike>
   lstat(path: string, opts?: { cwd?: string }, signal?: AbortSignal): Promise<EditPathInfoLike | undefined>
@@ -99,7 +90,6 @@ export interface EditSessionsLike {
   get(id: string): unknown | undefined
 }
 
-/** The three Host services the edit channel consumes; tests pass a fake. */
 export interface EditFacility {
   readonly fs: EditFsLike
   readonly sandbox: EditSandboxLike
@@ -172,10 +162,6 @@ async function withExistingEol(face: EditFacility, target: EditTargetLike, text:
   }
 }
 
-/**
- * Answer whether the session may edit this file, without writing anything.
- * The version returned here is the token a later guarded save must send back.
- */
 export async function editCheck(face: EditFacility, request: EditCheckRequest): Promise<EditCheckResult> {
   const session = face.sessions.get(request.sessionId)
   if (session === undefined) return unsupported('session')
@@ -227,7 +213,6 @@ export async function writeText(face: EditFacility, request: WriteTextRequest): 
     const entry = await face.fs.lstat(request.path, { cwd: root })
     if (entry?.type === 'symlink') return unsupported('symlink')
     if (entry !== undefined && entry.type !== 'file') return unsupported('not-file')
-    // A save-as has no file yet; every other intent writes a file that was read.
     if (entry === undefined && request.intent.kind !== 'create') return unsupported('not-file')
     const content = entry === undefined ? request.text : await withExistingEol(face, target, request.text)
     const outcome = await face.fs.writeText(target, content, expected, undefined, policy)

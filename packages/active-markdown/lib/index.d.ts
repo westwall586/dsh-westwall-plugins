@@ -85,7 +85,6 @@ export default class ActiveMarkdown extends TypertRemoteService {
     private annotation;
     private reviews;
     private cache;
-    /** The three optional services behind the edit channel; any absence disables it. */
     private editFacility;
     /**
      * The directory a session's writes belong to: the committed working directory

@@ -1,8 +1,3 @@
-/**
- * The CodeMirror bridge: React owns the edit phase and a shadow draft, while
- * the editor owns the document between mounts. The component is keyed by the
- * entry sequence, so every entry starts from a fresh history.
- */
 import * as React from 'react'
 import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
@@ -23,8 +18,8 @@ import {
 } from '@codemirror/view'
 import { tags } from '@lezer/highlight'
 import { sameText } from './model.ts'
+import { scrollportOf } from '../scroll.ts'
 
-/** New text pushed in from outside; the token makes adoption a one-shot. */
 export interface EditorAdopt {
   text: string
   token: number
@@ -32,30 +27,15 @@ export interface EditorAdopt {
 
 export interface SourceEditorProps {
   initialText: string
-  /** The source line the reading view was at. */
   entryLine: number
   adopt: EditorAdopt
-  /** Saving freezes the document so the write matches what the reader saw. */
   readOnly: boolean
-  /** "Edit <file name>" for the editor's accessible name. */
   label: string
   onUpdate(text: string, cursorLine: number): void
   onSave(text: string, cursorLine: number): void
   onExit(): void
 }
 
-/** Nearest ancestor that scrolls the preview, or null when the document scrolls. */
-function scrollportOf(element: HTMLElement | null): HTMLElement | null {
-  let node = element?.parentElement ?? null
-  while (node !== null) {
-    const overflow = getComputedStyle(node).overflowY
-    if (overflow === 'auto' || overflow === 'scroll') return node
-    node = node.parentElement
-  }
-  return null
-}
-
-/** Fill the visible part of the preview so only CodeMirror scrolls. */
 function fitHeight(container: HTMLElement): void {
   const port = scrollportOf(container)
   if (port === null) {
@@ -110,11 +90,6 @@ function cursorLineOf(view: EditorView): number {
   return view.state.doc.lineAt(view.state.selection.main.head).number
 }
 
-/**
- * Mount one editor and keep its text sized to the preview viewport.
- * @param props - the entry text, the adoption token, and the command callbacks.
- * @returns the editor container.
- */
 export function SourceEditor(props: SourceEditorProps): ReactNode {
   const host = useRef<HTMLDivElement | null>(null)
   const view = useRef<EditorView | null>(null)
@@ -215,7 +190,6 @@ export function SourceEditor(props: SourceEditorProps): ReactNode {
     }
   }, [])
 
-  // A banner appearing above the editor changes its top edge; refit on every render.
   useLayoutEffect(() => {
     const container = host.current
     if (container !== null) fitHeight(container)

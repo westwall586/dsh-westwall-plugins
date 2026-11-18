@@ -1,11 +1,5 @@
-/**
- * The source editor's wire vocabulary and the small pure decisions the Body
- * makes around it. No React and no DOM here: every rule in this module is a
- * table the unit tests can walk.
- */
 import type { Block } from '../markdown/model.ts'
 
-/** The Host's authority is this same number; the client only disables early. */
 export const MAX_EDIT_BYTES = 1024 * 1024
 
 export type EditMode = 'read-only' | 'workspace-write' | 'danger-full-access'
@@ -50,11 +44,8 @@ export function sameText(a: string, b: string): boolean {
   return a.replace(/\r\n/g, '\n') === b.replace(/\r\n/g, '\n')
 }
 
-/** What the Body knows when it asks whether the editor may open. */
 export interface EditGate {
-  /** The latest Host answer, or null while the check is still running. */
   check: EditCheckResult | null
-  /** The bytes the opener read; the client refuses over the limit before asking again. */
   bytes: number
 }
 
@@ -69,11 +60,6 @@ export type EditRefusal =
 
 export type EditEntry = { ok: true } | { ok: false, reason: EditRefusal }
 
-/**
- * The mutual-exclusion table: the translated view must switch back first, an
- * unsent review blocks the source from moving under it, and every Host refusal
- * keeps its own reason so the Body can say why instead of showing a dead button.
- */
 export function canEnterEdit(input: { view: 'source' | 'translated', pending: number, gate: EditGate }): EditEntry {
   if (input.view === 'translated') return { ok: false, reason: 'translated' }
   if (input.pending > 0) return { ok: false, reason: 'pending' }
@@ -88,7 +74,6 @@ export function canEnterEdit(input: { view: 'source' | 'translated', pending: nu
   }
 }
 
-/** The client-facing projection of one save result, one arm per wire status. */
 export type SaveOutcome =
   | { kind: 'saved', absolutePath: string, version: string, bytes: number }
   | { kind: 'stale' }
@@ -118,14 +103,12 @@ function isSeparator(character: string): boolean {
   return character === '/' || character === '\\'
 }
 
-/** Split one display path into its directory (with separator) and leaf. */
 export function splitDisplayPath(path: string): { directory: string, leaf: string } {
   let leafStart = path.length
   while (leafStart > 0 && !isSeparator(path[leafStart - 1]!)) leafStart -= 1
   return { directory: path.slice(0, leafStart), leaf: path.slice(leafStart) }
 }
 
-/** `<stem>.conflict-<yyyyMMdd-HHmmss>[-n]<ext>`, always beside the original. */
 export function conflictFileName(absolutePath: string, stamp: Date, taken: ReadonlySet<string>): string {
   const { directory, leaf } = splitDisplayPath(absolutePath)
   const dot = leaf.lastIndexOf('.')
@@ -149,11 +132,6 @@ export function conflictFileName(absolutePath: string, stamp: Date, taken: Reado
   return `${directory}${stem}.conflict-${tag}-999${extension}`
 }
 
-/**
- * The block a source line belongs to. A blank line between blocks resolves to
- * the block above it; a line before the first or after the last block clamps to
- * that edge, so restoring a reading position always has a target.
- */
 export function lineTarget(blocks: readonly Block[], line: number): Block | undefined {
   if (blocks.length === 0) return undefined
   let preceding: Block | undefined

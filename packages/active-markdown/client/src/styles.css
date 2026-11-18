@@ -1232,7 +1232,6 @@
   overflow-wrap: anywhere;
 }
 
-/* While the editor is open the pane's own scrollbar must not appear beside CodeMirror's. */
 [data-active-markdown][data-editing] {
   padding-bottom: 0;
 }

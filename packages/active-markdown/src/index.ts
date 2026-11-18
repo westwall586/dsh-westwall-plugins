@@ -507,7 +507,6 @@ export default class ActiveMarkdown extends TypertRemoteService {
     return this.cacheValue
   }
 
-  /** The three optional services behind the edit channel; any absence disables it. */
   private editFacility(): EditFacility | null {
     const fs = this.serviceOf<EditFsLike>('fs')
     const sandbox = this.serviceOf<EditSandboxLike>('sandboxPolicy')

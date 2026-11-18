@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
+import { MAX_EDIT_BYTES as CLIENT_MAX_EDIT_BYTES } from '../client/src/edit/model.ts'
 import {
   editCheck,
   MAX_EDIT_BYTES,
@@ -279,4 +280,8 @@ test('LF 文件与读不到原文时原样写入', async () => {
   const unreadable = fakeFacility({ readFails: true })
   await writeText(unreadable.face, writeRequest('# t\n\nbody changed\n'))
   assert.equal(unreadable.writes[0]?.content, '# t\n\nbody changed\n')
+})
+
+test('主机与客户端声明的编辑上限一致', () => {
+  assert.equal(CLIENT_MAX_EDIT_BYTES, MAX_EDIT_BYTES)
 })

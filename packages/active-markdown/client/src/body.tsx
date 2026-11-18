@@ -55,6 +55,7 @@ import {
   type WriteTextResult,
 } from './edit/model.ts'
 import { ConflictPanel, EditBanner, EditToolbar, useEditCommand } from './edit/panel.tsx'
+import { scrollportOf } from './scroll.ts'
 import { dirty as draftDirty, editReduce, sessionOf, type EditEvent, type EditState } from './edit/state.ts'
 import { createImageResolver, type ImageResolver } from './images.ts'
 import { classifyLink } from './links.ts'
@@ -216,17 +217,6 @@ const PEEK_HEIGHT = 64
 const PEEK_WIDTH = 340
 /** The editor's measured height is not known before it renders; this keeps it on screen. */
 const ANNOTATION_ESTIMATE_HEIGHT = 240
-
-/** Nearest ancestor that scrolls the preview, or null when the document scrolls. */
-function scrollportOf(element: HTMLElement | null): HTMLElement | null {
-  let node = element?.parentElement ?? null
-  while (node !== null) {
-    const overflow = getComputedStyle(node).overflowY
-    if (overflow === 'auto' || overflow === 'scroll') return node
-    node = node.parentElement
-  }
-  return null
-}
 
 /** The rendered line element for a source line, preferring the block that owns it. */
 function lineElement(root: HTMLElement | null, line: number, blockId?: string): HTMLElement | null {
@@ -471,6 +461,8 @@ export function Body({
   const [ask, setAsk] = useState<Ask | null>(null)
   const [save, setSave] = useState<SaveState>({ status: 'idle' })
   const [notice, setNotice] = useState<Notice | null>(null)
+  /** A save-as keeps its path on screen through the reload it starts. */
+  const keepNotice = useRef<Notice | null>(null)
   const [latest, setLatest] = useState<ReviewLatestView | null>(null)
   const [updateCursor, setUpdateCursor] = useState(0)
   const [tocOpen, setTocOpen] = useState(false)
@@ -509,7 +501,6 @@ export function Body({
   const runController = useRef<AbortController | null>(null)
   const editCheckToken = useRef(0)
   const adoptToken = useRef(0)
-  const savedEcho = useRef<string | null>(null)
   const restoreLine = useRef<number | undefined>(undefined)
   const docKeyRef = useRef<string | null>(null)
   const editHost = useRef<HTMLDivElement | null>(null)
@@ -540,7 +531,6 @@ export function Body({
   const inputAttachmentIds = useInput(state => state.attachmentIds)
   const composerBusy = phase === 'sending' || phase === 'submitting'
 
-  /** Reduce and keep the ref in step, so a save can read the draft it just changed. */
   const applyEdit = useCallback((event: EditEvent): EditState => {
     const next = editReduce(editRef.current, event)
     editRef.current = next
@@ -608,7 +598,6 @@ export function Body({
     const documentChanged = docKeyRef.current !== documentKey
     if (documentChanged) {
       docKeyRef.current = documentKey
-      savedEcho.current = null
       setView('source')
       setTranslation({ status: 'idle' })
       setInstruction('')
@@ -623,8 +612,7 @@ export function Body({
       setAttachBusy(false)
       setAttachError(null)
       setState({ status: 'loading' })
-      setEdit({ status: 'reading' })
-      editRef.current = { status: 'reading' }
+      applyEdit({ type: 'exit' })
       setEditability(null)
       setEditError(null)
       setExitConfirm(false)
@@ -635,7 +623,6 @@ export function Body({
     void loadDocument(readBytes, { sessionId, path }, controller.signal).then((result) => {
       if (controller.signal.aborted) return
       if (result.status !== 'ready') {
-        // An external reload that fails while editing must not unmount the draft.
         if (documentChanged || editRef.current.status === 'reading') {
           setState(result)
           rendererRef.current?.failed()
@@ -650,13 +637,6 @@ export function Body({
         bytes: result.bytes,
       }
       const current = stateRef.current
-      // Our own save lands here once the owner bumps the revision: the version
-      // matches the token we just wrote, so adopt it without touching the view.
-      if (savedEcho.current !== null && savedEcho.current === result.version) {
-        savedEcho.current = null
-        setState(ready)
-        return
-      }
       if (!documentChanged && current.status === 'ready' && current.version === result.version && sameText(current.text, result.text)) {
         setState(ready)
         return
@@ -676,8 +656,6 @@ export function Body({
         setEditability({ status: 'ok', absolutePath: result.absolutePath, version: result.version })
         return
       }
-      // A revision that arrived while reading is an ordinary external update.
-      // The toast stays: a save-as has just reported where the copy went.
       setView('source')
       setTranslation({ status: 'idle' })
       setInstruction('')
@@ -690,6 +668,8 @@ export function Body({
       setPeek(null)
       setAttachBusy(false)
       setAttachError(null)
+      setNotice(keepNotice.current)
+      keepNotice.current = null
       setState(ready)
       restoreTranslation(result.text, requestToken.current)
     })
@@ -711,8 +691,6 @@ export function Body({
   const readyVersion = state.status === 'ready' ? state.version : undefined
   const readyBytes = state.status === 'ready' ? state.bytes : 0
 
-  // Every new version answers the entry question again: a policy switch or an
-  // external resize decides whether the 编辑 button exists at all.
   useEffect(() => {
     if (sessionId === undefined || path === undefined || readyVersion === undefined) {
       setEditability(null)
@@ -1368,7 +1346,7 @@ export function Body({
       text: state.text,
       annotations: annotationsToSend,
       unlocatable: unlocatableNow(),
-      edited: editedSinceOpen,
+      editedSinceOpen,
       input: inputActions,
       phase,
       roundId: pending.roundId,
@@ -1413,7 +1391,7 @@ export function Body({
       text: state.text,
       annotations: latest.annotations,
       unlocatable: unlocatableNow(),
-      edited: editedSinceOpen,
+      editedSinceOpen,
       input: inputActions,
       phase,
     })
@@ -1822,7 +1800,6 @@ export function Body({
     else if (toolbarError?.kind === 'translate') chooseView('translated')
   }, [toolbarError, saveTranslation, chooseView])
 
-  /** The source line the reading view is showing at its top edge. */
   const visibleSourceLine = useCallback((): number => {
     const blocks = parsed.blocks
     if (blocks.length === 0) return 1
@@ -1849,14 +1826,11 @@ export function Body({
     }
   }, [t])
 
-  /** A successful write of the original file becomes the new reading state. */
   const rememberSavedOriginal = useCallback((
     text: string,
     result: Extract<WriteTextResult, { status: 'saved' }>,
   ): void => {
-    // A restore already in flight belongs to the old source text.
     stopRun()
-    savedEcho.current = result.version
     setState({ status: 'ready', text, absolutePath: result.absolutePath, version: result.version, bytes: result.bytes })
     setEditability({ status: 'ok', absolutePath: result.absolutePath, version: result.version })
     setEditedSinceOpen(true)
@@ -1902,7 +1876,6 @@ export function Body({
           return
       }
     }
-    savedEcho.current = null
     setTocOpen(false)
     setPeek(null)
     setEditor(null)
@@ -1957,7 +1930,6 @@ export function Body({
   const requestExit = useCallback((): void => {
     const current = editRef.current
     if (current.status === 'reading' || current.status === 'saving') return
-    // Esc over the conflict panel only closes it; the draft must survive.
     if (current.status === 'conflict') {
       setExitConfirm(false)
       applyEdit({ type: 'conflict-close' })
@@ -2025,13 +1997,13 @@ export function Body({
         if (result.status === 'saved') {
           setExitConfirm(false)
           setEditError(null)
-          // The copy is safe on disk; the original is someone else's to reload.
           applyEdit({ type: 'exit' })
-          setNotice({
+          keepNotice.current = {
             text: t('edit.savedAs', { path: result.absolutePath }),
             undo: false,
             copyPath: result.absolutePath,
-          })
+          }
+          setNotice(keepNotice.current)
           rendererRef.current?.reload()
           return
         }
@@ -2067,8 +2039,6 @@ export function Body({
     requestSave()
   }, [applyEdit, requestSave])
 
-  // The editor fills the pane between the toolbar and the bottom edge; the
-  // reading position comes back from the line the cursor was last on.
   useLayoutEffect(() => {
     if (edit.status !== 'reading') return
     const line = restoreLine.current
@@ -2098,7 +2068,10 @@ export function Body({
   }, [editSeq])
 
   useEffect(() => {
-    if (notice === null) return
+    if (notice === null) {
+      keepNotice.current = null
+      return
+    }
     const timer = setTimeout(
       () => setNotice(null),
       notice.copyPath === undefined ? (notice.undo ? UNDO_WINDOW_MS : 4000) : 8000,

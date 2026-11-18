@@ -1,8 +1,3 @@
-/**
- * The edit phase's controls: the wire commands, the toolbar that replaces the
- * reading toolbar, the conflict panel, and the banner that reports an external
- * revision or asks about an unsaved exit.
- */
 import * as React from 'react'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { HostBridge } from '../context.ts'
@@ -12,7 +7,6 @@ import type { EditEvent } from './state.ts'
 export interface EditCommandDeps {
   host(): Promise<HostBridge>
   onEvent(event: EditEvent): void
-  /** The save never reached the Host; the Body turns this into an error banner. */
   onError(message: string): void
 }
 
@@ -26,7 +20,6 @@ export interface EditCommand {
   ): Promise<WriteTextResult | undefined>
 }
 
-/** Wire calls plus the state transitions every save starts with and settles. */
 export function useEditCommand(deps: EditCommandDeps): EditCommand {
   const { host, onEvent, onError } = deps
   const check = useCallback(async (sessionId: string, path: string, bytes: number) => {
@@ -48,12 +41,7 @@ export function useEditCommand(deps: EditCommandDeps): EditCommand {
       const bridge = await host()
       const result = await bridge.writeText({ sessionId, path, text, intent })
       if (result.status === 'saved') {
-        onEvent({
-          type: 'saved',
-          target: intent.kind === 'create' ? 'copy' : 'original',
-          text,
-          version: result.version,
-        })
+        onEvent({ type: 'saved' })
       } else if (result.status === 'stale') {
         onEvent({ type: 'stale' })
       }
@@ -83,7 +71,6 @@ export interface EditToolbarProps {
   onExit(): void
 }
 
-/** The edit phase's half of the shared toolbar row. */
 export function EditToolbar(props: EditToolbarProps): ReactNode {
   const { dirty, saving, lineCount, labels } = props
   return (
@@ -134,7 +121,6 @@ export interface ConflictPanelProps {
   onClose(): void
 }
 
-/** Three exits from a stale save; overwrite needs a second click. */
 export function ConflictPanel(props: ConflictPanelProps): ReactNode {
   const { open, busy, labels, onClose } = props
   const [confirmed, setConfirmed] = useState(false)
@@ -216,7 +202,6 @@ export interface EditBannerProps {
   secondary?: BannerAction
 }
 
-/** One line of state that needs the reader's attention, without a modal. */
 export function EditBanner({ text, primary, secondary }: EditBannerProps): ReactNode {
   return (
     <div className="am-edit-banner" role="status" aria-live="polite">

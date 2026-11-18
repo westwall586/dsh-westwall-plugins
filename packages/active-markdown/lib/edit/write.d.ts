@@ -1,4 +1,3 @@
-/** The largest document the source editor accepts, client and Host alike. */
 export declare const MAX_EDIT_BYTES: number;
 export type EditMode = 'read-only' | 'workspace-write' | 'danger-full-access';
 export type EditUnsupportedReason = 'session' | 'symlink' | 'not-file' | 'fs';
@@ -80,12 +79,10 @@ type EditExpectedLike = {
     kind: 'replaceIfVersion';
     version: string;
 };
-/** The sandbox policy the plugin passes back to `writeText`, declared structurally. */
 export interface EditSandboxPolicyLike {
     readonly mode: EditMode;
     readonly workspaceRoot: string;
 }
-/** The subset of `ctx.fs` the edit channel uses. */
 export interface EditFsLike {
     resolve(path: string, opts?: {
         cwd?: string;
@@ -107,7 +104,6 @@ export interface EditSandboxLike {
 export interface EditSessionsLike {
     get(id: string): unknown | undefined;
 }
-/** The three Host services the edit channel consumes; tests pass a fake. */
 export interface EditFacility {
     readonly fs: EditFsLike;
     readonly sandbox: EditSandboxLike;
@@ -124,10 +120,6 @@ export declare function writeIntentOf(intent: WriteIntent): EditExpectedLike | u
  * shares the `exists` arm with `FS_ALREADY_EXISTS`.
  */
 export declare function writeResultOf(error: unknown, mode: EditMode, absolutePath: string): WriteTextResult;
-/**
- * Answer whether the session may edit this file, without writing anything.
- * The version returned here is the token a later guarded save must send back.
- */
 export declare function editCheck(face: EditFacility, request: EditCheckRequest): Promise<EditCheckResult>;
 /**
  * Write one document behind its intent; every refusal is a typed result.

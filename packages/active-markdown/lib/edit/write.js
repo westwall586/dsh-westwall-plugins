@@ -1,11 +1,4 @@
-/**
- * The guarded write channel for the preview's source editor. The Host owns the
- * session's sandbox policy and version token; the client only picks an intent.
- * Every refusal is a return value, because a thrown error would reach the wire
- * as a Remote code the client cannot branch on.
- */
 import { Buffer } from 'node:buffer';
-/** The largest document the source editor accepts, client and Host alike. */
 export const MAX_EDIT_BYTES = 1024 * 1024;
 function unsupported(reason) {
     return { status: 'unsupported', reason };
@@ -72,10 +65,6 @@ async function withExistingEol(face, target, text) {
         return text;
     }
 }
-/**
- * Answer whether the session may edit this file, without writing anything.
- * The version returned here is the token a later guarded save must send back.
- */
 export async function editCheck(face, request) {
     const session = face.sessions.get(request.sessionId);
     if (session === undefined)
@@ -140,7 +129,6 @@ export async function writeText(face, request) {
             return unsupported('symlink');
         if (entry !== undefined && entry.type !== 'file')
             return unsupported('not-file');
-        // A save-as has no file yet; every other intent writes a file that was read.
         if (entry === undefined && request.intent.kind !== 'create')
             return unsupported('not-file');
         const content = entry === undefined ? request.text : await withExistingEol(face, target, request.text);

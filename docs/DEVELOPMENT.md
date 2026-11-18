@@ -127,6 +127,27 @@ dsh plugin --profile <profile> add link:$(pwd)/packages/<name>
 4. **根包与子包不要同时安装。** 否则同一行会被挂两次，启动报 `duplicate loader entry id`。
 5. **提交信息用 Conventional Commits。** 如 `feat(hello): ...`、`fix(hello): ...`。
 
+## 开发闭环
+
+单人维护：**开分支、不开 PR**。PR 与网页合并省掉，`main` 由维护者确认后直接接收推送。
+
+1. 从最新 `main` 开分支：`git switch -c feat/<name>-<短描述>`。
+2. 改源码，跑完整自检：
+   ```sh
+   pnpm -r build && pnpm -r typecheck && pnpm -r test && pnpm aggregate:check
+   ```
+   有浏览器半体的改动，再做 [Web 端实测](#web-自主测试)。
+3. 在分支上提交（Conventional Commits），**不要**推 `main`。
+4. 向维护者汇报：分支名、改动的文件、跑过的命令、Web 实测结论（含截图路径）。
+5. 维护者确认后合入并推送：
+   ```sh
+   git switch main && git merge --ff-only <分支> && git push origin main
+   git branch -d <分支>
+   ```
+   只用 `--ff-only`：分支必须基于最新 `main`，冲突时先在分支上 `git rebase main`，不要用 merge commit。
+
+CI 只在推送 `main` 时运行（`.github/workflows/ci.yml`），它是推送前的最后一道闸门，所以在本地跑绿之前不要推 `main`。
+
 ## 本地调试与验证
 
 ```sh
@@ -148,6 +169,45 @@ dsh plugin --profile web remove @westwall/dsh-<name>
 ```sh
 node scripts/smoke-install.mjs link:$(pwd)/packages/<name> --expect "[dsh-<name>] mounted"
 ```
+
+### Web 自主测试
+
+Agent 在 Web 端做自主测试时，按下面的步骤走，不要靠猜。
+
+**必须用 Web profile 启动。** `dsh --profile web ...`（profile 名默认是 `web`）；桌面版、`headless`
+或默认 profile 起不来 Web GUI。
+
+**服务地址从控制台拿，不要自己拼。** 每个进程启动时生成一个随机 launch token，就绪后打印一行：
+
+```
+dsh web: http://127.0.0.1:<port>/?token=<token>
+```
+
+访问这个完整 URL。`GET /?token=...` 是本进程唯一的换取 cookie 入口：它写入绑定 authority 的签名 cookie，
+再 302 到干净的 `./`。直接打开不带 token 的地址（例如 `http://127.0.0.1:18787/`）会得到 **401**，
+这不是「需要额外配置」，而是走错了入口。
+
+后台起服务并取地址：
+
+```sh
+logs=$(mktemp)
+dsh --profile web --port 18787 --no-open >"$logs" 2>&1 &
+url=$(grep -ho 'dsh web: http[^ ]*' "$logs" | head -1 | cut -d' ' -f3)
+echo "$url"   # 浏览器打开这一个地址
+```
+
+用这个地址之前先看日志有没有 `did not activate`、`duplicate loader entry id`、`failed to import` 告警；
+有就让服务继续跑、把它们作为测试结论一起报，不要重试到静默。
+
+测完停进程、摘除插件，别把验证 profile 留脏。
+
+常见错误：
+
+| 现象 | 原因 |
+|---|---|
+| 直连 `http://127.0.0.1:<port>/` 返回 401 | 没走 `?token=` 入口；用控制台打印的完整 URL |
+| 端口连不上 | 自己猜了端口；实际端口以 `dsh web:` 那行为准，默认是 3080 |
+| 页面能开但插件行没出现 | 启动的不是 `--profile web`，或插件没装进这个 profile |
 
 ## 版本与发布
 

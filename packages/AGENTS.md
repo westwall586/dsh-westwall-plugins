@@ -77,3 +77,7 @@ pnpm typecheck
 # 安装冒烟（从仓库根执行）：装 → 启 → 检查 → 摘除还原
 node scripts/smoke-install.mjs link:$(pwd)/packages/<name>
 ```
+
+有浏览器半体（`client.js`）的改动不能只跑单测：用 Web profile 起服务做实测，
+地址取控制台 `dsh web: <URL>?token=<token>` 一行，不要直连不带 token 的地址。
+步骤见 [../docs/DEVELOPMENT.md#web-自主测试](../docs/DEVELOPMENT.md#web-自主测试)。

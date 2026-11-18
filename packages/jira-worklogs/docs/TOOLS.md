@@ -16,6 +16,8 @@ cd packages/jira-worklogs && pnpm build
 dsh plugin --profile web add link:/绝对路径/packages/jira-worklogs
 
 # 启动；确认没有「did not activate」等告警
+# 就绪后控制台打印 dsh web: http://127.0.0.1:18787/?token=...
+# 浏览器打开这一整行带 token 的地址；直接打开不带 token 的地址会 401
 dsh --profile web --port 18787 --no-open
 
 # 试完后摘除

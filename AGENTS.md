@@ -31,6 +31,9 @@
 - 发布只针对打磨到位的包，tag 形如 `dsh-<name>@<version>`；一个 tag 只发一个包
 - 公开仓库：文档与代码里不写邮箱、账号凭据、token、本机绝对路径
 - 提交信息用 Conventional Commits
+- **开发在分支上，不开 PR**：一个任务一个分支（如 `feat/<name>-<短描述>`），从最新 `main` 拉出；验证通过并经维护者确认后，`git merge --ff-only` 合入 `main` 并直接推送，然后删除分支。单人维护，不经过 GitHub PR 与网页合并
+- **Agent 不得把未确认的改动推送到 `main`**：维护者确认之前只能提交到分支，汇报只给分支名与证据
+- **Web 端实测必须用 Web profile**：`dsh --profile web ...` 启动，从控制台 `dsh web: <URL>?token=<token>` 一行取完整地址访问；不要自己拼端口、不要直接打开不带 token 的地址（会 401）。步骤见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#web-自主测试)
 - 版本规则、分发矩阵、兼容性策略以 `docs/decisions.md` 为权威说明
 
 ## 常用命令

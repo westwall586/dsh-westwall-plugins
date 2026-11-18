@@ -51,7 +51,7 @@
 
 ### 3.1 什么是基线
 
-P2a 在「加入输入框」时把 `state.text` 写成 `reviews/pending/<roundId>.md`，发送成功后 rename 到 `reviews/<镜像路径>/<roundId>.md`，并在旁边写 `<roundId>.json`。
+P2a 在「加入输入框」时把 `state.text` 写成 `reviews/pending/<roundId>.md`，发送成功后 `rename` 到 `reviews/<镜像路径>/<roundId>.md`，并在旁边写 `<roundId>.json`。
 
 - 基线就是这份 `<roundId>.md` 的全文。
 - 只认**已发送**的轮次；pending 只是「准备中」，不是用户已经确认过的基线。
@@ -59,7 +59,7 @@ P2a 在「加入输入框」时把 `state.text` 写成 `reviews/pending/<roundId
 
 ### 3.2 为什么最新一轮快照缺失时不回退
 
-如果第 N 轮写入失败（`snapshotMissing`），但第 N-1 轮还有快照，用第 N-1 轮做 diff 会把「N-1 之后、N 之前」的改动重新算进来。那部分用户已经看过、也已经批注过了，再显示成「上次反馈后」会误导。
+如果第 N 轮写入失败（`snapshotMissing`），但第 N-1 轮还有快照，用第 N-1 轮做 `diff` 会把「N-1 之后、N 之前」的改动重新算进来。那部分用户已经看过、也已经批注过了，再显示成「上次反馈后」会误导。
 
 所以：**最新一轮不可比较，就整轮不显示**。发送时已经提示过「旧版未保留」，这里不重复报错。
 
@@ -72,7 +72,7 @@ P2a 在「加入输入框」时把 `state.text` 写成 `reviews/pending/<roundId
 5. 取第一条；它带 `snapshotMissing` 或 `.md` 读不到时返回 `null`，不继续找。
 6. pending 目录不参与。
 
-## 4. Host 接口
+## 4. `Host` 接口
 
 ### 4.1 契约
 

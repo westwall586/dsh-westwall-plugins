@@ -8,6 +8,7 @@ import { PROMPT_VERSION } from "./translate/prompt.js";
 import { MAX_TEXT_BYTES, translateRequest, TranslateError, } from "./translate/request.js";
 import { Config, configSnapshot } from "./settings.js";
 import { createTranslationStore, nodeFiles, } from "./translate/store.js";
+import { editCheck as checkEditable, writeText as writeDocument, } from "./edit/write.js";
 const REMOTE_CODES = {
     'invalid-session': 'activeMarkdown/invalid-request',
     'unknown-session': 'activeMarkdown/unknown-session',
@@ -212,6 +213,30 @@ export default class ActiveMarkdown extends TypertRemoteService {
     async reviewLatest(sessionId, path) {
         return this.callAnnotation(() => this.reviews().latest({ sessionId, path }));
     }
+    /** Whether this session may edit the file, and the version a guarded save must send back. */
+    async editCheck(sessionId, path, bytes) {
+        const face = this.editFacility();
+        if (face === null)
+            return { status: 'unsupported', reason: 'fs' };
+        return checkEditable(face, {
+            sessionId: typeof sessionId === 'string' ? sessionId : '',
+            path: typeof path === 'string' ? path : '',
+            bytes: typeof bytes === 'number' && Number.isFinite(bytes) && bytes >= 0 ? bytes : 0,
+        });
+    }
+    /** Write one edited document; a missing service or session is a status, never a rejection. */
+    async writeText(sessionId, path, text, intent) {
+        const face = this.editFacility();
+        if (face === null)
+            return { status: 'unsupported', reason: 'fs' };
+        if (typeof text !== 'string' || typeof path !== 'string' || typeof sessionId !== 'string') {
+            return { status: 'unsupported', reason: 'fs' };
+        }
+        if (intent === null || typeof intent !== 'object' || typeof intent.kind !== 'string') {
+            return { status: 'unsupported', reason: 'fs' };
+        }
+        return writeDocument(face, { sessionId, path, text, intent });
+    }
     async call(operation) {
         try {
             return await operation();
@@ -280,6 +305,15 @@ export default class ActiveMarkdown extends TypertRemoteService {
             now: () => new Date(),
         }));
         return this.cacheValue;
+    }
+    /** The three optional services behind the edit channel; any absence disables it. */
+    editFacility() {
+        const fs = this.serviceOf('fs');
+        const sandbox = this.serviceOf('sandboxPolicy');
+        const sessions = this.serviceOf('sessions');
+        if (fs === null || sandbox === null || sessions === null)
+            return null;
+        return { fs, sandbox, sessions };
     }
     /**
      * The directory a session's writes belong to: the committed working directory
@@ -362,6 +396,7 @@ const METHODS = [
     'describe', 'translate', 'cacheGet', 'cachePut', 'translationSave', 'translationLoad',
     'annotationLoad', 'annotationSave', 'annotationClear', 'annotationPending',
     'reviewPrepare', 'reviewCommit', 'reviewDetach', 'reviewLatest',
+    'editCheck', 'writeText',
 ];
 Object.defineProperty(ActiveMarkdown.prototype, '@deepseek-ai/dsh-typert-protocol/remote-methods', {
     configurable: true,

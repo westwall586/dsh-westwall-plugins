@@ -55,6 +55,17 @@ import {
   type TranslationSaveView,
   type TranslationStore,
 } from './translate/store.ts'
+import {
+  editCheck as checkEditable,
+  writeText as writeDocument,
+  type EditCheckResult,
+  type EditFacility,
+  type EditFsLike,
+  type EditSandboxLike,
+  type EditSessionsLike,
+  type WriteIntent,
+  type WriteTextResult,
+} from './edit/write.ts'
 
 declare module '@deepseek-ai/dsh-typert-protocol' {
   interface RemoteErrorDetailsMap {
@@ -389,6 +400,35 @@ export default class ActiveMarkdown extends TypertRemoteService {
     return this.callAnnotation(() => this.reviews().latest({ sessionId, path }))
   }
 
+  /** Whether this session may edit the file, and the version a guarded save must send back. */
+  async editCheck(sessionId: string, path: string, bytes: number): Promise<EditCheckResult> {
+    const face = this.editFacility()
+    if (face === null) return { status: 'unsupported', reason: 'fs' }
+    return checkEditable(face, {
+      sessionId: typeof sessionId === 'string' ? sessionId : '',
+      path: typeof path === 'string' ? path : '',
+      bytes: typeof bytes === 'number' && Number.isFinite(bytes) && bytes >= 0 ? bytes : 0,
+    })
+  }
+
+  /** Write one edited document; a missing service or session is a status, never a rejection. */
+  async writeText(
+    sessionId: string,
+    path: string,
+    text: string,
+    intent: WriteIntent,
+  ): Promise<WriteTextResult> {
+    const face = this.editFacility()
+    if (face === null) return { status: 'unsupported', reason: 'fs' }
+    if (typeof text !== 'string' || typeof path !== 'string' || typeof sessionId !== 'string') {
+      return { status: 'unsupported', reason: 'fs' }
+    }
+    if (intent === null || typeof intent !== 'object' || typeof (intent as { kind?: unknown }).kind !== 'string') {
+      return { status: 'unsupported', reason: 'fs' }
+    }
+    return writeDocument(face, { sessionId, path, text, intent })
+  }
+
   private async call<T>(operation: () => Promise<T>): Promise<T> {
     try {
       return await operation()
@@ -467,6 +507,15 @@ export default class ActiveMarkdown extends TypertRemoteService {
     return this.cacheValue
   }
 
+  /** The three optional services behind the edit channel; any absence disables it. */
+  private editFacility(): EditFacility | null {
+    const fs = this.serviceOf<EditFsLike>('fs')
+    const sandbox = this.serviceOf<EditSandboxLike>('sandboxPolicy')
+    const sessions = this.serviceOf<EditSessionsLike>('sessions')
+    if (fs === null || sandbox === null || sessions === null) return null
+    return { fs, sandbox, sessions }
+  }
+
   /**
    * The directory a session's writes belong to: the committed working directory
    * when the Host is running that session, otherwise the header's original cwd
@@ -518,7 +567,9 @@ export default class ActiveMarkdown extends TypertRemoteService {
       | 'sessions'
       | 'workingDirectory'
       | 'sessionPersistence'
-      | 'storageDomain',
+      | 'storageDomain'
+      | 'fs'
+      | 'sandboxPolicy',
   ): T | null {
     const ctx = this.ctx as unknown as { get?: (key: string) => unknown }
     if (typeof ctx.get !== 'function') return null
@@ -552,6 +603,7 @@ const METHODS = [
   'describe', 'translate', 'cacheGet', 'cachePut', 'translationSave', 'translationLoad',
   'annotationLoad', 'annotationSave', 'annotationClear', 'annotationPending',
   'reviewPrepare', 'reviewCommit', 'reviewDetach', 'reviewLatest',
+  'editCheck', 'writeText',
 ] as const
 
 Object.defineProperty(ActiveMarkdown.prototype, '@deepseek-ai/dsh-typert-protocol/remote-methods', {

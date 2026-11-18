@@ -15,6 +15,7 @@ import { type ReviewCommitView, type ReviewDetachView, type ReviewLatestView, ty
 import { type CachedTranslation, type CachePutView } from './translate/cache.ts';
 import { type DescribeView, type TranslateView } from './translate/request.ts';
 import { type TranslationLoadView, type TranslationSaveView } from './translate/store.ts';
+import { type EditCheckResult, type WriteIntent, type WriteTextResult } from './edit/write.ts';
 declare module '@deepseek-ai/dsh-typert-protocol' {
     interface RemoteErrorDetailsMap {
         'activeMarkdown/invalid-request': {};
@@ -63,6 +64,10 @@ export default class ActiveMarkdown extends TypertRemoteService {
     reviewDetach(sessionId: string, path: string, roundId: string): Promise<ReviewDetachView>;
     /** The newest committed round's full text, or null when it cannot baseline a diff. */
     reviewLatest(sessionId: string, path: string): Promise<ReviewLatestView | null>;
+    /** Whether this session may edit the file, and the version a guarded save must send back. */
+    editCheck(sessionId: string, path: string, bytes: number): Promise<EditCheckResult>;
+    /** Write one edited document; a missing service or session is a status, never a rejection. */
+    writeText(sessionId: string, path: string, text: string, intent: WriteIntent): Promise<WriteTextResult>;
     private call;
     private callAnnotation;
     /**
@@ -80,6 +85,8 @@ export default class ActiveMarkdown extends TypertRemoteService {
     private annotation;
     private reviews;
     private cache;
+    /** The three optional services behind the edit channel; any absence disables it. */
+    private editFacility;
     /**
      * The directory a session's writes belong to: the committed working directory
      * when the Host is running that session, otherwise the header's original cwd

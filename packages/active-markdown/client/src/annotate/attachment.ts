@@ -40,6 +40,8 @@ export interface AttachmentRequest {
   annotations: readonly Annotation[]
   /** Annotation ids that no longer resolve in the current source. */
   unlocatable: ReadonlySet<string>
+  /** The reader saved this document after opening it. */
+  edited?: boolean
   input: InputActionsView | undefined
   phase: InputPhase
 }
@@ -231,6 +233,7 @@ export function createAttachmentController(deps: AttachmentDeps): AttachmentCont
       sourcePath: request.displayPath,
       annotations: request.annotations,
       unlocatable: request.unlocatable,
+      ...(request.edited === true ? { edited: true } : {}),
     })
     const fileHash = await sha256Hex(file.content)
     const prepared = await prepare(key, request.path, roundId, request.text)
@@ -332,6 +335,7 @@ export function createAttachmentController(deps: AttachmentDeps): AttachmentCont
       sourcePath: request.displayPath,
       annotations: request.annotations,
       unlocatable: request.unlocatable,
+      ...(request.edited === true ? { edited: true } : {}),
     })
     const fileHash = await sha256Hex(file.content)
     const prepared = await prepare(key, request.path, roundId, request.text)

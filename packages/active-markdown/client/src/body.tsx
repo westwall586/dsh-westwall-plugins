@@ -494,6 +494,7 @@ export function Body({
   const [editSeq, setEditSeq] = useState(0)
   const [adopt, setAdopt] = useState<{ text: string, token: number }>({ text: '', token: 0 })
   const [exitConfirm, setExitConfirm] = useState(false)
+  const [editedSinceOpen, setEditedSinceOpen] = useState(false)
   const tocButton = useRef<HTMLButtonElement | null>(null)
   const tocPanel = useRef<HTMLDivElement | null>(null)
   const toolbar = useRef<HTMLDivElement | null>(null)
@@ -627,6 +628,7 @@ export function Body({
       setEditability(null)
       setEditError(null)
       setExitConfirm(false)
+      setEditedSinceOpen(false)
     } else if (stateRef.current.status !== 'ready') {
       setState({ status: 'loading' })
     }
@@ -1366,6 +1368,7 @@ export function Body({
       text: state.text,
       annotations: annotationsToSend,
       unlocatable: unlocatableNow(),
+      edited: editedSinceOpen,
       input: inputActions,
       phase,
       roundId: pending.roundId,
@@ -1375,7 +1378,7 @@ export function Body({
     else if (result.reason === 'source-changed') setAttachError(refusalText(result.reason, t))
   }, [
     draftKey, state, phase, annotations, inputAttachmentIds, attachment, inputActions, hub,
-    composeSessionId, path, displayPath, unlocatableNow, t,
+    composeSessionId, path, displayPath, unlocatableNow, editedSinceOpen, t,
   ])
 
   const attachFeedback = useCallback(async (): Promise<void> => {
@@ -1410,6 +1413,7 @@ export function Body({
       text: state.text,
       annotations: latest.annotations,
       unlocatable: unlocatableNow(),
+      edited: editedSinceOpen,
       input: inputActions,
       phase,
     })
@@ -1424,7 +1428,7 @@ export function Body({
       : refusalText(result.reason, t))
   }, [
     draftKey, state, composerBusy, annotations, inputAttachmentIds, attachment, inputActions, phase,
-    hub, composeSessionId, path, displayPath, unlocatableNow, t,
+    hub, composeSessionId, path, displayPath, unlocatableNow, editedSinceOpen, t,
   ])
 
   const removeAttachment = useCallback(async (): Promise<void> => {
@@ -1855,6 +1859,7 @@ export function Body({
     savedEcho.current = result.version
     setState({ status: 'ready', text, absolutePath: result.absolutePath, version: result.version, bytes: result.bytes })
     setEditability({ status: 'ok', absolutePath: result.absolutePath, version: result.version })
+    setEditedSinceOpen(true)
     setExitConfirm(false)
     setEditError(null)
     if (translationRef.current.status !== 'idle') {

@@ -19,6 +19,8 @@ export interface FeedbackInput {
   annotations: readonly Annotation[]
   /** Annotation ids that no longer resolve in the current source. */
   unlocatable?: ReadonlySet<string>
+  /** The reader saved this file after opening it, so the Agent's copy is stale. */
+  edited?: boolean
 }
 
 export interface FeedbackFile {
@@ -104,6 +106,7 @@ export function renderFeedback(input: FeedbackInput): string {
     '---',
     '',
     `文件路径：${input.sourcePath}`,
+    ...(input.edited === true ? ['本文件已被用户修改，请重新读取。'] : []),
     '',
     '## 我的反馈',
     '',

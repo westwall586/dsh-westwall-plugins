@@ -677,6 +677,7 @@ export function Body({
         return
       }
       // A revision that arrived while reading is an ordinary external update.
+      // The toast stays: a save-as has just reported where the copy went.
       setView('source')
       setTranslation({ status: 'idle' })
       setInstruction('')
@@ -685,7 +686,6 @@ export function Body({
       setEditor(null)
       setDrawerOpen(false)
       setUndo(null)
-      setNotice(null)
       setPinTops({})
       setPeek(null)
       setAttachBusy(false)
@@ -2023,13 +2023,15 @@ export function Body({
           return
         }
         if (result.status === 'saved') {
+          setExitConfirm(false)
+          setEditError(null)
+          // The copy is safe on disk; the original is someone else's to reload.
+          applyEdit({ type: 'exit' })
           setNotice({
             text: t('edit.savedAs', { path: result.absolutePath }),
             undo: false,
             copyPath: result.absolutePath,
           })
-          setExitConfirm(false)
-          setEditError(null)
           rendererRef.current?.reload()
           return
         }

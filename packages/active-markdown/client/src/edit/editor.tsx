@@ -74,15 +74,16 @@ const theme = EditorView.theme({
 })
 
 const highlight = HighlightStyle.define([
-  { tag: tags.heading1, color: 'var(--dsw-alias-label-primary)', fontWeight: '700' },
-  { tag: [tags.heading2, tags.heading3], color: 'var(--dsw-alias-label-primary)', fontWeight: '650' },
+  { tag: tags.heading1, color: 'var(--dsw-alias-label-primary)', fontWeight: '700', fontSize: '1.35em' },
+  { tag: tags.heading2, color: 'var(--dsw-alias-label-primary)', fontWeight: '700', fontSize: '1.2em' },
+  { tag: tags.heading3, color: 'var(--dsw-alias-label-primary)', fontWeight: '650', fontSize: '1.1em' },
   { tag: [tags.heading4, tags.heading5, tags.heading6], color: 'var(--dsw-alias-label-secondary)', fontWeight: '600' },
   { tag: tags.strong, fontWeight: '700' },
   { tag: tags.emphasis, fontStyle: 'italic' },
   { tag: tags.strikethrough, textDecoration: 'line-through' },
-  { tag: [tags.link, tags.url], color: 'var(--dsw-alias-link)' },
+  { tag: [tags.link, tags.url], color: 'var(--dsw-alias-link)', textDecoration: 'underline' },
   { tag: tags.monospace, color: 'var(--dsw-alias-label-primary)', backgroundColor: 'var(--dsw-alias-markdown-inline-code)' },
-  { tag: [tags.quote, tags.list], color: 'var(--dsw-alias-label-secondary)' },
+  { tag: tags.quote, color: 'var(--dsw-alias-label-secondary)' },
   { tag: [tags.contentSeparator, tags.processingInstruction, tags.meta], color: 'var(--dsw-alias-label-tertiary)' },
 ])
 

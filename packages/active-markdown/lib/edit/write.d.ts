@@ -95,6 +95,7 @@ export interface EditFsLike {
         cwd?: string;
     }, signal?: AbortSignal): Promise<EditPathInfoLike | undefined>;
     stat(target: EditTargetLike, signal?: AbortSignal): Promise<EditInfoLike | undefined>;
+    readText(target: EditTargetLike, signal?: AbortSignal): Promise<string>;
     contains(parent: EditTargetLike, child: EditTargetLike): boolean;
     writeText(target: EditTargetLike, content: string, expected?: EditExpectedLike, signal?: AbortSignal, sandboxPolicy?: EditSandboxPolicyLike): Promise<EditWriteOutcomeLike>;
 }
@@ -128,6 +129,10 @@ export declare function writeResultOf(error: unknown, mode: EditMode, absolutePa
  * The version returned here is the token a later guarded save must send back.
  */
 export declare function editCheck(face: EditFacility, request: EditCheckRequest): Promise<EditCheckResult>;
-/** Write one document behind its intent; every refusal is a typed result. */
+/**
+ * Write one document behind its intent; every refusal is a typed result.
+ * `writeText` stores the string it is given, unlike `editText`, so the file's
+ * existing line-ending style is re-applied here before publication.
+ */
 export declare function writeText(face: EditFacility, request: WriteTextRequest): Promise<WriteTextResult>;
 export {};

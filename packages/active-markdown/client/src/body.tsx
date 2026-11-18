@@ -1875,7 +1875,7 @@ export function Body({
       setView('source')
       return
     }
-    const pendingCount = pendingReview?.annotations.length ?? 0
+    const pendingCount = annotationList.length
     const result = await editCommand.check(sessionId, path, ready.bytes)
     const check: EditCheckResult = result ?? { status: 'unsupported', reason: 'fs' }
     setEditability(check)
@@ -1915,7 +1915,7 @@ export function Body({
     setAdopt({ text: ready.text, token: 0 })
     applyEdit({ type: 'enter', text: ready.text, version: ready.version, line: visibleSourceLine() })
     setEditSeq(sequence => sequence + 1)
-  }, [sessionId, path, view, pendingReview, editCommand, t, visibleSourceLine, applyEdit])
+  }, [sessionId, path, view, annotationList, editCommand, t, visibleSourceLine, applyEdit])
 
   const requestSave = useCallback((): void => {
     const current = editRef.current
@@ -2373,7 +2373,7 @@ export function Body({
                   secondary={{ label: t('diff.dismiss'), run: () => setEditError(null) }}
                 />
               )}
-              {editExternal && !exitConfirm ? (
+              {editExternal && !exitConfirm && edit.status !== 'conflict' ? (
                 <EditBanner
                   text={t('edit.external')}
                   secondary={{

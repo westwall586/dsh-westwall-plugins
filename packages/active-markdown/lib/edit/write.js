@@ -58,6 +58,20 @@ function policyOf(face, session) {
         return null;
     }
 }
+/** Keep a CRLF file CRLF: the editor always hands over LF text. */
+async function withExistingEol(face, target, text) {
+    if (!text.includes('\n'))
+        return text;
+    try {
+        const before = await face.fs.readText(target);
+        if (!before.includes('\r\n'))
+            return text;
+        return text.replace(/\r\n/g, '\n').replace(/\n/g, '\r\n');
+    }
+    catch {
+        return text;
+    }
+}
 /**
  * Answer whether the session may edit this file, without writing anything.
  * The version returned here is the token a later guarded save must send back.
@@ -95,7 +109,11 @@ export async function editCheck(face, request) {
         return unsupported('fs');
     }
 }
-/** Write one document behind its intent; every refusal is a typed result. */
+/**
+ * Write one document behind its intent; every refusal is a typed result.
+ * `writeText` stores the string it is given, unlike `editText`, so the file's
+ * existing line-ending style is re-applied here before publication.
+ */
 export async function writeText(face, request) {
     const session = face.sessions.get(request.sessionId);
     if (session === undefined)
@@ -125,7 +143,8 @@ export async function writeText(face, request) {
         // A save-as has no file yet; every other intent writes a file that was read.
         if (entry === undefined && request.intent.kind !== 'create')
             return unsupported('not-file');
-        const outcome = await face.fs.writeText(target, request.text, expected, undefined, policy);
+        const content = entry === undefined ? request.text : await withExistingEol(face, target, request.text);
+        const outcome = await face.fs.writeText(target, content, expected, undefined, policy);
         return {
             status: 'saved',
             absolutePath: target.displayPath,

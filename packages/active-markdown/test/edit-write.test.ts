@@ -33,6 +33,8 @@ interface FakeOptions {
   entry?: { type: 'file' | 'directory' | 'symlink' | 'other', size?: number }
   entryMissing?: boolean
   info?: { type: 'file' | 'directory' | 'other', size?: number, version: string } | undefined
+  before?: string
+  readFails?: boolean
   write?: (content: string, expected: unknown) => Promise<{ version: string, after: string }>
 }
 
@@ -48,6 +50,10 @@ function fakeFacility(options: FakeOptions = {}): { face: EditFacility, writes: 
     },
     async stat() {
       return options.info ?? { type: 'file', size: 10, version: 'v1' }
+    },
+    async readText() {
+      if (options.readFails === true) throw new Error('unreadable')
+      return options.before ?? 'plain\n'
     },
     contains() {
       return options.contained ?? true
@@ -255,4 +261,22 @@ test('writeResultOf 按错误码映射写结果', () => {
     reason: 'fs',
   })
   assert.deepEqual(writeResultOf(new Error('plain'), 'read-only', FILE), { status: 'unsupported', reason: 'fs' })
+})
+
+test('覆盖 CRLF 文件时按原行尾写回', async () => {
+  const { face, writes } = fakeFacility({ before: '# t\r\n\r\nbody\r\n' })
+  const result = await writeText(face, writeRequest('# t\n\nbody changed\n'))
+
+  assert.equal(result.status, 'saved')
+  assert.equal(writes[0]?.content, '# t\r\n\r\nbody changed\r\n')
+})
+
+test('LF 文件与读不到原文时原样写入', async () => {
+  const lf = fakeFacility({ before: '# t\n\nbody\n' })
+  await writeText(lf.face, writeRequest('# t\n\nbody changed\n'))
+  assert.equal(lf.writes[0]?.content, '# t\n\nbody changed\n')
+
+  const unreadable = fakeFacility({ readFails: true })
+  await writeText(unreadable.face, writeRequest('# t\n\nbody changed\n'))
+  assert.equal(unreadable.writes[0]?.content, '# t\n\nbody changed\n')
 })

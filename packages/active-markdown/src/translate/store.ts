@@ -139,8 +139,10 @@ function requireFileName(name: string): void {
 }
 
 /**
- * 纯路径计算：源路径 → `translate/<code>/` 之下的镜像路径。`..` 与指向工作区
- * 内的绝对路径在这里拒绝，保证写盘目标永远在 `translate/` 下。
+ * 纯路径计算：源路径 → `translate/<code>/` 之下的镜像路径。`..` 一律拒绝；
+ * 工作区内的绝对路径先归一成相对路径，再按同一套目录镜像。这样从侧栏打开
+ * 和从文档内链接打开同一份文件，译文落在同一个位置。写盘目标永远在
+ * `translate/` 下。
  */
 export function mirrorOf(input: { readonly path: string; readonly workspace: string }): MirrorPath {
   const source = typeof input.path === 'string' ? input.path.trim() : ''
@@ -150,10 +152,16 @@ export function mirrorOf(input: { readonly path: string; readonly workspace: str
     throw new TranslateError('invalid-path', `路径不能包含 ..：${source}`)
   }
 
+  const workspace = resolve(input.workspace)
   if (isAbsolute(source)) {
     const absolute = resolve(source)
-    if (isInside(resolve(input.workspace), absolute)) {
-      throw new TranslateError('invalid-path', `工作区内的文档请使用会话相对路径：${source}`)
+    if (isInside(workspace, absolute)) {
+      const relativePath = relative(workspace, absolute).split(sep).join('/')
+      if (relativePath === '') {
+        throw new TranslateError('invalid-path', `文档路径不能是工作区目录：${source}`)
+      }
+      requireFileName(basename(absolute))
+      return { relative: relativePath, sourcePath: relativePath }
     }
     const name = basename(absolute)
     requireFileName(name)

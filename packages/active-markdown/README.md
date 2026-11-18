@@ -88,8 +88,9 @@
 2. 保存写两份文件。正文放在 `.dsh-active-markdown/translate/<语言代码>/<源文件相对路径>`，元数据放在平行的 `.dsh-active-markdown/index/translate/<语言代码>/` 下，把正文路径的最后一个扩展名换成 `.json`。
 3. `docs/a/README.md` 翻译成简体中文后，正文是 `.dsh-active-markdown/translate/zh/docs/a/README.md`，元数据是 `.dsh-active-markdown/index/translate/zh/docs/a/README.json`。文件名与源文件一致，语言只是目录。
 4. 工作区外的文档（例如绝对路径的会话文件）没有相对路径可镜像，落在 `translate/<语言代码>/_external/<路径 sha1 前 8 位>/<文件名>`，元数据在 index 树的同一位置。
-5. 不同目录的同名 `README.md` 各自保存；同一份文档换语言保存到不同语言目录，互不覆盖。
-6. `.dsh-active-markdown/.gitignore` 忽略该目录下的全部内容，`git status` 不会因为翻译变脏。
+5. 从文档内链接打开的文件地址是绝对路径；保存时归一成相对路径，和从侧栏打开时落在同一镜像位置，不会存成两份。
+6. 不同目录的同名 `README.md` 各自保存；同一份文档换语言保存到不同语言目录，互不覆盖。
+7. `.dsh-active-markdown/.gitignore` 忽略该目录下的全部内容，`git status` 不会因为翻译变脏。
 
 自动缓存放在插件存储里，不落工作区。它是可丢的，删掉只是下一次重新翻译。「保存」才会把译文写进工作区。自动缓存按整篇保存，单份译文上限 4 MiB。原文在保存后改过时，旧译文仍可查看，但不再显示保存入口；先点「重新翻译」再保存。
 

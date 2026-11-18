@@ -67,8 +67,10 @@ export interface MirrorPath {
     readonly sourcePath: string;
 }
 /**
- * 纯路径计算：源路径 → `translate/<code>/` 之下的镜像路径。`..` 与指向工作区
- * 内的绝对路径在这里拒绝，保证写盘目标永远在 `translate/` 下。
+ * 纯路径计算：源路径 → `translate/<code>/` 之下的镜像路径。`..` 一律拒绝；
+ * 工作区内的绝对路径先归一成相对路径，再按同一套目录镜像。这样从侧栏打开
+ * 和从文档内链接打开同一份文件，译文落在同一个位置。写盘目标永远在
+ * `translate/` 下。
  */
 export declare function mirrorOf(input: {
     readonly path: string;

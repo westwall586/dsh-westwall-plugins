@@ -261,7 +261,7 @@ test('元数据写出 8.1 表里的全部字段，落在平行的 index 树', as
   assert.equal(raw.savedAt, '2026-11-16T09:30:00.000Z')
 })
 
-test('带 .. 的路径与工作区内的绝对路径都被拒绝', async (t) => {
+test('带 .. 的路径被拒绝，工作区内的绝对路径归一为相对路径', async (t) => {
   const h = await harness(t)
 
   await assert.rejects(save(h.store, { path: 'docs/../secret.md' }), isCode('invalid-path'))
@@ -269,7 +269,15 @@ test('带 .. 的路径与工作区内的绝对路径都被拒绝', async (t) => 
     h.store.load({ sessionId: SESSION, path: 'docs/../../etc/passwd', lang: LANG }),
     isCode('invalid-path'),
   )
-  await assert.rejects(save(h.store, { path: join(h.workspace, 'docs/a/README.md') }), isCode('invalid-path'))
+
+  const absolute = join(h.workspace, 'docs/a/README.md')
+  await writeSource(h.workspace, 'docs/a/README.md', SOURCE)
+  const saved = (await save(h.store, { path: absolute })) as { file: string, meta: { sourcePath: string } }
+  assert.equal(saved.file, '.dsh-active-markdown/translate/zh/docs/a/README.md')
+  assert.equal(saved.meta.sourcePath, 'docs/a/README.md')
+  assert.equal((await h.store.load({ sessionId: SESSION, path: absolute, lang: LANG }))?.text, TRANSLATED)
+
+  await assert.rejects(save(h.store, { path: h.workspace }), isCode('invalid-path'))
 })
 
 test('未知会话在写入前就被拒绝', async (t) => {

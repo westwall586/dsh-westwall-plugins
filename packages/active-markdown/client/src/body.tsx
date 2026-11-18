@@ -35,6 +35,7 @@ import type {
   DescribeView,
   HostBridge,
   InputActionsView,
+  ReviewLatestView,
   Translate,
   TranslationMeta,
   UseInput,
@@ -43,8 +44,10 @@ import type {
 import { createImageResolver, type ImageResolver } from './images.ts'
 import { classifyLink } from './links.ts'
 import { parseDocument, type ParsedDocument } from './markdown/blocks.ts'
+import { diffBlocks, tocEntries, updatedSections, type DocumentDiff } from './markdown/diff.ts'
 import { componentLabel, componentOf, type Block } from './markdown/model.ts'
 import { MarkdownView, type ComponentContext } from './markdown/render.tsx'
+import { MarkdownToc } from './markdown/toc.tsx'
 import {
   registerSelectionHandler,
   SELECTION_MENU_KIND,
@@ -157,6 +160,7 @@ interface Notice {
 }
 
 const EMPTY_PARSED: ParsedDocument = { blocks: [] }
+const EMPTY_DIFF: DocumentDiff = { statuses: [], counts: { updated: 0 } }
 const ANNOTATION_HIGHLIGHT = 'am-annotation'
 const UNDO_WINDOW_MS = 6000
 const PIN_STEP = 18
@@ -317,6 +321,11 @@ function formatBytes(bytes: number | undefined): string {
   return `${bytes} B`
 }
 
+/** Line-ending style alone must not turn into a diff. */
+function normalizeDocumentText(text: string): string {
+  return text.replace(/\r\n/g, '\n').replace(/\n$/, '')
+}
+
 /** The run identity a stored record gives back, with the session's current prompt version as fallback. */
 function storedRun(meta: TranslationMeta, promptVersion: string, translateComments: boolean, extraInstruction = ''): PromptRun {
   return {
@@ -373,6 +382,9 @@ export function Body({
   const [ask, setAsk] = useState<Ask | null>(null)
   const [save, setSave] = useState<SaveState>({ status: 'idle' })
   const [notice, setNotice] = useState<Notice | null>(null)
+  const [latest, setLatest] = useState<ReviewLatestView | null>(null)
+  const [dismissed, setDismissed] = useState<{ roundId: string, text: string } | null>(null)
+  const [tocOpen, setTocOpen] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editor, setEditor] = useState<Editor | null>(null)
   const [undo, setUndo] = useState<UndoState | null>(null)
@@ -382,6 +394,7 @@ export function Body({
   const [attachError, setAttachError] = useState<string | null>(null)
   const peekPanel = useRef<HTMLDivElement | null>(null)
   const requestToken = useRef(0)
+  const reviewToken = useRef(0)
   const runController = useRef<AbortController | null>(null)
 
   const stopRun = useCallback((): void => {
@@ -551,6 +564,75 @@ export function Body({
   const annotationList = snapshot.annotations
   const pendingReview = snapshot.pending
   const attached = pendingReview !== null && inputAttachmentIds.includes(pendingReview.draftAttachmentId)
+
+  // A tab keeps its diff state across a reload; another document starts clean.
+  const documentKey = useMemo(
+    () => (!composeSessionId || path === undefined ? null : `${composeSessionId}\u0000${path}`),
+    [composeSessionId, path],
+  )
+
+  useEffect(() => {
+    setLatest(null)
+    setDismissed(null)
+    setTocOpen(false)
+  }, [documentKey])
+
+  const pendingRoundId = pendingReview?.roundId ?? null
+  useEffect(() => {
+    const token = (reviewToken.current += 1)
+    if (state.status !== 'ready' || draftKey === null || pendingRoundId !== null) {
+      setLatest(null)
+      return
+    }
+    const request = { sessionId: draftKey.sessionId, path: draftKey.path }
+    void (async () => {
+      const bridge = await host().catch(() => undefined)
+      if (bridge === undefined) return
+      const base = await bridge.reviewLatest(request).catch(() => null)
+      if (token !== reviewToken.current) return
+      setLatest(base)
+    })()
+  }, [state.status, revision, draftKey, pendingRoundId, host])
+
+  const currentText = state.status === 'ready' ? state.text : ''
+  const baselineText = latest?.text ?? null
+  const sameAsBaseline = baselineText !== null
+    && state.status === 'ready'
+    && normalizeDocumentText(baselineText) === normalizeDocumentText(currentText)
+  // Only parse and diff when the normalized texts differ: equal text means no
+  // updates, and a baseline outside the source view has nothing to mark.
+  const baselineParsed = useMemo<ParsedDocument>(
+    () => (baselineText === null || sameAsBaseline ? EMPTY_PARSED : parseDocument(baselineText)),
+    [baselineText, sameAsBaseline],
+  )
+  const diffActive = state.status === 'ready' && baselineText !== null && !sameAsBaseline
+  const diff = useMemo<DocumentDiff>(
+    () => (diffActive ? diffBlocks(baselineParsed.blocks, parsed.blocks) : EMPTY_DIFF),
+    [diffActive, baselineParsed, parsed],
+  )
+  const updatedAnchors = useMemo(
+    () => new Set(updatedSections(parsed.blocks, diff.statuses)),
+    [parsed, diff],
+  )
+  const toc = useMemo(() => tocEntries(parsed.blocks), [parsed])
+  const dismissedHere = dismissed !== null
+    && latest !== null
+    && dismissed.roundId === latest.roundId
+    && dismissed.text === normalizeDocumentText(currentText)
+  const showDiffNotice = diffActive && view === 'source' && diff.counts.updated > 0 && !dismissedHere
+
+  const dismissDiff = useCallback((): void => {
+    if (latest === null || state.status !== 'ready') return
+    setDismissed({ roundId: latest.roundId, text: normalizeDocumentText(state.text) })
+  }, [latest, state])
+
+  const jumpToSection = useCallback((anchor: string): void => {
+    const node = Array.from(container.current?.querySelectorAll<HTMLElement>('[data-anchor]') ?? [])
+      .find(element => element.getAttribute('data-anchor') === anchor)
+    node?.scrollIntoView({ block: 'start' })
+    setTocOpen(false)
+  }, [])
+
   // A cross-session attachment belongs to the composer, so an absolute path is
   // the only display path that stays true in that workspace.
   const displayPath = composeSessionId === sessionId ? (path ?? '') : ''
@@ -1285,6 +1367,12 @@ export function Body({
             <button type="button" className="am-toolbar-toggle" aria-pressed={lineNumbers} onClick={() => setLineNumbers(value => !value)}>
               {t('lineNumbers')}
             </button>
+            {view === 'source' && toc.length > 0 ? (
+              <button type="button" className="am-toolbar-toggle" aria-pressed={tocOpen} onClick={() => setTocOpen(value => !value)}>
+                {t('toc.label')}
+                {updatedAnchors.size === 0 ? null : <span className="am-toolbar-dot" aria-hidden="true" />}
+              </button>
+            ) : null}
             <button type="button" className="am-toolbar-toggle" aria-pressed={drawerOpen} onClick={() => setDrawerOpen(value => !value)}>
               {t('annotate.count', { count: annotationList.length })}
             </button>
@@ -1329,6 +1417,25 @@ export function Body({
               )}
             </div>
           </div>
+          {view === 'source' && tocOpen && toc.length > 0 ? (
+            <MarkdownToc
+              entries={toc}
+              updated={updatedAnchors}
+              label={t('toc.label')}
+              updatedLabel={t('toc.updated')}
+              onJump={jumpToSection}
+            />
+          ) : null}
+          {showDiffNotice ? (
+            <div className="am-notice" role="note">
+              <span className="am-notice-text">
+                {t(diff.counts.updated === 1 ? 'diff.summary.one' : 'diff.summary', { count: diff.counts.updated })}
+              </span>
+              <button type="button" className="am-toolbar-action" onClick={dismissDiff}>
+                {t('diff.dismiss')}
+              </button>
+            </div>
+          ) : null}
           {staleNoticeOf(translation) && view === 'translated' && (
             <div className="am-notice" role="note">
               <span className="am-notice-text">{t('translate.stale')}</span>
@@ -1351,6 +1458,7 @@ export function Body({
               components={componentContext}
               lineNumbers={showGutter}
               t={t}
+              diff={view === 'source' ? diff : undefined}
             />
           </RenderBoundary>
         </>
@@ -1477,10 +1585,11 @@ interface DocumentViewProps {
   components: ComponentContext
   lineNumbers: boolean
   t: Translate
+  diff?: DocumentDiff
 }
 
 /** Parse once in the body so annotations and the rendered tree share one block model. */
-function DocumentView({ parsed, labels, actions, components, lineNumbers, t }: DocumentViewProps): ReactNode {
+function DocumentView({ parsed, labels, actions, components, lineNumbers, t, diff }: DocumentViewProps): ReactNode {
   return (
     <>
       {parsed.frontmatter === undefined ? null : (
@@ -1489,7 +1598,7 @@ function DocumentView({ parsed, labels, actions, components, lineNumbers, t }: D
           <pre className="am-frontmatter-source">{parsed.frontmatter.source}</pre>
         </section>
       )}
-      <MarkdownView blocks={parsed.blocks} labels={labels} actions={actions} components={components} lineNumbers={lineNumbers} />
+      <MarkdownView blocks={parsed.blocks} labels={labels} actions={actions} components={components} lineNumbers={lineNumbers} diff={diff} />
     </>
   )
 }

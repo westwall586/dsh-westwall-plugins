@@ -2,12 +2,15 @@
 import * as React from 'react'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Block, ComponentView } from './model.ts'
+import type { DiffStatus } from './diff.ts'
 
 export interface ComponentFrameProps {
   block: Block
   component: ComponentView
   /** The block's single annotation, if it has one. */
   annotation: { seq: number } | undefined
+  /** Set when the top-level block was updated after the last review round. */
+  diff?: DiffStatus
   /** Absent in the translated view, where annotations are read-only. */
   annotate?: (block: Block) => void
   label: string
@@ -23,6 +26,7 @@ export function ComponentFrame({
   block,
   component,
   annotation,
+  diff,
   annotate,
   label,
   labels,
@@ -49,6 +53,7 @@ export function ComponentFrame({
       data-source-line={block.sourceStartLine}
       data-gutter-line={block.sourceStartLine}
       data-annotated={annotation === undefined ? undefined : ''}
+      data-diff={diff}
     >
       <div className="am-component-head">
         <span className="am-component-label">{label}</span>

@@ -3,6 +3,7 @@ import * as React from 'react'
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { Inline, Block, ListItem } from './model.ts'
 import { componentOf } from './model.ts'
+import type { DiffStatus, DocumentDiff } from './diff.ts'
 import { ComponentFrame } from './component-frame.tsx'
 import { splitSourceLines, type SourceLine } from './lines.ts'
 import { isRemoteSource } from '../images.ts'
@@ -35,6 +36,8 @@ export interface MarkdownViewProps {
   actions: RenderActions
   lineNumbers: boolean
   components: ComponentContext
+  /** Present in the source view once a review baseline differs from the text. */
+  diff?: DocumentDiff
 }
 
 /**
@@ -42,7 +45,7 @@ export interface MarkdownViewProps {
  * @param props - block tree, labels, line-number toggle, component hooks, and link/image behaviour.
  * @returns the rendered article.
  */
-export function MarkdownView({ blocks, labels, actions, lineNumbers, components }: MarkdownViewProps): ReactNode {
+export function MarkdownView({ blocks, labels, actions, lineNumbers, components, diff }: MarkdownViewProps): ReactNode {
   const doc = useRef<HTMLElement | null>(null)
   // Gutter numbers are absolutely positioned inside the article, so their tops
   // have to be measured after layout and again whenever the prose reflows.
@@ -62,7 +65,7 @@ export function MarkdownView({ blocks, labels, actions, lineNumbers, components 
   }, [blocks, lineNumbers])
   return (
     <article ref={doc} className="am-doc" data-active-markdown-doc>
-      {blocks.map((block, index) => renderBlock(block, `b${index}`, labels, actions, components))}
+      {blocks.map((block, index) => renderBlock(block, `b${index}`, labels, actions, components, diff?.statuses[index]))}
     </article>
   )
 }
@@ -73,12 +76,13 @@ function renderBlock(
   labels: RenderLabels,
   actions: RenderActions,
   components: ComponentContext,
+  status?: DiffStatus,
 ): ReactNode {
   switch (block.type) {
     case 'heading': {
       const Tag = `h${Math.min(Math.max(block.level, 1), 6)}` as 'h1'
       return (
-        <Tag key={key} className="am-heading" data-block-id={block.id} data-block-type="heading" data-source-line={block.sourceStartLine} data-line={block.sourceStartLine} data-gutter-line={block.sourceStartLine} data-anchor={block.anchor}>
+        <Tag key={key} className="am-heading" data-block-id={block.id} data-block-type="heading" data-source-line={block.sourceStartLine} data-line={block.sourceStartLine} data-gutter-line={block.sourceStartLine} data-anchor={block.anchor} data-diff={status}>
           {renderInline(block.inline, key, labels, actions)}
         </Tag>
       )
@@ -94,6 +98,7 @@ function renderBlock(
           data-block-id={block.id}
           data-block-type="paragraph"
           data-source-line={block.sourceStartLine}
+          data-diff={status}
           {...(single ? { 'data-line': block.sourceStartLine, 'data-gutter-line': block.sourceStartLine } : {})}
         >
           {single ? renderInline(lines[0].inline, key, labels, actions) : renderLineSpans(lines, key, labels, actions, true, block.id)}
@@ -110,6 +115,7 @@ function renderBlock(
           block={block}
           component={component}
           annotation={components.annotationOf(block)}
+          diff={status}
           {...(components.annotate === undefined ? {} : { annotate: components.annotate })}
           label={components.labelOf(block)}
           labels={{ annotate: labels.annotate, edit: labels.edit, copy: labels.copy, copied: labels.copied }}
@@ -121,15 +127,15 @@ function renderBlock(
     case 'list': {
       const items = block.items.map((item, index) => renderItem(item, `${key}-i${index}`, labels, actions, components))
       return block.ordered
-        ? <ol key={key} className="am-list" start={block.start} data-block-id={block.id} data-block-type="list" data-source-line={block.sourceStartLine}>{items}</ol>
-        : <ul key={key} className="am-list" data-block-id={block.id} data-block-type="list" data-source-line={block.sourceStartLine}>{items}</ul>
+        ? <ol key={key} className="am-list" start={block.start} data-block-id={block.id} data-block-type="list" data-source-line={block.sourceStartLine} data-diff={status}>{items}</ol>
+        : <ul key={key} className="am-list" data-block-id={block.id} data-block-type="list" data-source-line={block.sourceStartLine} data-diff={status}>{items}</ul>
     }
     case 'quote': return (
-      <blockquote key={key} className="am-quote" data-block-id={block.id} data-block-type="quote" data-source-line={block.sourceStartLine}>
+      <blockquote key={key} className="am-quote" data-block-id={block.id} data-block-type="quote" data-source-line={block.sourceStartLine} data-diff={status}>
         {block.blocks.map((child, index) => renderBlock(child, `${key}-q${index}`, labels, actions, components))}
       </blockquote>
     )
-    case 'divider': return <hr key={key} className="am-divider" data-block-id={block.id} data-block-type="divider" data-source-line={block.sourceStartLine} data-line={block.sourceStartLine} data-gutter-line={block.sourceStartLine} />
+    case 'divider': return <hr key={key} className="am-divider" data-block-id={block.id} data-block-type="divider" data-source-line={block.sourceStartLine} data-line={block.sourceStartLine} data-gutter-line={block.sourceStartLine} data-diff={status} />
   }
 }
 

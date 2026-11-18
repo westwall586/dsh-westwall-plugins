@@ -16,6 +16,26 @@
   background-color: color-mix(in srgb, var(--dsw-alias-link) 18%, transparent);
 }
 
+/* One marker for every updated block: a left stripe plus a wash, painted with
+   background layers so toggling it never changes the block's size. */
+[data-active-markdown] [data-diff='updated'] {
+  background-image:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--dsw-alias-link) 60%, transparent) 0 3px,
+      transparent 3px
+    ),
+    linear-gradient(
+      color-mix(in srgb, var(--dsw-alias-link) 6%, transparent),
+      color-mix(in srgb, var(--dsw-alias-link) 6%, transparent)
+    );
+}
+
+/* A divider has no content box for the wash, so its one line takes the mark. */
+[data-active-markdown] hr[data-diff='updated'] {
+  border-top-color: color-mix(in srgb, var(--dsw-alias-link) 60%, transparent);
+}
+
 [data-active-markdown].am-linenos {
   --am-pad-left: calc(var(--am-pad-x) + var(--am-gutter));
 }
@@ -72,7 +92,8 @@
   margin: 1.6em 0 0.6em;
   font-weight: 600;
   line-height: 1.35;
-  scroll-margin-top: 16px;
+  /* Keep a jumped-to heading clear of the sticky toolbar. */
+  scroll-margin-top: 56px;
 }
 
 .am-heading:is(h1) {
@@ -474,6 +495,72 @@
 .am-toolbar-toggle[aria-pressed='true'] {
   background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-primary);
+}
+
+.am-toolbar-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--dsw-alias-link);
+  vertical-align: middle;
+}
+
+/* Contents scroll in their own box under the toolbar and never narrow the prose. */
+.am-toc {
+  display: flex;
+  flex-direction: column;
+  max-height: min(50vh, 320px);
+  margin: -10px 0 14px;
+  padding: 6px;
+  overflow-y: auto;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.am-toc-entry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding-top: 4px;
+  padding-right: 8px;
+  padding-bottom: 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 0.9em;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+}
+
+.am-toc-entry:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.am-toc-entry-updated {
+  color: var(--dsw-alias-label-primary);
+}
+
+.am-toc-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dsw-alias-link);
+}
+
+.am-toc-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Fixed, so the panel is placed by viewport coordinates and escapes the prose. */
@@ -912,7 +999,7 @@
   color: var(--dsw-alias-label-primary);
 }
 
-/* The stale notice sits above the prose and never hides the translated text. */
+/* The source-update notice and the stale-translation notice share this row. */
 .am-notice {
   display: flex;
   align-items: center;

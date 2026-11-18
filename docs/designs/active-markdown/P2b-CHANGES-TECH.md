@@ -1,6 +1,6 @@
 # Active Markdown P2b 技术方案：块级更新标记
 
-> 状态：设计修订（2026-11-18，评审 1）。定位见 [POSITIONING.md](POSITIONING.md)，阶段见 [ROADMAP.md](ROADMAP.md)，批注与旧版快照见 [P2-ANNOTATION-TECH.md](P2-ANNOTATION-TECH.md)。
+> 状态：设计定稿（2026-11-18，评审 2），已实现（2026-11-18）；Web 版实机复核通过，桌面版待复核。定位见 [POSITIONING.md](POSITIONING.md)，阶段见 [ROADMAP.md](ROADMAP.md)，批注与旧版快照见 [P2-ANNOTATION-TECH.md](P2-ANNOTATION-TECH.md)。
 >
 > 本文只覆盖 P2b：把「上次发送反馈时的全文快照」当作基线，在文件被改过后标出需要读的地方。批注、附件、发送判定、旧版快照已在 P2a 完成，本文不改它们的行为，只加一个只读的基线读取接口、一层块级 diff，以及一个最小目录。
 >
@@ -343,4 +343,10 @@ const [tocOpen, setTocOpen] = useState(false)
 ## 12. 评审与偏差记录
 
 - 2026-11-18 评审 1：去掉新增 / 修改 / 删除分解；删除不计数、不展示 ghost；去掉「只看变化」；新增与修改统一为 `updated`；章节更新点与最小目录并入 P2b，目录的滚动高亮、折叠、当前章节留到 P2c。
-- 实现偏差待补。
+- 2026-11-18 评审 2：目录与 Markdown 的六级标题完全对齐，最小目录改为 H1–H6。
+- 实现偏差：Host 侧输入类型命名为 `ReviewLatestInput`，与既有 `ReviewPrepareInput` / `ReviewCommitInput` 保持一致；客户端请求仍叫 `ReviewLatestRequest`。
+- 实现偏差：损坏的轮次 JSON 按设计跳过；如果按 mtime 最新的一轮元数据损坏，会取更早的可读轮次，而不是返回 `null`。`snapshotMissing` 与 `.md` 缺失仍然直接返回 `null`，不回退。
+- 实现偏差：`updatedSections` 按每个更新块返回一条锚点，同一章节可能有重复；界面用 `Set` 去重。
+- 实现偏差：目录只收顶层块里的 H1–H6 标题。引用或列表内部的标题会在正文里被标记，但不进目录，与顶层块 diff 粒度一致。
+- 实现偏差：代码块外壳原本用 `background` 简写设置底色，会覆盖更新标记的背景层；改为 `background-color` 后代码块与表格使用同一种标记。
+- Browser 复核：用一份含 H1–H6、表格、代码、链接、移动块与删除块的文档，人工写入一份已发送轮次快照，在 Web 版预览里核对 6 处更新、单一标记、目录 4 个章节点、跳转、关闭后刷新恢复、文件再次变化后计数变为 8、改回基线后归零、未发送附件时隐藏、移除附件后恢复、译文视图隐藏。附件在 Web profile 的上传失败是 P2a 既有环境问题，本轮未改。

@@ -148,11 +148,29 @@ export interface ReviewDetachView {
   readonly detached: boolean
 }
 
+export interface ReviewLatestInput {
+  readonly sessionId: string
+  readonly path: string
+}
+
+export interface ReviewLatestView {
+  readonly roundId: string
+  readonly createdAt: string
+  /** The full document text that round was based on. */
+  readonly text: string
+}
+
 export interface ReviewStore {
   prepare(input: ReviewPrepareInput): Promise<ReviewPrepareView>
   commit(input: ReviewCommitInput): Promise<ReviewCommitView>
   /** Remove one round's pending snapshot; the draft record is the caller's. */
   detach(input: ReviewDetachInput): Promise<ReviewDetachView>
+  /**
+   * The newest committed round's snapshot for one document, or null when that
+   * round cannot serve as a baseline. An unusable newest round never falls
+   * back to an older one: the user already reviewed everything before it.
+   */
+  latest(input: ReviewLatestInput): Promise<ReviewLatestView | null>
   /** Prune pending and committed snapshots for one workspace. */
   prune(sessionId: string): Promise<number>
 }
@@ -282,6 +300,60 @@ async function collectRounds(files: ReviewFilePort, root: Roots): Promise<RoundR
     })
   }
   return records
+}
+
+interface LatestRecord {
+  readonly meta: ReviewRound
+  readonly markdownPath: string
+  readonly createdAt: number
+  readonly mtimeMs: number
+}
+
+/**
+ * The newest committed round in one document's mirror directory. A corrupt
+ * metadata file is not a round this read can rank, so it is skipped; a round
+ * that ranks newest but has no snapshot turns into null in the caller instead
+ * of handing back the one before it.
+ */
+async function newestRound(
+  files: ReviewFilePort,
+  directory: string,
+  sourcePath: string,
+): Promise<LatestRecord | null> {
+  let entries: readonly ReviewFileEntry[]
+  try {
+    entries = await files.list(directory)
+  } catch (error) {
+    throw new AnnotationError('read-failed', `读取轮次目录失败：${String(error)}`)
+  }
+  const records: LatestRecord[] = []
+  for (const entry of entries) {
+    if (entry.directory || !entry.path.endsWith('.json')) continue
+    let raw: string | null
+    try {
+      raw = await files.read(entry.path)
+    } catch (error) {
+      throw new AnnotationError('read-failed', `读取审阅元数据失败：${String(error)}`)
+    }
+    if (raw === null) continue
+    let value: unknown
+    try {
+      value = JSON.parse(raw)
+    } catch {
+      continue
+    }
+    const parsed = reviewRoundSchema.safeParse(value)
+    if (!parsed.success) continue
+    if (parsed.data.sourcePath !== sourcePath) continue
+    records.push({
+      meta: parsed.data,
+      markdownPath: `${entry.path.slice(0, -'.json'.length)}.md`,
+      createdAt: timeOf(parsed.data, entry.mtimeMs),
+      mtimeMs: entry.mtimeMs,
+    })
+  }
+  records.sort((left, right) => right.createdAt - left.createdAt || right.mtimeMs - left.mtimeMs)
+  return records[0] ?? null
 }
 
 export function createReviewStore(deps: ReviewStoreDeps): ReviewStore {
@@ -456,6 +528,26 @@ export function createReviewStore(deps: ReviewStoreDeps): ReviewStore {
         throw new AnnotationError('write-failed', `删除 pending 快照失败（${roundId}）：${String(error)}`)
       }
       return { detached: existed }
+    },
+
+    async latest(input) {
+      const sessionId = requireSessionId(input.sessionId)
+      const documentPath = canonicalDocumentPath(input.path)
+      const workspace = await workspaceOf(sessionId)
+      const root = rootsOf(workspace)
+      const mirror = documentMirror(workspace, documentPath)
+      const directory = roundDirectory(root, mirror)
+      const newest = await newestRound(deps.files, directory, mirror.sourcePath)
+      if (newest === null) return null
+      if (newest.meta.snapshotMissing === true) return null
+      let text: string | null
+      try {
+        text = await deps.files.read(newest.markdownPath)
+      } catch (error) {
+        throw new AnnotationError('read-failed', `读取轮次快照失败：${String(error)}`)
+      }
+      if (text === null) return null
+      return { roundId: newest.meta.roundId, createdAt: newest.meta.createdAt, text }
     },
 
     prune,

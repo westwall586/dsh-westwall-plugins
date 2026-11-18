@@ -371,3 +371,113 @@ test('pending 快照 30 天后被清掉', async () => {
   await store.prune('s1')
   assert.equal(files.contentOf(`${PENDING_ROOT}/r1.md`), undefined)
 })
+
+async function commitRound(store: ReviewStore, roundId: string, text: string): Promise<void> {
+  await store.prepare({ sessionId: 's1', path: DOC, roundId, text })
+  await store.commit({ sessionId: 's1', path: DOC, roundId, pending: pendingOf(roundId), sentText: '' })
+}
+
+test('reviewLatest 取 createdAt 最新的一轮快照，不返回更早的轮次', async () => {
+  const clockValue = clock('2026-01-01T00:00:00.000Z')
+  const files = new MemoryFiles(clockValue)
+  const store = storeWith(files, clockValue)
+  await commitRound(store, 'r1', '第一版')
+  clockValue.advance(60_000)
+  await commitRound(store, 'r2', '第二版')
+
+  assert.deepEqual(await store.latest({ sessionId: 's1', path: DOC }), {
+    roundId: 'r2',
+    createdAt: '2026-01-01T00:01:00.000Z',
+    text: '第二版',
+  })
+})
+
+test('reviewLatest 在最新一轮 snapshotMissing 时返回 null，不回退到更早一轮', async () => {
+  const clockValue = clock()
+  const files = new MemoryFiles(clockValue)
+  const store = storeWith(files, clockValue)
+  await commitRound(store, 'r1', '旧版原文')
+  clockValue.advance(60_000)
+  await store.commit({ sessionId: 's1', path: DOC, roundId: 'r2', pending: pendingOf('r2'), sentText: '' })
+
+  assert.equal(await store.latest({ sessionId: 's1', path: DOC }), null)
+})
+
+test('reviewLatest 在最新一轮 .md 缺失时返回 null，不回退到更早一轮', async () => {
+  const clockValue = clock()
+  const files = new MemoryFiles(clockValue)
+  const store = storeWith(files, clockValue)
+  await commitRound(store, 'r1', '旧版原文')
+  clockValue.advance(60_000)
+  await commitRound(store, 'r2', '新版原文')
+  await files.remove(`${ROUND_DIR}/r2.md`)
+
+  assert.equal(await store.latest({ sessionId: 's1', path: DOC }), null)
+})
+
+test('reviewLatest 跳过损坏的元数据，取可读的最新一轮', async () => {
+  const clockValue = clock()
+  const files = new MemoryFiles(clockValue)
+  const store = storeWith(files, clockValue)
+  await commitRound(store, 'r1', '旧版原文')
+  clockValue.advance(60_000)
+  await commitRound(store, 'r2', '新版原文')
+  await files.write(`${ROUND_DIR}/r2.json`, '{ not json')
+
+  assert.deepEqual(await store.latest({ sessionId: 's1', path: DOC }), {
+    roundId: 'r1',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    text: '旧版原文',
+  })
+})
+
+test('reviewLatest 只认镜像里同一 sourcePath 的轮次', async () => {
+  const clockValue = clock()
+  const files = new MemoryFiles(clockValue)
+  const store = storeWith(files, clockValue)
+  await commitRound(store, 'r1', '本文档旧版')
+  const meta = JSON.parse(files.contentOf(`${ROUND_DIR}/r1.json`) ?? '{}')
+  await files.write(`${ROUND_DIR}/rx.json`, JSON.stringify({
+    ...meta,
+    roundId: 'rx',
+    sourcePath: 'docs/b.md',
+    createdAt: '2026-01-02T00:00:00.000Z',
+  }))
+  await files.write(`${ROUND_DIR}/rx.md`, '别的文档')
+
+  assert.deepEqual(await store.latest({ sessionId: 's1', path: DOC }), {
+    roundId: 'r1',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    text: '本文档旧版',
+  })
+})
+
+test('reviewLatest 不把 pending 当基线，没有已发送轮次时返回 null', async () => {
+  const clockValue = clock()
+  const files = new MemoryFiles(clockValue)
+  const store = storeWith(files, clockValue)
+  await store.prepare({ sessionId: 's1', path: DOC, roundId: 'r1', text: '还没发送' })
+
+  assert.equal(await store.latest({ sessionId: 's1', path: DOC }), null)
+})
+
+test('reviewLatest 能取工作区外文档的快照', async () => {
+  const clockValue = clock()
+  const files = new MemoryFiles(clockValue)
+  const store = storeWith(files, clockValue)
+  const external = '/outside/doc.md'
+  await store.prepare({ sessionId: 's1', path: external, roundId: 'r1', text: '外部原文' })
+  await store.commit({
+    sessionId: 's1',
+    path: external,
+    roundId: 'r1',
+    pending: pendingOf('r1'),
+    sentText: '',
+  })
+
+  assert.deepEqual(await store.latest({ sessionId: 's1', path: external }), {
+    roundId: 'r1',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    text: '外部原文',
+  })
+})

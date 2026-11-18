@@ -20,6 +20,8 @@ import type {
   ReviewCommitView,
   ReviewDetachRequest,
   ReviewDetachView,
+  ReviewLatestRequest,
+  ReviewLatestView,
   ReviewPrepareRequest,
   ReviewPrepareView,
   SavedTranslation,
@@ -61,6 +63,7 @@ const WIRE = {
   reviewPrepare: ['sessionId', 'path', 'roundId', 'text'],
   reviewCommit: ['sessionId', 'path', 'roundId', 'sentText'],
   reviewDetach: ['sessionId', 'path', 'roundId'],
+  reviewLatest: ['sessionId', 'path'],
 } as const
 
 function descriptor(method: keyof typeof WIRE) {
@@ -91,6 +94,7 @@ export const DESCRIPTORS = [
   descriptor('reviewPrepare'),
   descriptor('reviewCommit'),
   descriptor('reviewDetach'),
+  descriptor('reviewLatest'),
 ]
 
 export const CLIENT_CONTRIBUTION = { package: 'active-markdown', descriptors: DESCRIPTORS }
@@ -201,6 +205,10 @@ export interface Namespace {
     path: string,
     roundId: string,
   ): Promise<RemoteOutcome<ReviewDetachView>>
+  reviewLatest(
+    sessionId: string,
+    path: string,
+  ): Promise<RemoteOutcome<ReviewLatestView | null>>
 }
 
 /** Value-level facade so the Body never touches wire shapes. */
@@ -282,6 +290,8 @@ export function createBridge(namespace: Namespace): HostBridge {
     unwrap(await namespace.reviewCommit(request.sessionId, request.path, request.roundId, request.sentText))
   const reviewDetach = async (request: ReviewDetachRequest): Promise<ReviewDetachView> =>
     unwrap(await namespace.reviewDetach(request.sessionId, request.path, request.roundId))
+  const reviewLatest = async (request: ReviewLatestRequest): Promise<ReviewLatestView | null> =>
+    unwrap(await namespace.reviewLatest(request.sessionId, request.path)) ?? null
   return {
     translate,
     describe,
@@ -296,6 +306,7 @@ export function createBridge(namespace: Namespace): HostBridge {
     reviewPrepare,
     reviewCommit,
     reviewDetach,
+    reviewLatest,
   }
 }
 

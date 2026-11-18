@@ -22,6 +22,7 @@ import {
   nodeReviewFiles,
   type ReviewCommitView,
   type ReviewDetachView,
+  type ReviewLatestView,
   type ReviewPrepareView,
   type ReviewStore,
 } from './annotate/reviews.ts'
@@ -383,6 +384,11 @@ export default class ActiveMarkdown extends TypertRemoteService {
     })
   }
 
+  /** The newest committed round's full text, or null when it cannot baseline a diff. */
+  async reviewLatest(sessionId: string, path: string): Promise<ReviewLatestView | null> {
+    return this.callAnnotation(() => this.reviews().latest({ sessionId, path }))
+  }
+
   private async call<T>(operation: () => Promise<T>): Promise<T> {
     try {
       return await operation()
@@ -545,7 +551,7 @@ function textField(value: unknown): string {
 const METHODS = [
   'describe', 'translate', 'cacheGet', 'cachePut', 'translationSave', 'translationLoad',
   'annotationLoad', 'annotationSave', 'annotationClear', 'annotationPending',
-  'reviewPrepare', 'reviewCommit', 'reviewDetach',
+  'reviewPrepare', 'reviewCommit', 'reviewDetach', 'reviewLatest',
 ] as const
 
 Object.defineProperty(ActiveMarkdown.prototype, '@deepseek-ai/dsh-typert-protocol/remote-methods', {

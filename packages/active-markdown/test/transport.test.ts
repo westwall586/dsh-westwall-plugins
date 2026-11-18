@@ -31,6 +31,7 @@ const WIRE_PARAMETERS: Record<string, string[]> = {
   reviewPrepare: ['sessionId', 'path', 'roundId', 'text'],
   reviewCommit: ['sessionId', 'path', 'roundId', 'sentText'],
   reviewDetach: ['sessionId', 'path', 'roundId'],
+  reviewLatest: ['sessionId', 'path'],
 }
 
 /** Host method parameters: the wire names, plus the Gateway-injected signal on translate. */
@@ -119,6 +120,7 @@ interface Answers {
   cacheGet?: 'hit' | 'missing'
   load?: 'hit' | 'missing'
   annotationLoad?: 'hit' | 'missing'
+  reviewLatest?: 'hit' | 'missing'
 }
 
 const META = { promptVersion: 'am.translate.v1', lang: 'zh', provider: 'p', model: 'm' }
@@ -210,6 +212,12 @@ function recordingNamespace(answers: Answers = {}): { namespace: Namespace, call
     async reviewDetach(...args: unknown[]) {
       record('reviewDetach', args)
       return { ok: true, value: { detached: true } }
+    },
+    async reviewLatest(...args: unknown[]) {
+      record('reviewLatest', args)
+      return answers.reviewLatest === 'hit'
+        ? { ok: true, value: { roundId: 'r1', createdAt: '2026-11-17T00:00:00.000Z', text: '基线全文' } }
+        : { ok: true }
     },
   }
   return { namespace, calls }
@@ -306,6 +314,21 @@ test('审阅快照桥接按 Host 的线序传参', async () => {
     method: 'reviewDetach',
     args: ['s1', '/w/a.md', 'r1'],
   })
+})
+
+test('基线桥接按线序传参，没有可比较轮次时返回 null', async () => {
+  const hit = recordingNamespace({ reviewLatest: 'hit' })
+  const bridge = createBridge(hit.namespace)
+  const latest = await bridge.reviewLatest({ sessionId: 's1', path: '/w/a.md' })
+  assert.deepEqual(latest, {
+    roundId: 'r1',
+    createdAt: '2026-11-17T00:00:00.000Z',
+    text: '基线全文',
+  })
+  assert.deepEqual(hit.calls.at(-1), { method: 'reviewLatest', args: ['s1', '/w/a.md'] })
+
+  const empty = createBridge(recordingNamespace().namespace)
+  assert.equal(await empty.reviewLatest({ sessionId: 's1', path: '/w/a.md' }), null)
 })
 
 test('取消信号只在提供时追加到 translate 参数末尾', async () => {

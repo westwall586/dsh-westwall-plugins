@@ -200,6 +200,19 @@ export interface ReviewDetachView {
   detached: boolean
 }
 
+/** The newest committed review round for one document, used as a diff baseline. */
+export interface ReviewLatestRequest {
+  sessionId: string
+  path: string
+}
+
+export interface ReviewLatestView {
+  roundId: string
+  createdAt: string
+  /** The full document text that round was based on. */
+  text: string
+}
+
 /** The input submit plane this plugin observes. */
 export type InputPhase = 'plain' | 'adjudicating' | 'claimed' | 'submitting' | 'sending'
 
@@ -299,6 +312,7 @@ export interface HostBridge {
   reviewPrepare(request: ReviewPrepareRequest): Promise<ReviewPrepareView>
   reviewCommit(request: ReviewCommitRequest): Promise<ReviewCommitView>
   reviewDetach(request: ReviewDetachRequest): Promise<ReviewDetachView>
+  reviewLatest(request: ReviewLatestRequest): Promise<ReviewLatestView | null>
 }
 
 /** The plugin-page config form surface, declared structurally. */

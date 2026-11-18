@@ -167,6 +167,7 @@ test('reviewPrepare / reviewCommit / reviewDetach 走工作区快照与草稿', 
   }
 
   try {
+    assert.equal(await service.reviewLatest('s1', path), null)
     const prepared = await service.reviewPrepare('s1', path, 'r1', '# 原文\n')
     assert.equal(prepared.snapshotWritten, true)
     assert.equal(prepared.bytes, Buffer.byteLength('# 原文\n', 'utf8'))
@@ -176,6 +177,11 @@ test('reviewPrepare / reviewCommit / reviewDetach 走工作区快照与草稿', 
     const committed = await service.reviewCommit('s1', path, 'r1', '发送的文本')
     assert.deepEqual(committed, { roundId: 'r1', committed: true, snapshotMissing: false })
     assert.equal(await service.annotationLoad('s1', path), null)
+
+    const latest = await service.reviewLatest('s1', path)
+    assert.equal(latest?.roundId, 'r1')
+    assert.equal(latest?.text, '# 原文\n')
+    assert.match(latest?.createdAt ?? '', /^\d{4}-\d{2}-\d{2}T/)
 
     const snapshot = join(workspace, '.dsh-active-markdown', 'reviews', 'docs', 'a.md', 'r1.md')
     assert.equal(await readFile(snapshot, 'utf8'), '# 原文\n')
@@ -198,6 +204,40 @@ test('reviewPrepare / reviewCommit / reviewDetach 走工作区快照与草稿', 
     const draft = await service.annotationLoad('s1', path)
     assert.equal(draft?.pending, undefined)
     assert.equal(draft?.annotations.length, 1)
+  } finally {
+    await rm(workspace, { recursive: true, force: true })
+  }
+})
+
+test('reviewLatest 在最新一轮快照缺失时返回 null，不回退到更早一轮', async () => {
+  const workspace = await mkdtemp(join(tmpdir(), 'am-review-latest-'))
+  const table = createMemoryAnnotationTable()
+  const service = serviceWith({
+    storageDomain: { open: async () => ({ table: () => table }) },
+    sessions: { get: () => ({ header: { cwd: workspace } }) },
+  })
+  const path = join(workspace, 'a.md')
+  const pendingOf = (roundId: string): PendingReview => ({
+    roundId,
+    draftAttachmentId: `d-${roundId}`,
+    fileName: `a-review-${roundId}.md`,
+    fileBytes: 10,
+    fileHash: 'f'.repeat(64),
+    sourceHash: 's'.repeat(64),
+    annotations: [annotation()],
+    feedback: '反馈',
+    createdAt: '2026-11-17T00:00:00.000Z',
+  })
+  try {
+    await service.reviewPrepare('s1', path, 'r1', '旧版原文')
+    await service.annotationSave('s1', path, [annotation()], pendingOf('r1'))
+    await service.reviewCommit('s1', path, 'r1', '')
+    assert.equal((await service.reviewLatest('s1', path))?.text, '旧版原文')
+
+    // No reviewPrepare for r2: the round lands with snapshotMissing.
+    await service.annotationSave('s1', path, [annotation()], pendingOf('r2'))
+    await service.reviewCommit('s1', path, 'r2', '')
+    assert.equal(await service.reviewLatest('s1', path), null)
   } finally {
     await rm(workspace, { recursive: true, force: true })
   }

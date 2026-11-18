@@ -148,7 +148,11 @@ dsh plugin --profile <profile> add link:$(pwd)/packages/<name>
    git worktree remove .agents/worktrees/<任务> && git branch -d feat/<name>-<短描述>
    ```
    只用 `--ff-only`：分支必须基于最新 `main`，冲突时先在分支上 `git rebase main`，不要用 merge commit。
-5. 维护者在桌面端验收。验出问题：小修按同样流程补分支再合；整块不可用时 `git revert -m 1 <合并提交>`。
+5. 维护者在桌面端验收。验出问题：小修按同样流程补分支再合；整块不可用时把这段提交整体回滚：
+   ```sh
+   git revert --no-commit <改动前的提交>..HEAD && git commit -m "revert: 回滚 <任务>"
+   ```
+   ff-only 合并没有 merge commit，所以不用 `-m`。
 6. 文档类改动（`docs/`、`*.md`、注释与规则）不建 worktree，直接在 `main` 提交推送。
 
 CI 只在推送 `main` 时运行（`.github/workflows/ci.yml`），它是推送前的最后一道闸门，所以在本地跑绿之前不要推 `main`。

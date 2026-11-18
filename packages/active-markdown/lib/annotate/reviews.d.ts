@@ -63,11 +63,27 @@ export interface ReviewDetachInput {
 export interface ReviewDetachView {
     readonly detached: boolean;
 }
+export interface ReviewLatestInput {
+    readonly sessionId: string;
+    readonly path: string;
+}
+export interface ReviewLatestView {
+    readonly roundId: string;
+    readonly createdAt: string;
+    /** The full document text that round was based on. */
+    readonly text: string;
+}
 export interface ReviewStore {
     prepare(input: ReviewPrepareInput): Promise<ReviewPrepareView>;
     commit(input: ReviewCommitInput): Promise<ReviewCommitView>;
     /** Remove one round's pending snapshot; the draft record is the caller's. */
     detach(input: ReviewDetachInput): Promise<ReviewDetachView>;
+    /**
+     * The newest committed round's snapshot for one document, or null when that
+     * round cannot serve as a baseline. An unusable newest round never falls
+     * back to an older one: the user already reviewed everything before it.
+     */
+    latest(input: ReviewLatestInput): Promise<ReviewLatestView | null>;
     /** Prune pending and committed snapshots for one workspace. */
     prune(sessionId: string): Promise<number>;
 }

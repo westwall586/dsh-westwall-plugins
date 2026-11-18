@@ -11,7 +11,7 @@ import type { Context } from '@deepseek-ai/cordis';
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
 import { type AnnotationSaveView } from './annotate/store.ts';
 import type { Annotation, AnnotationDraft, PendingReview } from './annotate/schema.ts';
-import { type ReviewCommitView, type ReviewDetachView, type ReviewPrepareView } from './annotate/reviews.ts';
+import { type ReviewCommitView, type ReviewDetachView, type ReviewLatestView, type ReviewPrepareView } from './annotate/reviews.ts';
 import { type CachedTranslation, type CachePutView } from './translate/cache.ts';
 import { type DescribeView, type TranslateView } from './translate/request.ts';
 import { type TranslationLoadView, type TranslationSaveView } from './translate/store.ts';
@@ -61,6 +61,8 @@ export default class ActiveMarkdown extends TypertRemoteService {
     reviewCommit(sessionId: string, path: string, roundId: string, sentText: string): Promise<ReviewCommitView>;
     /** Clear one matching pending record and its snapshot; annotations stay. */
     reviewDetach(sessionId: string, path: string, roundId: string): Promise<ReviewDetachView>;
+    /** The newest committed round's full text, or null when it cannot baseline a diff. */
+    reviewLatest(sessionId: string, path: string): Promise<ReviewLatestView | null>;
     private call;
     private callAnnotation;
     /**

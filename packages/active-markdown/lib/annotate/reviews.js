@@ -199,6 +199,55 @@ async function collectRounds(files, root) {
     }
     return records;
 }
+/**
+ * The newest committed round in one document's mirror directory. A corrupt
+ * metadata file is not a round this read can rank, so it is skipped; a round
+ * that ranks newest but has no snapshot turns into null in the caller instead
+ * of handing back the one before it.
+ */
+async function newestRound(files, directory, sourcePath) {
+    let entries;
+    try {
+        entries = await files.list(directory);
+    }
+    catch (error) {
+        throw new AnnotationError('read-failed', `读取轮次目录失败：${String(error)}`);
+    }
+    const records = [];
+    for (const entry of entries) {
+        if (entry.directory || !entry.path.endsWith('.json'))
+            continue;
+        let raw;
+        try {
+            raw = await files.read(entry.path);
+        }
+        catch (error) {
+            throw new AnnotationError('read-failed', `读取审阅元数据失败：${String(error)}`);
+        }
+        if (raw === null)
+            continue;
+        let value;
+        try {
+            value = JSON.parse(raw);
+        }
+        catch {
+            continue;
+        }
+        const parsed = reviewRoundSchema.safeParse(value);
+        if (!parsed.success)
+            continue;
+        if (parsed.data.sourcePath !== sourcePath)
+            continue;
+        records.push({
+            meta: parsed.data,
+            markdownPath: `${entry.path.slice(0, -'.json'.length)}.md`,
+            createdAt: timeOf(parsed.data, entry.mtimeMs),
+            mtimeMs: entry.mtimeMs,
+        });
+    }
+    records.sort((left, right) => right.createdAt - left.createdAt || right.mtimeMs - left.mtimeMs);
+    return records[0] ?? null;
+}
 export function createReviewStore(deps) {
     const now = deps.now ?? (() => new Date());
     const limits = { ...REVIEW_LIMITS, ...deps.limits };
@@ -373,6 +422,29 @@ export function createReviewStore(deps) {
                 throw new AnnotationError('write-failed', `删除 pending 快照失败（${roundId}）：${String(error)}`);
             }
             return { detached: existed };
+        },
+        async latest(input) {
+            const sessionId = requireSessionId(input.sessionId);
+            const documentPath = canonicalDocumentPath(input.path);
+            const workspace = await workspaceOf(sessionId);
+            const root = rootsOf(workspace);
+            const mirror = documentMirror(workspace, documentPath);
+            const directory = roundDirectory(root, mirror);
+            const newest = await newestRound(deps.files, directory, mirror.sourcePath);
+            if (newest === null)
+                return null;
+            if (newest.meta.snapshotMissing === true)
+                return null;
+            let text;
+            try {
+                text = await deps.files.read(newest.markdownPath);
+            }
+            catch (error) {
+                throw new AnnotationError('read-failed', `读取轮次快照失败：${String(error)}`);
+            }
+            if (text === null)
+                return null;
+            return { roundId: newest.meta.roundId, createdAt: newest.meta.createdAt, text };
         },
         prune,
     };

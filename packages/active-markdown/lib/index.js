@@ -208,6 +208,10 @@ export default class ActiveMarkdown extends TypertRemoteService {
             return { detached: true };
         });
     }
+    /** The newest committed round's full text, or null when it cannot baseline a diff. */
+    async reviewLatest(sessionId, path) {
+        return this.callAnnotation(() => this.reviews().latest({ sessionId, path }));
+    }
     async call(operation) {
         try {
             return await operation();
@@ -357,7 +361,7 @@ function textField(value) {
 const METHODS = [
     'describe', 'translate', 'cacheGet', 'cachePut', 'translationSave', 'translationLoad',
     'annotationLoad', 'annotationSave', 'annotationClear', 'annotationPending',
-    'reviewPrepare', 'reviewCommit', 'reviewDetach',
+    'reviewPrepare', 'reviewCommit', 'reviewDetach', 'reviewLatest',
 ];
 Object.defineProperty(ActiveMarkdown.prototype, '@deepseek-ai/dsh-typert-protocol/remote-methods', {
     configurable: true,

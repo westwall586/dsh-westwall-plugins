@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObjec
 import { createPortal } from 'react-dom'
 import { frameButtons, type Block, type ComponentView, type FrameButton } from './model.ts'
 import type { DiffStatus } from './diff.ts'
+import type { AnnotationLabels } from '../annotate/form.tsx'
+import { PanelAnnotation } from '../annotate/panel.tsx'
 import { AnnotateIcon, CloseIcon, CopyIcon, ExpandIcon, WrapIcon } from '../rich/icons.tsx'
 
 /** What a frame body receives: the frame's wrap preference, and whether it is the expanded copy. */
@@ -24,15 +26,31 @@ export interface ComponentFrameLabels {
   close: string
 }
 
+/** What the expanded panel's annotation drawer needs. */
+export interface PanelAnnotationHooks {
+  labels: AnnotationLabels
+  /** The label the saved annotation records; the drawer previews it as the quote. */
+  quote(block: Block): string
+  save(block: Block, body: string): void
+  remove?(block: Block): void
+}
+
+/** Where a frame's annotate buttons lead: the floating editor, or the panel drawer. */
+export interface AnnotateHooks {
+  inline(block: Block): void
+  /** Present when this view may edit annotations inside the expanded panel. */
+  panel?: PanelAnnotationHooks
+}
+
 export interface ComponentFrameProps {
   block: Block
   component: ComponentView
   /** The block's single annotation, if it has one. */
-  annotation: { seq: number } | undefined
+  annotation: { seq: number, body: string } | undefined
   /** Set when the top-level block was updated after the last review round. */
   diff?: DiffStatus
   /** Absent in the translated view, where annotations are read-only. */
-  annotate?: (block: Block) => void
+  annotate?: AnnotateHooks
   /** Header text after the leading icon. */
   label: string
   /**
@@ -77,9 +95,11 @@ export function ComponentFrame({
   const [copied, setCopied] = useState(false)
   const [wrap, setWrap] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  const [panelAnnotating, setPanelAnnotating] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const expandButton = useRef<HTMLButtonElement | null>(null)
   const closeButton = useRef<HTMLButtonElement | null>(null)
+  const annotateButton = useRef<HTMLButtonElement | null>(null)
   const copy = useCallback(() => {
     if (component.copyText === undefined) return
     void navigator.clipboard?.writeText(component.copyText).then(() => {
@@ -89,6 +109,21 @@ export function ComponentFrame({
     }).catch(() => {})
   }, [component.copyText])
   useEffect(() => () => clearTimeout(timer.current), [])
+  // A closed panel drops its drawer, so reopening always starts without one.
+  useEffect(() => {
+    if (!expanded) setPanelAnnotating(false)
+  }, [expanded])
+
+  const panelHooks = annotate?.panel
+  const closePanelAnnotation = useCallback((): void => {
+    setPanelAnnotating(false)
+    annotateButton.current?.focus()
+  }, [])
+  const closeGuard = useCallback((): boolean => {
+    if (!panelAnnotating) return false
+    closePanelAnnotation()
+    return true
+  }, [panelAnnotating, closePanelAnnotation])
 
   const capabilities = component.capabilities
   const buttons = frameButtons(capabilities).filter((button) => {
@@ -134,7 +169,21 @@ export function ComponentFrame({
         )
       case 'annotate':
         return (
-          <button key="annotate" type="button" className="am-component-action" aria-label={annotateLabel} title={annotateLabel} onClick={() => annotate?.(block)}>
+          <button
+            key="annotate"
+            {...(variant === 'panel' ? { ref: annotateButton } : {})}
+            type="button"
+            className="am-component-action"
+            aria-label={annotateLabel}
+            title={annotateLabel}
+            onClick={() => {
+              if (annotate === undefined) return
+              // The panel's drawer is laid out for the panel; falling back to the
+              // floating editor would place it against the masked document.
+              if (variant === 'panel' && panelHooks !== undefined) setPanelAnnotating(true)
+              else annotate.inline(block)
+            }}
+          >
             <AnnotateIcon />
           </button>
         )
@@ -146,6 +195,31 @@ export function ComponentFrame({
         )
     }
   }
+
+  const drawer = expanded && panelAnnotating && panelHooks !== undefined
+    ? (
+      <PanelAnnotation
+        title={panelHooks.labels.title}
+        quote={panelHooks.quote(block)}
+        initial={annotation?.body ?? ''}
+        seq={annotation?.seq}
+        labels={panelHooks.labels}
+        onSave={(body) => {
+          closePanelAnnotation()
+          panelHooks.save(block, body)
+        }}
+        onCancel={closePanelAnnotation}
+        {...(annotation !== undefined && panelHooks.remove !== undefined
+          ? {
+            onDelete: (): void => {
+              closePanelAnnotation()
+              panelHooks.remove?.(block)
+            },
+          }
+          : {})}
+      />
+    )
+    : null
 
   // Only the in-place copy opens the panel; the panel's own copy is already open.
   const clickToExpand = capabilities.clickToExpand && capabilities.fullscreen
@@ -191,6 +265,8 @@ export function ComponentFrame({
             returnFocus={expandButton}
             closeButton={closeButton}
             head={head('panel')}
+            drawer={drawer}
+            closeGuard={closeGuard}
             onClose={() => setExpanded(false)}
           >
             {children({ wrap, expanded: true })}
@@ -214,6 +290,10 @@ interface ComponentPanelProps {
   closeButton: RefObject<HTMLButtonElement | null>
   /** The shared header row, already bound to this panel's close handler. */
   head: ReactNode
+  /** The annotation drawer, layered over the body. */
+  drawer?: ReactNode
+  /** Runs before Esc closes the panel; true means something inside consumed it. */
+  closeGuard?: () => boolean
   onClose: () => void
   children: ReactNode
 }
@@ -225,14 +305,21 @@ interface ComponentPanelProps {
  * @param props - the component kind and label, panel behaviour, focus targets, and body.
  * @returns the portal, or null before the document body exists.
  */
-function ComponentPanel({ kind, label, zoom, pan, returnFocus, closeButton, head, onClose, children }: ComponentPanelProps): ReactNode {
+function ComponentPanel({ kind, label, zoom, pan, returnFocus, closeButton, head, drawer, closeGuard, onClose, children }: ComponentPanelProps): ReactNode {
   const close = useRef(onClose)
   close.current = onClose
+  const guard = useRef(closeGuard)
+  guard.current = closeGuard
   useEffect(() => {
     closeButton.current?.focus()
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape') return
       event.preventDefault()
+      // The open drawer owns the first Esc; the panel closes on the next one.
+      if (guard.current?.() === true) {
+        event.stopPropagation()
+        return
+      }
       close.current()
     }
     document.addEventListener('keydown', onKeyDown, true)
@@ -256,12 +343,15 @@ function ComponentPanel({ kind, label, zoom, pan, returnFocus, closeButton, head
     >
       <div className="am-component-panel" data-component-panel={kind} onClick={stop}>
         {head}
-        <div
-          className="am-component-panel-body"
-          data-zoom={zoom ? '' : undefined}
-          data-pan={pan ? '' : undefined}
-        >
-          {children}
+        <div className="am-component-panel-main">
+          <div
+            className="am-component-panel-body"
+            data-zoom={zoom ? '' : undefined}
+            data-pan={pan ? '' : undefined}
+          >
+            {children}
+          </div>
+          {drawer}
         </div>
       </div>
     </div>,

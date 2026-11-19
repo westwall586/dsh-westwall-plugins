@@ -5,10 +5,11 @@ import { CodeBlock, ImageLightbox } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { Inline, Block, ListItem } from './model.ts'
 import { componentOf } from './model.ts'
 import type { DiffStatus, DocumentDiff } from './diff.ts'
-import { ComponentFrame } from './component-frame.tsx'
+import { ComponentFrame, type AnnotateHooks, type ComponentFrameLabels } from './component-frame.tsx'
 import { calloutHeadTitle, resolveCallout } from './callout.ts'
 import { splitSourceLines, type SourceLine } from './lines.ts'
 import { isRemoteSource } from '../images.ts'
+import type { AnnotationLabels } from '../annotate/form.tsx'
 import { MarkmapView } from '../rich/markmap.tsx'
 import { MermaidView } from '../rich/mermaid.tsx'
 import { MathInline, MathView } from '../rich/math.tsx'
@@ -27,6 +28,8 @@ export interface RenderLabels {
   nowrap: string
   fullscreen: string
   close: string
+  /** The annotation editor and drawer copy, shared by the popover and the panel drawer. */
+  annotation: AnnotationLabels
   /** Localized copy for the lazily rendered diagrams. */
   rich: RichLabels
   /** One callout type's localized label. */
@@ -42,8 +45,8 @@ export interface RenderActions {
 /** The block frame's annotation hooks; absent actions mean the view is read-only. */
 export interface ComponentContext {
   labelOf(block: Block): string
-  annotationOf(block: Block): { seq: number } | undefined
-  annotate?: (block: Block) => void
+  annotationOf(block: Block): { seq: number, body: string } | undefined
+  annotate?: AnnotateHooks
 }
 
 export interface MarkdownViewProps {
@@ -53,6 +56,23 @@ export interface MarkdownViewProps {
   components: ComponentContext
   /** Present in the source view once a review baseline differs from the text. */
   diff?: DocumentDiff
+}
+
+/**
+ * One mapping from the view's copy to the shell's copy, so every frame call site
+ * passes the same shape instead of repeating it.
+ */
+function frameLabels(labels: RenderLabels): ComponentFrameLabels {
+  return {
+    annotate: labels.annotate,
+    edit: labels.edit,
+    copy: labels.copy,
+    copied: labels.copied,
+    wrap: labels.wrap,
+    nowrap: labels.nowrap,
+    fullscreen: labels.fullscreen,
+    close: labels.close,
+  }
 }
 
 /**
@@ -120,16 +140,7 @@ function renderBlock(
           diff={status}
           {...(components.annotate === undefined ? {} : { annotate: components.annotate })}
           label={components.labelOf(block)}
-          labels={{
-            annotate: labels.annotate,
-            edit: labels.edit,
-            copy: labels.copy,
-            copied: labels.copied,
-            wrap: labels.wrap,
-            nowrap: labels.nowrap,
-            fullscreen: labels.fullscreen,
-            close: labels.close,
-          }}
+          labels={frameLabels(labels)}
         >
           {(context) => {
             switch (block.type) {
@@ -200,16 +211,7 @@ function renderCallout(
       icon={<span dangerouslySetInnerHTML={{ __html: type.icon }} />}
       title={calloutHeadTitle(block.title, typeLabel)}
       family={block.family}
-      labels={{
-        annotate: labels.annotate,
-        edit: labels.edit,
-        copy: labels.copy,
-        copied: labels.copied,
-        wrap: labels.wrap,
-        nowrap: labels.nowrap,
-        fullscreen: labels.fullscreen,
-        close: labels.close,
-      }}
+      labels={frameLabels(labels)}
     >
       {() => block.blocks.length === 0
         ? null

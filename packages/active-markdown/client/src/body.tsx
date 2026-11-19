@@ -6,13 +6,13 @@ import type { PendingHub } from './annotate/committer.ts'
 import { AnnotationDrawer } from './annotate/drawer.tsx'
 import {
   addAnnotation,
-  annotateBlock,
   blockAnnotationOf,
   editAnnotation,
   newAnnotationId,
   nextSeq,
   removeAnnotation,
   restoreAnnotation,
+  savedBlockAnnotation,
   type Annotation,
   type Anchor,
 } from './annotate/model.ts'
@@ -747,6 +747,14 @@ export function Body({
     nowrap: t('code.nowrap'),
     fullscreen: t('component.fullscreen'),
     close: t('component.close'),
+    annotation: {
+      title: t('annotate.drawer.title'),
+      quote: t('annotate.quote'),
+      placeholder: t('annotate.placeholder'),
+      save: t('annotate.save'),
+      cancel: t('annotate.cancel'),
+      delete: t('annotate.drawer.delete'),
+    },
     rich: {
       rendering: t('rich.rendering'),
       copyError: t('rich.copyError'),
@@ -1262,6 +1270,12 @@ export function Body({
     return map
   }, [annotationList, sourceJoined, parsed])
 
+  /** The label a block's annotation records, and the text its frame head shows. */
+  const labelOf = useCallback((block: Block): string => {
+    const component = componentOf(block)
+    return component === null ? '' : componentLabel(component, t)
+  }, [t])
+
   const openEditor = useCallback((annotation: Annotation, anchor?: HTMLElement): void => {
     const rect = anchor?.getBoundingClientRect()
     const left = rect?.left ?? window.innerWidth - ANNOTATION_POPOVER_WIDTH - 24
@@ -1337,14 +1351,20 @@ export function Body({
     }
   }, [editor?.origin])
 
-  const componentContext = useMemo<ComponentContext>(() => ({
-    labelOf: (block) => {
-      const component = componentOf(block)
-      return component === null ? '' : componentLabel(component, t)
-    },
-    annotationOf: block => (view === 'source' ? blockAnnotationOf(annotationList, block.id) : undefined),
-    ...(view === 'source' ? { annotate: openBlockEditor } : {}),
-  }), [view, annotationList, t, openBlockEditor])
+  // Close on the press rather than the click: whatever was pressed still gets its
+  // click afterwards, so a link under the blank area opens as usual.
+  const editorOpen = editor !== null
+  useEffect(() => {
+    if (!editorOpen) return
+    const onPointerDown = (event: PointerEvent): void => {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      if (editorPanel.current?.contains(target) === true) return
+      setEditor(null)
+    }
+    document.addEventListener('pointerdown', onPointerDown, true)
+    return () => document.removeEventListener('pointerdown', onPointerDown, true)
+  }, [editorOpen])
 
   const unlocatableNow = useCallback((): ReadonlySet<string> => {
     const ids = new Set<string>()
@@ -1458,11 +1478,43 @@ export function Body({
     if (result.status === 'failed') setAttachError(t('annotate.attachFailed', { message: result.message }))
   }, [draftKey, composerBusy, annotations, attachment, inputActions, phase, hub, t])
 
+  /** Write one block's annotation; the panel drawer and the popover both land here. */
+  const writeBlockAnnotation = useCallback((block: Block, body: string): void => {
+    const target = draftKey
+    const text = body.trim()
+    if (target === null || text === '') return
+    if (composerBusy) {
+      setNotice({ text: t('annotate.composerBusy'), undo: false })
+      return
+    }
+    const latest = annotations.getSnapshot(target)
+    if (latest.status !== 'ready') {
+      setNotice({ text: t('annotate.loading'), undo: false })
+      return
+    }
+    const base = latest.annotations
+    const next = savedBlockAnnotation(base, block, text, {
+      id: newAnnotationId(),
+      seq: nextSeq(base, latest.nextSeq),
+      createdAt: new Date().toISOString(),
+    }, labelOf(block))
+    void annotations.write(target, next).then((result) => {
+      if (result.status === 'too-large') setNotice({ text: t('annotate.tooLarge'), undo: false })
+      else if (result.status === 'failed') setNotice({ text: result.message, undo: false })
+      else void syncAttachment(annotations.getSnapshot(target).annotations)
+    })
+  }, [draftKey, annotations, composerBusy, t, labelOf, syncAttachment])
+
   const saveEditor = useCallback((body: string): void => {
     const target = draftKey
     const current = editor
     const text = body.trim()
     if (target === null || current === null || text === '') return
+    if (current.mode === 'new-block') {
+      setEditor(null)
+      writeBlockAnnotation(current.block, text)
+      return
+    }
     if (composerBusy) {
       setEditor(null)
       setNotice({ text: t('annotate.composerBusy'), undo: false })
@@ -1482,16 +1534,14 @@ export function Body({
     }
     const next = current.mode === 'edit'
       ? editAnnotation(base, current.annotation.id, text)
-      : current.mode === 'new-block'
-        ? annotateBlock(base, current.block, text, options, componentContext.labelOf(current.block))
-        : addAnnotation(base, { ...current.anchor, kind: 'text', body: text }, options)
+      : addAnnotation(base, { ...current.anchor, kind: 'text', body: text }, options)
     setEditor(null)
     void annotations.write(target, next).then((result) => {
       if (result.status === 'too-large') setNotice({ text: t('annotate.tooLarge'), undo: false })
       else if (result.status === 'failed') setNotice({ text: result.message, undo: false })
       else void syncAttachment(annotations.getSnapshot(target).annotations)
     })
-  }, [draftKey, editor, annotations, componentContext, t, composerBusy, syncAttachment])
+  }, [draftKey, editor, annotations, t, composerBusy, syncAttachment, writeBlockAnnotation])
 
   const deleteAnnotation = useCallback((annotation: Annotation): void => {
     const target = draftKey
@@ -1512,6 +1562,37 @@ export function Body({
     setUndo({ annotation, key: target, timer })
     setNotice({ text: t('annotate.deleted'), undo: true })
   }, [draftKey, annotations, undo, t, composerBusy, syncAttachment])
+
+  /** Delete a block's annotation from the panel drawer; the undo toast is the same one. */
+  const deleteBlockAnnotation = useCallback((block: Block): void => {
+    const target = draftKey
+    if (target === null) return
+    const annotation = blockAnnotationOf(annotations.getSnapshot(target).annotations, block.id)
+    if (annotation === undefined) return
+    deleteAnnotation(annotation)
+  }, [draftKey, annotations, deleteAnnotation])
+
+  const componentContext = useMemo<ComponentContext>(() => ({
+    labelOf,
+    annotationOf: (block) => {
+      if (view !== 'source') return undefined
+      const annotation = blockAnnotationOf(annotationList, block.id)
+      return annotation === undefined ? undefined : { seq: annotation.seq, body: annotation.body }
+    },
+    ...(view === 'source'
+      ? {
+        annotate: {
+          inline: openBlockEditor,
+          panel: {
+            labels: labels.annotation,
+            quote: labelOf,
+            save: writeBlockAnnotation,
+            remove: deleteBlockAnnotation,
+          },
+        },
+      }
+      : {}),
+  }), [view, annotationList, labelOf, openBlockEditor, labels, writeBlockAnnotation, deleteBlockAnnotation])
 
   const undoDelete = useCallback((): void => {
     if (undo === null) return
@@ -2523,13 +2604,7 @@ export function Body({
           panelRef={editorPanel}
           quote={editor.mode === 'edit' ? editor.annotation.quote : editor.mode === 'new-block' ? componentContext.labelOf(editor.block) : editor.anchor.quote}
           initial={editor.mode === 'edit' ? editor.annotation.body : ''}
-          labels={{
-            title: t('annotate.drawer.title'),
-            quote: t('annotate.quote'),
-            placeholder: t('annotate.placeholder'),
-            save: t('annotate.save'),
-            cancel: t('annotate.cancel'),
-          }}
+          labels={labels.annotation}
           onSave={saveEditor}
           onCancel={() => setEditor(null)}
         />

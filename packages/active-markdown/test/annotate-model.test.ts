@@ -3,14 +3,17 @@ import assert from 'node:assert/strict'
 
 import {
   addAnnotation,
+  blockAnnotationOf,
   editAnnotation,
   maxSeq,
   nextSeq,
   removeAnnotation,
   restoreAnnotation,
+  savedBlockAnnotation,
   type Annotation,
   type AnnotationInput,
 } from '../client/src/annotate/model.ts'
+import { parseDocument } from '../client/src/markdown/blocks.ts'
 
 function input(overrides: Partial<AnnotationInput> = {}): AnnotationInput {
   return {
@@ -94,4 +97,51 @@ test('空列表从 1 开始，没有 tag/priority/status 字段', () => {
   assert.equal('priority' in annotation!, false)
   assert.equal('status' in annotation!, false)
   assert.equal(Object.keys(annotation!).includes('tag'), false)
+})
+
+const BLOCKS = parseDocument([
+  '| a | b |',
+  '| - | - |',
+  '| 1 | 2 |',
+  '',
+  '```ts',
+  'const a = 1',
+  '```',
+].join('\n')).blocks
+const TABLE = BLOCKS.find(block => block.type === 'table')!
+const CODE = BLOCKS.find(block => block.type === 'code')!
+const BLOCK_OPTIONS = { id: 'a1', seq: 1, createdAt: '2026-11-17T00:00:00.000Z' }
+
+test('块批注首次保存记下标签、块 id 与编号', () => {
+  const saved = savedBlockAnnotation([], TABLE, '表格意见', BLOCK_OPTIONS, '表格 · 2 列 × 1 行')
+  assert.equal(saved.length, 1)
+  const annotation = saved[0]!
+  assert.equal(annotation.kind, 'block')
+  assert.equal(annotation.id, 'a1')
+  assert.equal(annotation.seq, 1)
+  assert.equal(annotation.body, '表格意见')
+  assert.equal(annotation.quote, '表格 · 2 列 × 1 行')
+  assert.equal(annotation.blockStartId, TABLE.id)
+  assert.equal(annotation.startOffset, 0)
+})
+
+test('再次保存保留 id 与编号，其它块的批注不动，入参不被改写', () => {
+  const first = savedBlockAnnotation([], CODE, '代码意见', BLOCK_OPTIONS, '代码块 · ts')
+  const both = savedBlockAnnotation(first, TABLE, '表格意见', { ...BLOCK_OPTIONS, id: 'a2', seq: 2 }, '表格 · 2 列 × 1 行')
+  const again = savedBlockAnnotation(both, CODE, '改过的代码意见', { ...BLOCK_OPTIONS, id: 'a3', seq: 3 }, '代码块 · ts')
+
+  assert.equal(again.length, 2)
+  const code = blockAnnotationOf(again, CODE.id)!
+  assert.equal(code.id, 'a1')
+  assert.equal(code.seq, 1)
+  assert.equal(code.body, '改过的代码意见')
+  assert.equal(code.createdAt, BLOCK_OPTIONS.createdAt)
+
+  const table = blockAnnotationOf(again, TABLE.id)!
+  assert.equal(table.id, 'a2')
+  assert.equal(table.seq, 2)
+  assert.equal(table.body, '表格意见')
+
+  assert.equal(blockAnnotationOf(both, CODE.id)?.body, '代码意见')
+  assert.deepEqual(both.map(annotation => annotation.id), ['a1', 'a2'])
 })

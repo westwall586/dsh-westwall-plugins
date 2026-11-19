@@ -441,6 +441,15 @@
   letter-spacing: 0;
 }
 
+/* The body and the annotation drawer share one positioning box below the head,
+   so the drawer stays inside the visible panel while the body scrolls. */
+.am-component-panel-main {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
 /* The body stacks blocks as flex items so a diagram fills the height while a
    tall code block or table scrolls instead of squeezing. */
 .am-component-panel-body {
@@ -1687,6 +1696,21 @@ svg.am-markmap-canvas .markmap-foreign > div {
   margin-top: 8px;
 }
 
+/* The drawer's delete sits on the left, away from save. */
+.am-annotate-delete {
+  margin-right: auto;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  color: var(--dsw-alias-label-error, var(--dsw-alias-label-secondary));
+  font: inherit;
+  cursor: pointer;
+}
+
+.am-annotate-delete:hover {
+  text-decoration: underline;
+}
+
 .am-annotate-save {
   border-color: var(--dsw-alias-link);
   color: var(--dsw-alias-link);
@@ -1695,6 +1719,78 @@ svg.am-markmap-canvas .markmap-foreign > div {
 .am-annotate-save:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* The panel drawer is laid out for the panel, not for the document underneath:
+   the scrim only catches a click outside it, and the drawer scrolls on its own. */
+.am-panel-annotation {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+.am-panel-annotation-scrim {
+  position: absolute;
+  inset: 0;
+}
+
+.am-panel-annotation-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 320px;
+  max-width: 100%;
+  overflow-y: auto;
+  border-left: 0.5px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: -6px 0 20px var(--dsw-alias-border-l1);
+  color: var(--dsw-alias-label-primary);
+  font-size: 0.92em;
+}
+
+.am-panel-annotation-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l1);
+}
+
+.am-panel-annotation-title {
+  font-weight: 600;
+}
+
+.am-panel-annotation-seq {
+  color: var(--dsw-alias-link);
+  font-size: 0.9em;
+}
+
+.am-panel-annotation-close {
+  margin-left: auto;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 1.1em;
+  cursor: pointer;
+}
+
+.am-panel-annotation-close:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.am-panel-annotation-body {
+  padding: 10px 12px 12px;
 }
 
 .am-toast-action {

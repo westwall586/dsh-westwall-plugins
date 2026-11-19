@@ -147,3 +147,20 @@ export function annotateBlock(
   if (existing !== undefined) return editAnnotation(annotations, existing.id, body)
   return addAnnotation(annotations, { ...blockAnchor(block, quote), kind: 'block', body }, options)
 }
+
+/**
+ * Save one block's annotation, the single entry the popover and the panel drawer share:
+ * an existing entry keeps its id, seq, and createdAt and only takes the new body.
+ */
+export function savedBlockAnnotation(
+  base: readonly Annotation[],
+  block: Block,
+  body: string,
+  options: AddOptions,
+  quote: string,
+): Annotation[] {
+  const existing = blockAnnotationOf(base, block.id)
+  return existing === undefined
+    ? annotateBlock(base, block, body, options, quote)
+    : editAnnotation(base, existing.id, body)
+}

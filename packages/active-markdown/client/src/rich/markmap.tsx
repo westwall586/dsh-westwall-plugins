@@ -7,10 +7,22 @@ import { RichError } from './fallback.tsx'
 import type { RichLabels } from './labels.ts'
 import { usePalette } from './palette.ts'
 import { outlineToTree, type MarkmapNode } from './tree.ts'
-import { ZoomPanel } from './zoom-panel.tsx'
+
+/** The panel controls the chunk exposes once a map is mounted. */
+interface MarkmapHandle {
+  dispose(): void
+  scale(): number
+  rescale(scale: number): void
+  fit(): void
+}
 
 interface MarkmapChunk {
-  mount(svg: SVGSVGElement, tree: MarkmapNode, palette: Record<string, string>): () => void
+  mount(
+    svg: SVGSVGElement,
+    tree: MarkmapNode,
+    palette: Record<string, string>,
+    onScale?: (scale: number) => void,
+  ): MarkmapHandle
 }
 
 type MountState = { kind: 'loading' } | { kind: 'ready' } | { kind: 'error', error: unknown }
@@ -33,34 +45,48 @@ interface MarkmapCanvasProps {
   palette: Record<string, string>
   className: string
   onState: (state: MountState) => void
+  /** Expanded copy only: the view reads the mounted handle off this element. */
+  svgRef?: { current: SVGSVGElement | null }
+  /** Expanded copy only: the live handle and the scale markmap reports after a gesture. */
+  onHandle?: (handle: MarkmapHandle | undefined) => void
+  onScale?: (scale: number) => void
 }
 
 /** Mount one markmap instance and tear it down whenever the data or theme changes. */
-function MarkmapCanvas({ tree, palette, className, onState }: MarkmapCanvasProps): ReactNode {
-  const holder = useRef<SVGSVGElement | null>(null)
+function MarkmapCanvas({ tree, palette, className, onState, onHandle, onScale, svgRef }: MarkmapCanvasProps): ReactNode {
+  const local = useRef<SVGSVGElement | null>(null)
+  const holder = svgRef ?? local
+  const state = useRef(onState)
+  state.current = onState
+  const handle = useRef(onHandle)
+  handle.current = onHandle
+  const scale = useRef(onScale)
+  scale.current = onScale
 
   useEffect(() => {
     const svg = holder.current
     if (svg === null) return
     let alive = true
-    let dispose: (() => void) | undefined
-    onState({ kind: 'loading' })
+    let mounted: MarkmapHandle | undefined
+    state.current({ kind: 'loading' })
     loadMarkmap().then((chunk) => {
       if (!alive) return
       try {
-        dispose = chunk.mount(svg, tree, palette)
-        onState({ kind: 'ready' })
+        mounted = chunk.mount(svg, tree, palette, value => { scale.current?.(value) })
+        handle.current?.(mounted)
+        state.current({ kind: 'ready' })
       } catch (error) {
-        onState({ kind: 'error', error })
+        state.current({ kind: 'error', error })
       }
     }).catch((error: unknown) => {
-      if (alive) onState({ kind: 'error', error })
+      if (alive) state.current({ kind: 'error', error })
     })
     return () => {
       alive = false
-      dispose?.()
+      handle.current?.(undefined)
+      mounted?.dispose()
     }
-  }, [tree, palette, onState])
+  }, [tree, palette])
 
   return <svg ref={holder} className={className} />
 }
@@ -68,7 +94,7 @@ function MarkmapCanvas({ tree, palette, className, onState }: MarkmapCanvasProps
 export interface MarkmapViewProps {
   code: string
   labels: RichLabels
-  /** Set on the panel's copy, which carries its own zoom bar. */
+  /** Set on the panel's copy, which carries its own footer. */
   expanded: boolean
 }
 
@@ -87,16 +113,36 @@ export function MarkmapView({ code, labels, expanded }: MarkmapViewProps): React
   }, [code])
   const [state, setState] = useState<MountState>({ kind: 'loading' })
   const [panelState, setPanelState] = useState<MountState>({ kind: 'loading' })
+  const svg = useRef<SVGSVGElement | null>(null)
+  const handleOf = (): MarkmapHandle | undefined =>
+    (svg.current as SVGSVGElement & { __markmapHandle?: MarkmapHandle } | null)?.__markmapHandle
 
   if (state.kind === 'error') return <RichError code={code} error={state.error} labels={labels} />
 
   if (expanded) {
     return (
-      <ZoomPanel labels={labels}>
-        <MarkmapCanvas tree={tree} palette={palette} className="am-markmap-canvas" onState={setPanelState} />
-        {panelState.kind === 'loading' ? <div className="am-rich-state" aria-busy="true">{labels.rendering}</div> : null}
-        {panelState.kind === 'error' ? <RichError code={code} error={panelState.error} labels={labels} /> : null}
-      </ZoomPanel>
+      <div className="am-rich-panel">
+        <div className="am-rich-panel-body am-rich-scene am-rich-scene-native">
+          <MarkmapCanvas
+            tree={tree}
+            palette={palette}
+            className="am-markmap-canvas"
+            svgRef={svg}
+            onState={setPanelState}
+          />
+          {panelState.kind === 'loading' ? <div className="am-rich-state" aria-busy="true">{labels.rendering}</div> : null}
+          {panelState.kind === 'error' ? <RichError code={code} error={panelState.error} labels={labels} /> : null}
+        </div>
+        <div className="am-rich-panel-foot">
+          <button
+            type="button"
+            className="am-rich-panel-reset"
+            onClick={() => { handleOf()?.fit() }}
+          >
+            {labels.reset}
+          </button>
+        </div>
+      </div>
     )
   }
 

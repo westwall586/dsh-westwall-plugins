@@ -5,7 +5,7 @@ import { loadChunk } from '../chunks.ts'
 import { RichError } from './fallback.tsx'
 import type { RichLabels } from './labels.ts'
 import { paletteKey, usePalette } from './palette.ts'
-import { ZoomPanel } from './zoom-panel.tsx'
+import { MermaidStage } from './stage.tsx'
 
 interface MermaidChunk {
   render(code: string, palette: Record<string, string>): Promise<string>
@@ -66,6 +66,6 @@ export function MermaidView({ code, labels, expanded }: MermaidViewProps): React
       </div>
     )
 
-  if (expanded) return <ZoomPanel labels={labels}>{diagram}</ZoomPanel>
+  if (expanded) return <MermaidStage labels={labels}>{diagram}</MermaidStage>
   return <div className="am-rich-view">{diagram}</div>
 }

@@ -116,6 +116,10 @@
 
 实测范围：`test/blocks.test.ts` 覆盖 mermaid 围栏成块；`pnpm build` 产出 `client.mermaid.js` 3,317,876 字节（gzip 908,519），低于 chunk 的 4 MiB 门；入口 `client.js` 859,352 字节里 `flowchart`、`sequenceDiagram`、`mermaidAPI` 的 grep 计数都是 0。Web 版实测：没有图的文档零请求，含图的文档只请求 `client.mermaid.js` 与 `client.markmap.js` 两个 chunk；正常图渲染出 422×168 的 SVG，写坏的图回退成源码 + 「Parse error on line 2」+「复制错误」；全屏遮罩有关闭 / 缩小 / 缩放比例 / 放大四个控件，Esc 关闭后焦点回到「全屏」。暗色主题下实测，亮色未切换。
 
+## 7.1 图的全屏交互
+
+两个图种在全屏里统一为：拖动平移、滚轮缩放、底栏「还原」回到适配。Mermaid 由本插件驱动（translate + scale，缩放以指针为中心），底部按 100% 的适配比例显示当前倍率；导图沿用 markmap 自带的拖拽与滚轮（d3 zoom），底栏只留「还原」，因为它的 `rescale` 是相对倍率，接到百分比控件上会重复放大。导图的标签裁切是 markmap 自身把每个标签盒设成 9999px 宽导致的，样式里改成 `max-content` 后测量与渲染一致。
+
 ## 8. 思维导图
 
 已实现（P4d）。语言为 `markmap` / `mindmap` 的围栏走 `client.markmap.js`。chunk 只带 `markmap-view` 与它必需的 peer `markmap-common`，没有引入 `markmap-lib`，因此不会把 katex / prism / highlight.js / yaml 拖进来。

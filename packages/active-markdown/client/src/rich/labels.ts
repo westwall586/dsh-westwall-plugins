@@ -9,4 +9,6 @@ export interface RichLabels {
   copied: string
   /** The expanded panel's zoom bar owns these. */
   zoom: DocumentZoomLabels
+  /** Reset-to-fit button in the expanded panel's footer. */
+  reset: string
 }

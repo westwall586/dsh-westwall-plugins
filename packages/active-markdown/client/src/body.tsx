@@ -757,6 +757,7 @@ export function Body({
         into: t('rich.zoom.into'),
         value: (percent: number): string => t('rich.zoom.value', { percent }),
       },
+      reset: t('rich.reset'),
     },
     calloutType: (id: string): string => {
       const type = resolveCallout(id)

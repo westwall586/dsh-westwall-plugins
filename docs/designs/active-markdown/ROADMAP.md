@@ -243,6 +243,7 @@
 
 ## 12. 变更记录
 
+- 2026-11-19：全屏里的批注改成面板专用右侧抽屉，按面板布局不再按文档坐标；Esc 先收抽屉再关面板，焦点回批注按钮。批注表单抽成浮窗与抽屉共用的 `AnnotationForm`，块保存收敛为纯函数 `savedBlockAnnotation`；Markdown 批注浮窗补上点空白收起。代码级自测通过，Web 与桌面端待复核。见 [P2-ANNOTATION-TECH.md](P2-ANNOTATION-TECH.md) 5.3。
 - 2026-11-19：P4 复核微调。编辑态主按钮移到最右（退出在左、保存在右）；front matter 复制改成外壳同款图标按钮（复制后换对勾）；Callout 头部去掉类型文字，只留图标 + 标题，空标题回退类型名、类型名进 tooltip；导图交互对齐 Mermaid（内嵌不吃滚轮、点击进全屏，全屏滚轮缩放、拖拽平移）；顺手修掉两个 P4 遗留：底栏百分比不跟随缩放（监听挂到了元素而不是 d3 zoom 的 dispatch）、「实际大小」实际回到的是适配值（相对倍率的分子写错）。Web 版实测，桌面端待验收。
 - 2026-11-19：P4 完成。懒加载基建落地包内 chunk（Mermaid 3.2MB、导图 116KB、公式 256KB，均按需加载）；Callout 按 13 类型 7 族、front matter 卡、图片放大、代码高亮与换行开关；Mermaid 与导图支持拖动、缩放、还原，导图标签裁切已修；公式用 KaTeX，与聊天同源；排版改走主题 markdown token，正文 44em、组件可撑满容器、开启中文标点压缩与中西文自动间距。见 [P4-TECH.md](P4-TECH.md)。
 - 2026-11-19：P4 拆分定稿并开工。顺序改为懒加载基建 → 富组件 → Mermaid → 思维导图 → 数学 → 排版；数学定 KaTeX（与 chat 同一套），Mermaid 全量图类型，思维导图走 Markmap 式（只取 `markmap-view`），图片放大复用 shell 的 `ImageLightbox`。已核实 DSH 的包内 chunk 契约（`require.async('./client.<name>.js')`）与包资源路由只服务图片，故字体不能当资源发；细节见 [P4-TECH.md](P4-TECH.md)。

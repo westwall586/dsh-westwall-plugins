@@ -224,55 +224,56 @@ export function ComponentFrame({
   // Only the in-place copy opens the panel; the panel's own copy is already open.
   const clickToExpand = capabilities.clickToExpand && capabilities.fullscreen
   return (
-    <div
-      className="am-component"
-      data-component={component.kind}
-      data-block-id={block.id}
-      data-block-type={block.type}
-      data-source-line={block.sourceStartLine}
-      data-annotated={annotation === undefined ? undefined : ''}
-      data-family={family}
-      data-diff={diff}
-    >
-      {head('inline')}
+    <div className="am-component-slot" data-diff={diff}>
       <div
-        className="am-component-body"
-        data-interactive={clickToExpand ? '' : undefined}
-        {...(clickToExpand
-          ? {
-            role: 'button',
-            tabIndex: 0,
-            'aria-label': labels.fullscreen,
-            'aria-expanded': expanded,
-            onClick: () => setExpanded(true),
-            onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => {
-              if (event.key !== 'Enter' && event.key !== ' ') return
-              event.preventDefault()
-              setExpanded(true)
-            },
-          }
-          : {})}
+        className="am-component"
+        data-component={component.kind}
+        data-block-id={block.id}
+        data-block-type={block.type}
+        data-source-line={block.sourceStartLine}
+        data-annotated={annotation === undefined ? undefined : ''}
+        data-family={family}
       >
-        {children({ wrap, expanded: false })}
+        {head('inline')}
+        <div
+          className="am-component-body"
+          data-interactive={clickToExpand ? '' : undefined}
+          {...(clickToExpand
+            ? {
+              role: 'button',
+              tabIndex: 0,
+              'aria-label': labels.fullscreen,
+              'aria-expanded': expanded,
+              onClick: () => setExpanded(true),
+              onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return
+                event.preventDefault()
+                setExpanded(true)
+              },
+            }
+            : {})}
+        >
+          {children({ wrap, expanded: false })}
+        </div>
+        {expanded
+          ? (
+            <ComponentPanel
+              kind={component.kind}
+              label={label}
+              zoom={capabilities.zoom}
+              pan={capabilities.pan}
+              returnFocus={expandButton}
+              closeButton={closeButton}
+              head={head('panel')}
+              drawer={drawer}
+              closeGuard={closeGuard}
+              onClose={() => setExpanded(false)}
+            >
+              {children({ wrap, expanded: true })}
+            </ComponentPanel>
+          )
+          : null}
       </div>
-      {expanded
-        ? (
-          <ComponentPanel
-            kind={component.kind}
-            label={label}
-            zoom={capabilities.zoom}
-            pan={capabilities.pan}
-            returnFocus={expandButton}
-            closeButton={closeButton}
-            head={head('panel')}
-            drawer={drawer}
-            closeGuard={closeGuard}
-            onClose={() => setExpanded(false)}
-          >
-            {children({ wrap, expanded: true })}
-          </ComponentPanel>
-        )
-        : null}
     </div>
   )
 }

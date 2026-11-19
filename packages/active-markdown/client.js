@@ -158,7 +158,9 @@ window.__ModuleLoader__.load({ id: '@westwall/dsh-active-markdown',
 }
 
 .am-callout[data-family='abstract'] {
-  --am-callout-accent: var(--dsw-alias-link);
+  /* No theme token carries the cyan the spec gives abstract, so it is mixed
+     from the two families it sits between. */
+  --am-callout-accent: color-mix(in oklch, var(--dsw-alias-state-business-primary) 50%, var(--dsw-alias-state-success-primary) 50%);
 }
 
 .am-callout[data-family='success'] {

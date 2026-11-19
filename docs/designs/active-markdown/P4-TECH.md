@@ -85,7 +85,7 @@
 
 ## 6. 富组件
 
-已实现（P4b）。实测范围：`test/callout.test.ts` 覆盖 13 个规范类型、大小写、别名、未知类型、折叠语法、列表内与嵌套引用、空标题、`-` 开头的标题、标记行与正文同段时的切分与行号；`test/blocks.test.ts` 覆盖 front matter 条目（续行、空行、无冒号行）。`pnpm build` 产出 `client.js` 842KB，低于 1.5 MiB 门。明暗、窄栏、全屏三形态的观感，以及图片放大与代码换行的交互，尚未在浏览器实测。
+已实现（P4b）。实测范围：`test/callout.test.ts` 覆盖 13 个规范类型、大小写、别名、未知类型、折叠语法、列表内与嵌套引用、空标题、`-` 开头的标题、标记行与正文同段时的切分与行号；`test/blocks.test.ts` 覆盖 front matter 条目（续行、空行、无冒号行）。Web 版逐项点过（暗色主题、窄栏与全屏两种宽度）：10 个 callout 的 family、类型名、标题与七族左边线都不重复，普通引用与列表内标记保持引用，front matter 卡两列表格与复制可用，点图开灯箱且 Esc 可关，代码换行开关把 `white-space` 切到 `pre-wrap`，callout 悬停出现批注入口并唤起批注输入框。亮色主题未切换验证。`pnpm build` 产出 `client.js` 843KB，低于 1.5 MiB 门。
 
 - Callout：顶层引用首行是 `[!type]` 时识别。13 个规范类型、别名、label 与图标照抄组件规范的 `component.json`，映射到 7 个语义族；未知类型、`-`/`+` 折叠语法、列表内与嵌套引用都保持普通引用，读侧不报错。标题行去掉标记，剩余块照常渲染；`[!note] - 标题`（标记后有空格）仍算标题。批注落在 callout 整体，正文选区落在组件区间时按现有规则拒绝，只到组件级。
 - front matter：顶格 `key: value` 行拆成两列卡片，缩进续行并入上一条；不做 YAML 语义，原始文本仍可整块复制。
@@ -97,7 +97,7 @@
 | family | token |
 |---|---|
 | info | `--dsw-alias-state-business-primary` |
-| abstract | `--dsw-alias-link` |
+| abstract | `color-mix(in oklch, business 50%, success 50%)`（主题里没有青色 token，按它位于 info 与 success 之间的位置混出来） |
 | success | `--dsw-alias-state-success-primary` |
 | warning | `--dsw-alias-state-warn-primary` |
 | danger | `--dsw-alias-state-error-primary` |

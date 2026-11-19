@@ -1,10 +1,10 @@
-/** Inline SVG icons for the component shell's header buttons and zoom bar. */
+/** Inline SVG icons for the component shell, drawn on the toolbar's 16-unit grid. */
 import * as React from 'react'
 import type { ReactElement, ReactNode } from 'react'
 
 /** Every icon takes the same measurable edge length. */
 export interface IconProps {
-  /** Rendered edge length in CSS pixels; the shell draws its buttons at 15. */
+  /** Rendered edge length in CSS pixels; the shell draws its buttons at 14. */
   size?: number
 }
 
@@ -12,16 +12,16 @@ interface IconShellProps extends IconProps {
   children: ReactNode
 }
 
-/** One stroked 24-unit drawing that follows the button's text color. */
-function IconShell({ size = 15, children }: IconShellProps): ReactElement {
+/** One 1.3-unit stroke drawing that follows the button's text color, matching the top toolbar. */
+function IconShell({ size = 14, children }: IconShellProps): ReactElement {
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 24 24"
+      viewBox="0 0 16 16"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.7}
+      strokeWidth={1.3}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
@@ -32,57 +32,57 @@ function IconShell({ size = 15, children }: IconShellProps): ReactElement {
   )
 }
 
-/** Open the expanded panel. */
+/** Open the expanded panel: four outward corners. */
 export function ExpandIcon({ size }: IconProps = {}): ReactElement {
-  return <IconShell size={size}><path d="M9 4H4v5M15 4h5v5M20 15v5h-5M4 15v5h5" /></IconShell>
+  return <IconShell size={size}><path d="M6 2H2v4M10 2h4v4M14 10v4h-4M6 14H2v-4" /></IconShell>
+}
+
+/** Collapse the expanded panel: four inward corners. */
+export function CollapseIcon({ size }: IconProps = {}): ReactElement {
+  return <IconShell size={size}><path d="M2 6h4V2M14 6h-4V2M14 10h-4v4M2 10h4v4" /></IconShell>
 }
 
 /** Close the expanded panel. */
 export function CloseIcon({ size }: IconProps = {}): ReactElement {
-  return <IconShell size={size}><path d="M6 6l12 12M18 6 6 18" /></IconShell>
+  return <IconShell size={size}><path d="M4 4l8 8M12 4l-8 8" /></IconShell>
 }
 
 /** Copy the component's source text. */
 export function CopyIcon({ size }: IconProps = {}): ReactElement {
   return (
     <IconShell size={size}>
-      <rect x="9" y="9" width="11" height="11" rx="2" />
-      <path d="M15 6V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h1" />
+      <rect x="6" y="6" width="8" height="8" rx="1.6" />
+      <path d="M10 4V3.4A1.4 1.4 0 0 0 8.6 2H3.4A1.4 1.4 0 0 0 2 3.4v5.2A1.4 1.4 0 0 0 3.4 10H4" />
     </IconShell>
   )
+}
+
+/** Annotate the component. */
+export function AnnotateIcon({ size }: IconProps = {}): ReactElement {
+  return <IconShell size={size}><path d="M2.5 3.5h11v7H8L5 13v-2.5H2.5z" /></IconShell>
 }
 
 /** Toggle soft wrapping for a code fence. */
 export function WrapIcon({ size }: IconProps = {}): ReactElement {
   return (
     <IconShell size={size}>
-      <path d="M3 6h18M3 12h15a3 3 0 1 1 0 6h-4M3 18h7" />
-      <path d="m16 16-2 2 2 2" />
+      <path d="M2 4h12M2 8h9.5a2.5 2.5 0 1 1 0 5H9M2 12h5" />
+      <path d="m7 11-2 2 2 2" />
     </IconShell>
   )
 }
 
-/** Annotate this block, or edit its annotation. */
-export function AnnotateIcon({ size }: IconProps = {}): ReactElement {
-  return (
-    <IconShell size={size}>
-      <path d="M4.5 4.5h15a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H11l-4 3v-3H4.5a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2Z" />
-      <path d="M8 9.5h8M8 12.5h5" />
-    </IconShell>
-  )
-}
-
-/** Fit the diagram into the stage; that scale is the footer's 100%. */
+/** Fit the whole drawing into the panel. */
 export function FitIcon({ size }: IconProps = {}): ReactElement {
-  return <IconShell size={size}><path d="M9 4v5H4M15 4v5h5M20 15h-5v5M4 15h5v5" /></IconShell>
+  return <IconShell size={size}><path d="M2 6V2h4M14 6V2h-4M14 10v4h-4M2 10v4h4" /></IconShell>
 }
 
-/** Show the diagram at its natural size. */
+/** Show the drawing at its own size. */
 export function ActualIcon({ size }: IconProps = {}): ReactElement {
   return (
     <IconShell size={size}>
-      <rect x="9" y="9" width="6" height="6" rx="1" />
-      <path d="M12 3v3M12 18v3M3 12h3M18 12h3" />
+      <rect x="2" y="2" width="12" height="12" rx="2" />
+      <path d="M6 11V6h2M9 6h1.5a1.5 1.5 0 0 1 0 3H9v2" />
     </IconShell>
   )
 }

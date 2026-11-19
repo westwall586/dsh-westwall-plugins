@@ -63,11 +63,13 @@ export type FrameButton = 'fullscreen' | 'wrap' | 'annotate' | 'copy'
  * @returns fullscreen, wrap, annotate, copy, keeping only what the component has.
  */
 export function frameButtons(capabilities: ComponentCapabilities): readonly FrameButton[] {
+  // Right-to-left reading: the most-used action sits closest to the content,
+  // the panel toggle at the far edge.
   const buttons: FrameButton[] = []
-  if (capabilities.fullscreen) buttons.push('fullscreen')
   if (capabilities.wrap) buttons.push('wrap')
-  if (capabilities.annotate) buttons.push('annotate')
   if (capabilities.copy) buttons.push('copy')
+  if (capabilities.annotate) buttons.push('annotate')
+  if (capabilities.fullscreen) buttons.push('fullscreen')
   return buttons
 }
 

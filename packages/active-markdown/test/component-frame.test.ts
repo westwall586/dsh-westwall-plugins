@@ -69,30 +69,31 @@ test('能力表按组件给按钮，图才有点击放大与缩放平移', () =>
     assert.deepEqual(component!.capabilities, {
       fullscreen: true, clickToExpand: true, zoom: true, pan: true, wrap: false, copy: true, annotate: true,
     })
-    assert.deepEqual(frameButtons(component!.capabilities), ['fullscreen', 'annotate', 'copy'])
+    assert.deepEqual(frameButtons(component!.capabilities), ['copy', 'annotate', 'fullscreen'])
   }
 })
 
-test('按钮顺序固定为全屏、换行、批注、复制，callout 只有批注', () => {
-  assert.deepEqual(frameButtons(COMPONENT_REGISTRY.table.capabilities), ['fullscreen', 'annotate'])
-  assert.deepEqual(frameButtons(COMPONENT_REGISTRY.code.capabilities), ['fullscreen', 'wrap', 'annotate', 'copy'])
-  assert.deepEqual(frameButtons(COMPONENT_REGISTRY.mermaid.capabilities), ['fullscreen', 'annotate', 'copy'])
-  assert.deepEqual(frameButtons(COMPONENT_REGISTRY.markmap.capabilities), ['fullscreen', 'annotate', 'copy'])
+test('按钮顺序固定为换行、复制、批注、全屏，callout 只有批注', () => {
+  assert.deepEqual(frameButtons(COMPONENT_REGISTRY.table.capabilities), ['annotate', 'fullscreen'])
+  assert.deepEqual(frameButtons(COMPONENT_REGISTRY.code.capabilities), ['wrap', 'copy', 'annotate', 'fullscreen'])
+  assert.deepEqual(frameButtons(COMPONENT_REGISTRY.mermaid.capabilities), ['copy', 'annotate', 'fullscreen'])
+  assert.deepEqual(frameButtons(COMPONENT_REGISTRY.markmap.capabilities), ['copy', 'annotate', 'fullscreen'])
   assert.deepEqual(frameButtons(COMPONENT_REGISTRY.callout.capabilities), ['annotate'])
   for (const definition of Object.values(COMPONENT_REGISTRY)) {
     assert.equal(definition.capabilities.zoom, definition.capabilities.pan, `${definition.kind} 的缩放与拖动同开同关`)
   }
 })
 
-test('图标集齐全：每个按钮与底栏都有 15–16px 的内联 SVG', () => {
+test('图标集齐全：每个按钮与底栏都有 14px 的内联 SVG，与顶栏同网格', () => {
   // node:test 不能 import .tsx，这里核对图标源文件本身。
   const icons = readFileSync(new URL('../client/src/rich/icons.tsx', import.meta.url), 'utf8')
-  for (const name of ['ExpandIcon', 'CloseIcon', 'CopyIcon', 'WrapIcon', 'AnnotateIcon', 'FitIcon', 'ActualIcon']) {
+  for (const name of ['ExpandIcon', 'CollapseIcon', 'CloseIcon', 'CopyIcon', 'WrapIcon', 'AnnotateIcon', 'FitIcon', 'ActualIcon']) {
     assert.match(icons, new RegExp(`export function ${name}\\(`), `缺少 ${name}`)
   }
-  assert.match(icons, /strokeWidth=\{1\.7\}/)
+  assert.match(icons, /strokeWidth=\{1\.3\}/)
   assert.match(icons, /stroke="currentColor"/)
-  assert.match(icons, /size = 15/)
+  assert.match(icons, /size = 14/)
+  assert.match(icons, /viewBox="0 0 16 16"/)
 })
 
 test('标签走 locale 键，空语言显示 text', () => {

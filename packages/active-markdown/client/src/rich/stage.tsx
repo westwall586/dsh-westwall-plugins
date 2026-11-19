@@ -2,32 +2,39 @@
 import * as React from 'react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { RichLabels } from './labels.ts'
-import { fitTransform, panBy, zoomAt, type StageView } from './stage-math.ts'
+import { ActualIcon, FitIcon } from './icons.tsx'
+import { actualTransform, fitPercent, fitTransform, panBy, zoomAt, type StageView } from './stage-math.ts'
 
 /** One wheel step's scale factor. */
 const WHEEL_STEP = 1.12
 
 export interface StageFooterProps {
-  /** Current scale relative to the fitted one; 1 is the fit. */
+  /** Current scale as a percentage, where the fitted scale is 100. */
   percent: number
   labels: RichLabels
   onZoom(factor: number): void
   onFit(): void
+  onActual(): void
 }
 
 /**
- * The bottom bar: step zoom, the current ratio, and the fit reset.
- * @param props - ratio relative to the fit, localized copy, and the two actions.
+ * The bottom bar: step zoom, the current ratio, fit, and actual size.
+ * @param props - the ratio where fit is 100%, localized copy, and the three actions.
  * @returns the footer row.
  */
-export function StageFooter({ percent, labels, onZoom, onFit }: StageFooterProps): ReactNode {
+export function StageFooter({ percent, labels, onZoom, onFit, onActual }: StageFooterProps): ReactNode {
   return (
     <div className="am-rich-panel-foot">
       <button type="button" className="am-rich-panel-step" aria-label={labels.zoom.out} title={labels.zoom.out} onClick={() => onZoom(1 / 1.25)}>−</button>
-      <span className="am-rich-panel-percent">{labels.zoom.value(Math.round(percent * 100))}</span>
+      <span className="am-rich-panel-percent">{labels.zoom.value(Math.round(percent))}</span>
       <button type="button" className="am-rich-panel-step" aria-label={labels.zoom.into} title={labels.zoom.into} onClick={() => onZoom(1.25)}>+</button>
       <span className="am-rich-panel-sep" aria-hidden="true" />
-      <button type="button" className="am-rich-panel-reset" onClick={onFit}>{labels.reset}</button>
+      <button type="button" className="am-component-action" aria-label={labels.zoom.fit} title={labels.zoom.fit} onClick={onFit}>
+        <FitIcon />
+      </button>
+      <button type="button" className="am-component-action" aria-label={labels.zoom.actual} title={labels.zoom.actual} onClick={onActual}>
+        <ActualIcon />
+      </button>
     </div>
   )
 }
@@ -49,7 +56,8 @@ export function MermaidStage({ labels, children }: MermaidStageProps): ReactNode
   const [dragging, setDragging] = useState(false)
   const drag = useRef<{ pointerId: number, startX: number, startY: number, view: StageView } | null>(null)
 
-  const baseline = useRef(1)
+  // The scale the last fit produced; the footer reads the live scale against it.
+  const fitScale = useRef(1)
   const fit = useCallback(() => {
     const stage = area.current
     const box = content.current
@@ -58,8 +66,18 @@ export function MermaidStage({ labels, children }: MermaidStageProps): ReactNode
       { width: stage.clientWidth, height: stage.clientHeight },
       { width: box.offsetWidth, height: box.offsetHeight },
     )
-    baseline.current = next.scale
+    fitScale.current = next.scale
     setView(next)
+  }, [])
+
+  const actual = useCallback(() => {
+    const stage = area.current
+    const box = content.current
+    if (stage === null || box === null) return
+    setView(actualTransform(
+      { width: stage.clientWidth, height: stage.clientHeight },
+      { width: box.offsetWidth, height: box.offsetHeight },
+    ))
   }, [])
 
   useLayoutEffect(() => {
@@ -121,13 +139,14 @@ export function MermaidStage({ labels, children }: MermaidStageProps): ReactNode
         </div>
       </div>
       <StageFooter
-        percent={view.scale / baseline.current}
+        percent={fitPercent(view.scale, fitScale.current)}
         labels={labels}
         onZoom={(factor) => {
           const point = { x: (area.current?.clientWidth ?? 0) / 2, y: (area.current?.clientHeight ?? 0) / 2 }
           setView(current => zoomAt(current, current.scale * factor, point))
         }}
         onFit={fit}
+        onActual={actual}
       />
     </div>
   )

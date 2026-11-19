@@ -6,12 +6,16 @@ import { parseDocument } from '../markdown/blocks.ts'
 import { RichError } from './fallback.tsx'
 import type { RichLabels } from './labels.ts'
 import { usePalette } from './palette.ts'
+import { actualFactor, fitPercent } from './stage-math.ts'
+import { StageFooter } from './stage.tsx'
 import { outlineToTree, type MarkmapNode } from './tree.ts'
 
 /** The panel controls the chunk exposes once a map is mounted. */
 interface MarkmapHandle {
   dispose(): void
   scale(): number
+  /** The scale the last fit produced; the footer reads percent against it. */
+  fitScale(): number
   rescale(scale: number): void
   fit(): void
 }
@@ -45,17 +49,14 @@ interface MarkmapCanvasProps {
   palette: Record<string, string>
   className: string
   onState: (state: MountState) => void
-  /** Expanded copy only: the view reads the mounted handle off this element. */
-  svgRef?: { current: SVGSVGElement | null }
   /** Expanded copy only: the live handle and the scale markmap reports after a gesture. */
   onHandle?: (handle: MarkmapHandle | undefined) => void
   onScale?: (scale: number) => void
 }
 
 /** Mount one markmap instance and tear it down whenever the data or theme changes. */
-function MarkmapCanvas({ tree, palette, className, onState, onHandle, onScale, svgRef }: MarkmapCanvasProps): ReactNode {
-  const local = useRef<SVGSVGElement | null>(null)
-  const holder = svgRef ?? local
+function MarkmapCanvas({ tree, palette, className, onState, onHandle, onScale }: MarkmapCanvasProps): ReactNode {
+  const holder = useRef<SVGSVGElement | null>(null)
   const state = useRef(onState)
   state.current = onState
   const handle = useRef(onHandle)
@@ -113,13 +114,13 @@ export function MarkmapView({ code, labels, expanded }: MarkmapViewProps): React
   }, [code])
   const [state, setState] = useState<MountState>({ kind: 'loading' })
   const [panelState, setPanelState] = useState<MountState>({ kind: 'loading' })
-  const svg = useRef<SVGSVGElement | null>(null)
-  const handleOf = (): MarkmapHandle | undefined =>
-    (svg.current as SVGSVGElement & { __markmapHandle?: MarkmapHandle } | null)?.__markmapHandle
+  const [panelScale, setPanelScale] = useState(1)
+  const [handle, setHandle] = useState<MarkmapHandle | undefined>(undefined)
 
   if (state.kind === 'error') return <RichError code={code} error={state.error} labels={labels} />
 
   if (expanded) {
+    const fitScale = handle?.fitScale() ?? panelScale
     return (
       <div className="am-rich-panel">
         <div className="am-rich-panel-body am-rich-scene am-rich-scene-native">
@@ -127,21 +128,24 @@ export function MarkmapView({ code, labels, expanded }: MarkmapViewProps): React
             tree={tree}
             palette={palette}
             className="am-markmap-canvas"
-            svgRef={svg}
             onState={setPanelState}
+            onHandle={setHandle}
+            onScale={setPanelScale}
           />
           {panelState.kind === 'loading' ? <div className="am-rich-state" aria-busy="true">{labels.rendering}</div> : null}
           {panelState.kind === 'error' ? <RichError code={code} error={panelState.error} labels={labels} /> : null}
         </div>
-        <div className="am-rich-panel-foot">
-          <button
-            type="button"
-            className="am-rich-panel-reset"
-            onClick={() => { handleOf()?.fit() }}
-          >
-            {labels.reset}
-          </button>
-        </div>
+        <StageFooter
+          percent={fitPercent(panelScale, fitScale)}
+          labels={labels}
+          onZoom={(factor) => { handle?.rescale(factor) }}
+          onFit={() => { handle?.fit() }}
+          onActual={() => {
+            if (handle === undefined) return
+            // The chunk's rescale is a relative factor, so actual size is fit over live scale.
+            handle.rescale(actualFactor(handle.scale(), handle.fitScale()))
+          }}
+        />
       </div>
     )
   }

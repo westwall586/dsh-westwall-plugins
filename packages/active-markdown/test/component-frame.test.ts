@@ -1,8 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 
 import { parseDocument } from '../client/src/markdown/blocks.ts'
-import { COMPONENT_REGISTRY, componentLabel, componentOf } from '../client/src/markdown/model.ts'
+import { COMPONENT_REGISTRY, componentLabel, componentOf, frameButtons } from '../client/src/markdown/model.ts'
 import { annotateBlock, blockAnnotationOf, blockAnchor } from '../client/src/annotate/model.ts'
 import { locateBlockAnchor } from '../client/src/annotate/selection.ts'
 
@@ -27,14 +28,16 @@ const PARAGRAPH = PARSED.blocks.find(block => block.type === 'paragraph')!
 
 const OPTIONS = { id: 'a1', seq: 1, createdAt: '2026-11-17T00:00:00.000Z' }
 
-test('文本块没有组件外壳，表格与代码块有类型、动作与签名', () => {
+test('文本块没有组件外壳，表格与代码块有类型、能力与签名', () => {
   assert.equal(componentOf(PARAGRAPH), null)
   assert.equal(componentOf(PARSED.blocks[0]!), null)
 
   const table = componentOf(TABLE)!
   assert.equal(table.kind, 'table')
   assert.deepEqual(table.label, { kind: 'table', columns: 2, rows: 1 })
-  assert.deepEqual(table.actions, ['annotate', 'fullscreen'])
+  assert.deepEqual(table.capabilities, {
+    fullscreen: true, clickToExpand: false, zoom: false, pan: false, wrap: false, copy: false, annotate: true,
+  })
   assert.match(table.signature, /^table:2x1:/)
   assert.equal(table.lineStart, TABLE.sourceStartLine)
   assert.equal(table.lineEnd, TABLE.sourceEndLine)
@@ -42,12 +45,14 @@ test('文本块没有组件外壳，表格与代码块有类型、动作与签�
   const code = componentOf(CODE)!
   assert.equal(code.kind, 'code')
   assert.deepEqual(code.label, { kind: 'code', lang: 'ts' })
-  assert.deepEqual(code.actions, ['annotate', 'copy', 'fullscreen'])
+  assert.deepEqual(code.capabilities, {
+    fullscreen: true, clickToExpand: false, zoom: false, pan: false, wrap: true, copy: true, annotate: true,
+  })
   assert.equal(code.copyText, 'const a = 1')
   assert.match(code.signature, /^code:ts:/)
 })
 
-test('每个套组件框的富组件都能全屏，批注与复制仍按类型给', () => {
+test('能力表按组件给按钮，图才有点击放大与缩放平移', () => {
   const source = [
     '```mermaid',
     'flowchart LR',
@@ -60,10 +65,34 @@ test('每个套组件框的富组件都能全屏，批注与复制仍按类型�
   ].join('\n')
   const components = parseDocument(source).blocks.map(componentOf)
   assert.deepEqual(components.map(component => component?.kind), ['mermaid', 'markmap'])
-  for (const component of components) assert.ok(component!.actions.includes('fullscreen'))
-  assert.deepEqual(components[0]!.actions, ['annotate', 'copy', 'fullscreen'])
-  // A callout wears its own header and is never framed, so it has no action to give.
-  assert.deepEqual(COMPONENT_REGISTRY.callout.actions, ['annotate'])
+  for (const component of components) {
+    assert.deepEqual(component!.capabilities, {
+      fullscreen: true, clickToExpand: true, zoom: true, pan: true, wrap: false, copy: true, annotate: true,
+    })
+    assert.deepEqual(frameButtons(component!.capabilities), ['fullscreen', 'annotate', 'copy'])
+  }
+})
+
+test('按钮顺序固定为全屏、换行、批注、复制，callout 只有批注', () => {
+  assert.deepEqual(frameButtons(COMPONENT_REGISTRY.table.capabilities), ['fullscreen', 'annotate'])
+  assert.deepEqual(frameButtons(COMPONENT_REGISTRY.code.capabilities), ['fullscreen', 'wrap', 'annotate', 'copy'])
+  assert.deepEqual(frameButtons(COMPONENT_REGISTRY.mermaid.capabilities), ['fullscreen', 'annotate', 'copy'])
+  assert.deepEqual(frameButtons(COMPONENT_REGISTRY.markmap.capabilities), ['fullscreen', 'annotate', 'copy'])
+  assert.deepEqual(frameButtons(COMPONENT_REGISTRY.callout.capabilities), ['annotate'])
+  for (const definition of Object.values(COMPONENT_REGISTRY)) {
+    assert.equal(definition.capabilities.zoom, definition.capabilities.pan, `${definition.kind} 的缩放与拖动同开同关`)
+  }
+})
+
+test('图标集齐全：每个按钮与底栏都有 15–16px 的内联 SVG', () => {
+  // node:test 不能 import .tsx，这里核对图标源文件本身。
+  const icons = readFileSync(new URL('../client/src/rich/icons.tsx', import.meta.url), 'utf8')
+  for (const name of ['ExpandIcon', 'CloseIcon', 'CopyIcon', 'WrapIcon', 'AnnotateIcon', 'FitIcon', 'ActualIcon']) {
+    assert.match(icons, new RegExp(`export function ${name}\\(`), `缺少 ${name}`)
+  }
+  assert.match(icons, /strokeWidth=\{1\.7\}/)
+  assert.match(icons, /stroke="currentColor"/)
+  assert.match(icons, /size = 15/)
 })
 
 test('标签走 locale 键，空语言显示 text', () => {

@@ -101,12 +101,14 @@ test('只有标记行时正文为空', () => {
   assert.deepEqual(block.blocks, [])
 })
 
-test('callout 是组件，动作与签名按类型和正文', () => {
+test('callout 是组件，能力只留批注，签名按类型和正文', () => {
   const block = only('> [!example] 示例\n> 正文')
   const view = componentOf(block)
   assert.ok(view !== null)
   assert.equal(view.kind, 'callout')
-  assert.deepEqual(view.actions, ['annotate'])
+  assert.equal(view.capabilities.annotate, true)
+  assert.equal(view.capabilities.fullscreen, false)
+  assert.equal(view.capabilities.copy, false)
   assert.match(view.signature, /^callout:example:/)
   assert.equal(view.lineStart, 1)
   assert.equal(view.lineEnd, 2)

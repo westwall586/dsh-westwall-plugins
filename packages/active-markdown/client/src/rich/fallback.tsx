@@ -42,7 +42,7 @@ export function RichError({ code, error, labels }: RichErrorProps): ReactNode {
       <pre className="am-rich-source"><code>{code}</code></pre>
       <div className="am-rich-error-foot">
         <span className="am-rich-error-line" title={errorText(error)}>{errorLine(error)}</span>
-        <button type="button" className="am-component-action" onClick={copy}>{copied ? labels.copied : labels.copyError}</button>
+        <button type="button" className="am-rich-error-copy" onClick={copy}>{copied ? labels.copied : labels.copyError}</button>
       </div>
     </div>
   )

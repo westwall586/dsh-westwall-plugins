@@ -70,3 +70,42 @@ export function zoomAt(view: StageView, next: number, point: { x: number, y: num
 export function panBy(view: StageView, delta: { x: number, y: number }): StageView {
   return { scale: view.scale, x: view.x + delta.x, y: view.y + delta.y }
 }
+
+/**
+ * Center content in the stage at its natural size.
+ * @param stage - stage width and height in CSS pixels.
+ * @param content - content width and height in CSS pixels.
+ * @returns the centered placement at scale 1.
+ */
+export function actualTransform(
+  stage: { width: number, height: number },
+  content: { width: number, height: number },
+): StageView {
+  return {
+    scale: 1,
+    x: (stage.width - content.width) / 2,
+    y: (stage.height - content.height) / 2,
+  }
+}
+
+/**
+ * Read a stage scale as the footer's percentage, where the fitted scale is 100%.
+ * @param scale - current stage scale.
+ * @param fitScale - scale produced by the last fit.
+ * @returns the percentage to show.
+ */
+export function fitPercent(scale: number, fitScale: number): number {
+  if (!Number.isFinite(fitScale) || fitScale <= 0) return 100
+  return (scale / fitScale) * 100
+}
+
+/**
+ * Relative factor that returns a stage at `scale` to its fitted scale.
+ * @param scale - current stage scale.
+ * @param fitScale - scale produced by the last fit.
+ * @returns the factor to hand a relative `rescale`.
+ */
+export function actualFactor(scale: number, fitScale: number): number {
+  if (!Number.isFinite(scale) || scale <= 0 || !Number.isFinite(fitScale) || fitScale <= 0) return 1
+  return fitScale / scale
+}

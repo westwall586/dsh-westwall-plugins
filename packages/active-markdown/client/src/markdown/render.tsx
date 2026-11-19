@@ -171,7 +171,7 @@ function renderItem(
   )
 }
 
-/** A callout keeps the component shell's annotation rules but its own header. */
+/** A callout keeps its semantic accent but wears the same shell head as every other component. */
 function renderCallout(
   block: Extract<Block, { type: 'callout' }>,
   key: string,
@@ -180,49 +180,40 @@ function renderCallout(
   components: ComponentContext,
   status?: DiffStatus,
 ): ReactNode {
+  const component = componentOf(block)
   const type = resolveCallout(block.kind)
-  if (type === undefined) return null
-  const annotate = components.annotate
-  const annotation = components.annotationOf(block)
+  if (component === null || type === undefined) return null
   return (
-    <section
+    <ComponentFrame
       key={key}
-      className="am-callout"
-      data-component="callout"
-      data-block-id={block.id}
-      data-block-type="callout"
-      data-source-line={block.sourceStartLine}
-      data-family={block.family}
-      data-annotated={annotation === undefined ? undefined : ''}
-      data-diff={status}
+      block={block}
+      component={component}
+      annotation={components.annotationOf(block)}
+      diff={status}
+      {...(components.annotate === undefined ? {} : { annotate: components.annotate })}
+      label={labels.calloutType(block.kind)}
+      icon={<span dangerouslySetInnerHTML={{ __html: type.icon }} />}
+      title={block.title}
+      family={block.family}
+      labels={{
+        annotate: labels.annotate,
+        edit: labels.edit,
+        copy: labels.copy,
+        copied: labels.copied,
+        wrap: labels.wrap,
+        nowrap: labels.nowrap,
+        fullscreen: labels.fullscreen,
+        close: labels.close,
+      }}
     >
-      <div className="am-callout-head">
-        <span className="am-callout-icon" aria-hidden="true" dangerouslySetInnerHTML={{ __html: type.icon }} />
-        <span className="am-callout-type">{labels.calloutType(block.kind)}</span>
-        {block.title === '' ? null : <span className="am-callout-title">{block.title}</span>}
-        {annotation === undefined && annotate === undefined
-          ? null
-          : (
-            <div className="am-callout-actions">
-              {annotation === undefined ? null : <span className="am-callout-seq">#{annotation.seq}</span>}
-              {annotate === undefined
-                ? null
-                : (
-                  <button type="button" className="am-callout-action" onClick={() => annotate(block)}>
-                    {annotation === undefined ? labels.annotate : labels.edit}
-                  </button>
-                )}
-            </div>
-          )}
-      </div>
-      {block.blocks.length === 0
+      {() => block.blocks.length === 0
         ? null
         : (
           <div className="am-callout-body">
             {block.blocks.map((child, index) => renderBlock(child, `${key}-c${index}`, labels, actions, components))}
           </div>
         )}
-    </section>
+    </ComponentFrame>
   )
 }
 

@@ -751,13 +751,12 @@ export function Body({
       copyError: t('rich.copyError'),
       copied: t('code.copied'),
       zoom: {
-        controls: t('rich.zoom.controls'),
-        menu: t('rich.zoom.menu'),
         out: t('rich.zoom.out'),
         into: t('rich.zoom.into'),
         value: (percent: number): string => t('rich.zoom.value', { percent }),
+        fit: t('rich.fit'),
+        actual: t('rich.actual'),
       },
-      reset: t('rich.reset'),
     },
     calloutType: (id: string): string => {
       const type = resolveCallout(id)

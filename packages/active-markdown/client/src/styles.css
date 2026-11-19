@@ -142,110 +142,68 @@
   margin-bottom: 0;
 }
 
-/* Callouts are quotes with one semantic edge; the family token drives edge and wash.
-   Info is the fallback family, so its token is the base value. */
-.am-callout {
+/* Callouts wear the same shell as every other component but keep one semantic edge;
+   the family token drives the edge, the wash, and the head's icon and type name. */
+.am-component[data-component='callout'] {
   --am-callout-accent: var(--dsw-alias-state-business-primary);
-  margin: 1em 0;
   padding: 10px 14px 12px;
+  border: 0;
   border-left: 3px solid var(--am-callout-accent);
   border-radius: 8px;
   background: color-mix(in srgb, var(--am-callout-accent) 8%, transparent);
 }
 
-.am-callout[data-family='abstract'] {
+.am-component[data-component='callout'][data-family='abstract'] {
   /* No theme token carries the cyan the spec gives abstract, so it is mixed
      from the two families it sits between. */
   --am-callout-accent: color-mix(in oklch, var(--dsw-alias-state-business-primary) 50%, var(--dsw-alias-state-success-primary) 50%);
 }
 
-.am-callout[data-family='success'] {
+.am-component[data-component='callout'][data-family='success'] {
   --am-callout-accent: var(--dsw-alias-state-success-primary);
 }
 
-.am-callout[data-family='warning'] {
+.am-component[data-component='callout'][data-family='warning'] {
   --am-callout-accent: var(--dsw-alias-state-warn-primary);
 }
 
-.am-callout[data-family='danger'] {
+.am-component[data-component='callout'][data-family='danger'] {
   --am-callout-accent: var(--dsw-alias-state-error-primary);
 }
 
-.am-callout[data-family='example'] {
+.am-component[data-component='callout'][data-family='example'] {
   --am-callout-accent: var(--dsw-alias-state-done-primary);
 }
 
-.am-callout[data-family='quote'] {
+.am-component[data-component='callout'][data-family='quote'] {
   --am-callout-accent: var(--dsw-alias-label-tertiary);
 }
 
-.am-callout-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.am-callout-icon {
-  display: inline-flex;
-  flex: none;
-  width: 16px;
-  height: 16px;
-  color: var(--am-callout-accent);
-}
-
-.am-callout-icon svg {
-  width: 16px;
-  height: 16px;
-}
-
-.am-callout-type {
-  flex: none;
-  color: var(--am-callout-accent);
-  font-size: 12px;
-  letter-spacing: 0.02em;
-}
-
-.am-callout-title {
-  min-width: 0;
-  font-weight: 600;
-}
-
-.am-callout-actions {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 4px;
-  margin-left: auto;
-  padding-left: 8px;
-}
-
-.am-callout-seq {
-  color: var(--am-callout-accent);
-  font-size: 11px;
-}
-
-/* The annotation entry waits until the reader points at the callout. */
-.am-callout-action {
-  padding: 1px 6px;
-  border: 1px solid transparent;
-  border-radius: 4px;
+/* The callout head is the shell head with its banner and divider removed. */
+.am-component[data-component='callout'] > .am-component-head {
+  min-height: 0;
+  padding: 0;
+  border-bottom: 0;
   background: transparent;
-  color: var(--dsw-alias-label-tertiary);
-  font: inherit;
-  font-size: 11px;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.12s ease;
 }
 
-.am-callout:hover .am-callout-action,
-.am-callout:focus-within .am-callout-action {
-  opacity: 1;
+.am-component[data-component='callout'] .am-component-icon,
+.am-component[data-component='callout'] .am-component-label {
+  flex: none;
+  color: var(--am-callout-accent);
 }
 
-.am-callout-action:hover {
-  border-color: var(--dsw-alias-border-l2);
-  color: var(--dsw-alias-label-primary);
+.am-component[data-component='callout'] .am-component-label {
+  font-size: 12px;
+}
+
+.am-component[data-component='callout'] .am-component-seq {
+  color: var(--am-callout-accent);
+}
+
+/* An annotated callout keeps its accent edge and only gains the shared ring. */
+.am-component[data-component='callout'][data-annotated] {
+  border-left-color: var(--am-callout-accent);
 }
 
 .am-callout-body {
@@ -268,13 +226,15 @@
   font-size: 0.88em;
 }
 
-/* One shell for every non-text block; only its body differs. */
+/* One shell for every non-text block; the head and its buttons never fork, only
+   the body and the capabilities differ. */
 .am-component {
   margin: 1em 0;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 8px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 12px;
   overflow: hidden;
   background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
 }
 
 .am-component[data-component='code'] {
@@ -288,15 +248,30 @@
 
 .am-component-head {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  padding: 4px 8px 4px 12px;
+  gap: 6px;
+  min-width: 0;
+  min-height: 38px;
+  padding: 5px 8px 5px 12px;
   border-bottom: 1px solid var(--dsw-alias-border-l1);
-  background: var(--dsw-alias-markdown-code-block-banner);
-  color: var(--dsw-alias-label-tertiary);
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-secondary);
   font-size: 12px;
   line-height: 1.4;
+}
+
+.am-component-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
+
+.am-component-icon svg {
+  width: 16px;
+  height: 16px;
 }
 
 .am-component-label {
@@ -307,35 +282,73 @@
   white-space: nowrap;
 }
 
+.am-component-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-primary);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .am-component-seq {
+  flex: none;
   color: var(--dsw-alias-link);
+  font-size: 11px;
+}
+
+.am-component-feedback {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
   font-size: 11px;
 }
 
 .am-component-actions {
   display: flex;
   flex: none;
-  gap: 6px;
+  align-items: center;
+  gap: 2px;
   margin-left: auto;
 }
 
 .am-component-action {
-  padding: 2px 8px;
-  border: 1px solid transparent;
-  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
   background: transparent;
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   font: inherit;
   cursor: pointer;
 }
 
 .am-component-action:hover {
-  border-color: var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-bg-layer-3);
   color: var(--dsw-alias-label-primary);
+}
+
+.am-component-action:focus-visible {
+  background: var(--dsw-alias-bg-layer-3);
+  color: var(--dsw-alias-label-primary);
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: 2px;
+}
+
+.am-component-action[aria-pressed='true'] {
+  color: var(--dsw-alias-link);
 }
 
 .am-component-body {
   min-width: 0;
+}
+
+/* A body that opens the panel reads as one big button; the panel copy does not. */
+.am-component-body[data-interactive] {
+  cursor: zoom-in;
 }
 
 .am-component .am-table-wrap {
@@ -364,29 +377,22 @@
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 14px;
   background: var(--dsw-alias-bg-layer-1);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
 }
 
-.am-component-panel-head {
-  display: flex;
+/* Same head as the inline copy, sized for the panel's title row. */
+.am-component-panel > .am-component-head {
   flex: none;
-  align-items: center;
-  gap: 12px;
+  min-height: 44px;
   padding: 8px 12px 8px 16px;
-  border-bottom: 1px solid var(--dsw-alias-border-l1);
+  background: var(--dsw-alias-bg-layer-1);
 }
 
-.am-component-panel-title {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--dsw-alias-label-secondary);
-  font-size: 12px;
-  letter-spacing: 0.02em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.am-component-panel-head .am-component-action {
-  margin-left: auto;
+.am-component-panel > .am-component-head .am-component-label {
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 /* The body stacks blocks as flex items so a diagram fills the height while a
@@ -404,6 +410,19 @@
 
 .am-component-panel-body > * {
   flex: none;
+}
+
+/* A zoomable body is the dotted stage; the diagram body supplies its footer. */
+.am-component-panel-body[data-zoom] {
+  padding: 0;
+  overflow: hidden;
+  background-color: var(--dsw-alias-bg-layer-2);
+  background-image: radial-gradient(circle, var(--dsw-alias-border-l1) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+.am-component-panel-body[data-pan] {
+  cursor: grab;
 }
 
 .am-component-panel-body > .am-rich-panel {
@@ -497,6 +516,24 @@
   white-space: nowrap;
 }
 
+/* The error fallback keeps a text button; the shell's header buttons are icons. */
+.am-rich-error-copy {
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.am-rich-error-copy:hover {
+  color: var(--dsw-alias-label-primary);
+  border-color: var(--dsw-alias-border-l3);
+}
+
 /* The mind-map renderer ships light-theme defaults; every color below comes from the host theme. */
 .am-markmap-canvas {
   display: block;
@@ -568,19 +605,21 @@ svg.am-markmap-canvas .markmap-foreign > div {
   height: 100%;
 }
 
+/* The zoom bar: steps and ratio on the left of the separator, fit and actual size on the right. */
 .am-rich-panel-foot {
   display: flex;
+  flex: none;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  flex: none;
+  gap: 4px;
   padding: 8px 12px;
   border-top: 1px solid var(--dsw-alias-border-l1);
+  background: var(--dsw-alias-bg-layer-1);
 }
 
 .am-rich-panel-step {
   width: 26px;
-  height: 24px;
+  height: 26px;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 6px;
   background: transparent;
@@ -607,23 +646,8 @@ svg.am-markmap-canvas .markmap-foreign > div {
 .am-rich-panel-sep {
   width: 1px;
   height: 16px;
+  margin: 0 4px;
   background: var(--dsw-alias-border-l2);
-}
-
-.am-rich-panel-reset {
-  padding: 2px 10px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--dsw-alias-label-secondary);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.am-rich-panel-reset:hover {
-  color: var(--dsw-alias-label-primary);
-  border-color: var(--dsw-alias-border-l3);
 }
 
 .am-rich-panel-body {
@@ -634,15 +658,6 @@ svg.am-markmap-canvas .markmap-foreign > div {
   justify-content: center;
   min-height: 0;
   overflow: auto;
-}
-
-.am-rich-panel-zoom {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  transform-origin: center;
 }
 
 .am-rich-panel-body .am-rich-figure {
@@ -659,17 +674,6 @@ svg.am-markmap-canvas .markmap-foreign > div {
 
 .am-rich-panel-body .am-markmap-canvas {
   height: 100%;
-}
-
-.am-rich-panel-foot {
-  position: relative;
-  flex: none;
-  height: 52px;
-  border-top: 1px solid var(--dsw-alias-border-l1);
-}
-
-.am-rich-panel-foot .am-rich-panel-controls {
-  bottom: 11px;
 }
 
 .am-table-wrap {

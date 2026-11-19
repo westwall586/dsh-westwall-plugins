@@ -3,20 +3,72 @@ import { calloutLabel, resolveCallout, type CalloutFamily, type CalloutType } fr
 
 export type ComponentKind = 'table' | 'code' | 'callout' | 'mermaid' | 'markmap'
 
-export type ComponentAction = 'annotate' | 'copy' | 'fullscreen' | 'collapse'
+/**
+ * What the shared shell offers one component. The header buttons come from
+ * `fullscreen`, `wrap`, `annotate`, and `copy`; the rest describe what the
+ * body does in the expanded panel.
+ */
+export interface ComponentCapabilities {
+  /** The panel toggle and, inside the panel, the close button. */
+  fullscreen: boolean
+  /** Clicking the inline body, or Enter / Space on it, opens the panel. */
+  clickToExpand: boolean
+  /** The footer zoom bar, and a zoomable panel body. */
+  zoom: boolean
+  /** Dragging the panel body pans it. */
+  pan: boolean
+  /** The header's wrap toggle. */
+  wrap: boolean
+  /** The header's copy button, when the component has text to copy. */
+  copy: boolean
+  /** The header's annotation button, when the view is not read-only. */
+  annotate: boolean
+}
 
 /** One non-text block family; new rich blocks register here instead of a new frame. */
 export interface ComponentDefinition {
   kind: ComponentKind
-  actions: readonly ComponentAction[]
+  capabilities: ComponentCapabilities
 }
 
 export const COMPONENT_REGISTRY: Record<ComponentKind, ComponentDefinition> = {
-  table: { kind: 'table', actions: ['annotate', 'fullscreen'] },
-  code: { kind: 'code', actions: ['annotate', 'copy', 'fullscreen'] },
-  callout: { kind: 'callout', actions: ['annotate'] },
-  mermaid: { kind: 'mermaid', actions: ['annotate', 'copy', 'fullscreen'] },
-  markmap: { kind: 'markmap', actions: ['annotate', 'copy', 'fullscreen'] },
+  table: {
+    kind: 'table',
+    capabilities: { fullscreen: true, clickToExpand: false, zoom: false, pan: false, wrap: false, copy: false, annotate: true },
+  },
+  code: {
+    kind: 'code',
+    capabilities: { fullscreen: true, clickToExpand: false, zoom: false, pan: false, wrap: true, copy: true, annotate: true },
+  },
+  callout: {
+    kind: 'callout',
+    capabilities: { fullscreen: false, clickToExpand: false, zoom: false, pan: false, wrap: false, copy: false, annotate: true },
+  },
+  mermaid: {
+    kind: 'mermaid',
+    capabilities: { fullscreen: true, clickToExpand: true, zoom: true, pan: true, wrap: false, copy: true, annotate: true },
+  },
+  markmap: {
+    kind: 'markmap',
+    capabilities: { fullscreen: true, clickToExpand: true, zoom: true, pan: true, wrap: false, copy: true, annotate: true },
+  },
+}
+
+/** One header button slot, in the order the shell renders them. */
+export type FrameButton = 'fullscreen' | 'wrap' | 'annotate' | 'copy'
+
+/**
+ * Project capabilities onto the header buttons, in render order.
+ * @param capabilities - one component's capability record.
+ * @returns fullscreen, wrap, annotate, copy, keeping only what the component has.
+ */
+export function frameButtons(capabilities: ComponentCapabilities): readonly FrameButton[] {
+  const buttons: FrameButton[] = []
+  if (capabilities.fullscreen) buttons.push('fullscreen')
+  if (capabilities.wrap) buttons.push('wrap')
+  if (capabilities.annotate) buttons.push('annotate')
+  if (capabilities.copy) buttons.push('copy')
+  return buttons
 }
 
 /** The dimensions or language a frame shows in its header. */
@@ -34,7 +86,7 @@ export interface ComponentView {
   signature: string
   lineStart: number
   lineEnd: number
-  actions: readonly ComponentAction[]
+  capabilities: ComponentCapabilities
   copyText?: string
 }
 
@@ -217,7 +269,7 @@ export function componentOf(block: Block): ComponentView | null {
         signature: `table:${block.header.length}x${block.rows.length}:${hashText(block.text)}:${block.text.length}`,
         lineStart: block.sourceStartLine,
         lineEnd: block.sourceEndLine,
-        actions: COMPONENT_REGISTRY.table.actions,
+        capabilities: COMPONENT_REGISTRY.table.capabilities,
       }
     case 'code':
       return {
@@ -226,7 +278,7 @@ export function componentOf(block: Block): ComponentView | null {
         signature: `code:${block.lang}:${hashText(block.content)}:${block.content.length}`,
         lineStart: block.sourceStartLine,
         lineEnd: block.sourceEndLine,
-        actions: COMPONENT_REGISTRY.code.actions,
+        capabilities: COMPONENT_REGISTRY.code.capabilities,
         copyText: block.content,
       }
     case 'callout': {
@@ -238,7 +290,7 @@ export function componentOf(block: Block): ComponentView | null {
         signature: `callout:${block.kind}:${hashText(block.text)}:${block.text.length}`,
         lineStart: block.sourceStartLine,
         lineEnd: block.sourceEndLine,
-        actions: COMPONENT_REGISTRY.callout.actions,
+        capabilities: COMPONENT_REGISTRY.callout.capabilities,
       }
     }
     case 'mermaid':
@@ -248,7 +300,7 @@ export function componentOf(block: Block): ComponentView | null {
         signature: `mermaid:${hashText(block.content)}:${block.content.length}`,
         lineStart: block.sourceStartLine,
         lineEnd: block.sourceEndLine,
-        actions: COMPONENT_REGISTRY.mermaid.actions,
+        capabilities: COMPONENT_REGISTRY.mermaid.capabilities,
         copyText: block.content,
       }
     case 'markmap':
@@ -258,7 +310,7 @@ export function componentOf(block: Block): ComponentView | null {
         signature: `markmap:${block.lang}:${hashText(block.content)}:${block.content.length}`,
         lineStart: block.sourceStartLine,
         lineEnd: block.sourceEndLine,
-        actions: COMPONENT_REGISTRY.markmap.actions,
+        capabilities: COMPONENT_REGISTRY.markmap.capabilities,
         copyText: block.content,
       }
     default:

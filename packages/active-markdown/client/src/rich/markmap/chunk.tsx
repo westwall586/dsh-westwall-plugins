@@ -32,9 +32,11 @@ export interface MarkmapHandle {
   dispose(): void
   /** Current d3 zoom scale. */
   scale(): number
-  /** Zoom about the viewport center. */
+  /** d3 scale the last fit produced, which the footer shows as 100%. */
+  fitScale(): number
+  /** Zoom about the viewport center, as a factor of the current scale. */
   rescale(scale: number): void
-  /** Fit every node into the viewport. */
+  /** Fit every node into the viewport and adopt that scale as 100%. */
   fit(): void
 }
 
@@ -66,20 +68,24 @@ export default {
     const current = (): number => (svg as SVGSVGElement & { __zoom?: { k?: number } }).__zoom?.k ?? 1
     const emit = (): void => { onScale?.(current()) }
     map.svg.on('zoom.scale-track', emit)
-    emit()
-    // The view drives the map through the element it already owns, so the handle
-    // survives React re-renders without another ref handoff.
-    const api: MarkmapHandle = {
+    // autoFit and this fit settle on the same transform; running it here is what
+    // lets the handle record the fitted scale as the footer's 100%.
+    let fitScale = current()
+    const adoptFit = (): void => {
+      fitScale = current()
+      emit()
+    }
+    const fit = (): void => { void map.fit().then(adoptFit) }
+    fit()
+    return {
       dispose: () => {
         map.svg.on('zoom.scale-track', null)
-        delete (svg as SVGSVGElement & { __markmapHandle?: MarkmapHandle }).__markmapHandle
         map.destroy()
       },
       scale: current,
+      fitScale: () => fitScale,
       rescale: (scale) => { void map.rescale(scale) },
-      fit: () => { void map.fit() },
+      fit,
     }
-    ;(svg as SVGSVGElement & { __markmapHandle?: MarkmapHandle }).__markmapHandle = api
-    return api
   },
 }

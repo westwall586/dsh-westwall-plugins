@@ -52,10 +52,13 @@ test('百分比以适配为 100%，翻倍就显示 200%', () => {
   assert.equal(fitPercent(1, 0), 100)
 })
 
-test('实际大小的相对倍率能把当前缩放拉回适配', () => {
-  assert.equal(actualFactor(2, 1.5), 0.75)
-  assert.equal(actualFactor(1, 1), 1)
-  assert.equal(actualFactor(0, 1), 1)
-  const rescaled = 2 * actualFactor(2, 1.5)
-  assert.ok(Math.abs(rescaled - 1.5) < 1e-9)
+test('实际大小的相对倍率把当前缩放拉回 1，而不是拉回适配值', () => {
+  assert.equal(actualFactor(2), 0.5)
+  assert.equal(actualFactor(1), 1)
+  assert.equal(actualFactor(0), 1)
+  assert.equal(actualFactor(Number.NaN), 1)
+  const fitScale = 1.5
+  const rescaled = 2 * actualFactor(2)
+  assert.ok(Math.abs(rescaled - 1) < 1e-9)
+  assert.ok(Math.abs(fitPercent(rescaled, fitScale) - 66.6) < 0.1)
 })

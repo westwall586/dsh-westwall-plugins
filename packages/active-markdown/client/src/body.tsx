@@ -73,6 +73,7 @@ import {
   type SelectionAction,
   type SelectionMenuValue,
 } from './menus.ts'
+import { CheckIcon, CopyIcon } from './rich/icons.tsx'
 import { READ_CAP, loadDocument, sessionFileOf } from './source.ts'
 import { InstructionAsk } from './translate/ask.tsx'
 import { assembleTranslation, normalize, planTranslation } from './translate/plan.ts'
@@ -2608,7 +2609,15 @@ function FrontmatterCard({ source, labels }: FrontmatterCardProps): ReactNode {
     <section className="am-frontmatter" data-active-markdown-frontmatter>
       <div className="am-frontmatter-head">
         <span className="am-frontmatter-label">{labels.title}</span>
-        <button type="button" className="am-frontmatter-copy" onClick={copy}>{copied ? labels.copied : labels.copy}</button>
+        <button
+          type="button"
+          className={copied ? 'am-frontmatter-action am-frontmatter-action--done' : 'am-frontmatter-action'}
+          aria-label={copied ? labels.copied : labels.copy}
+          title={copied ? labels.copied : labels.copy}
+          onClick={copy}
+        >
+          {copied ? <CheckIcon /> : <CopyIcon />}
+        </button>
       </div>
       {entries.length === 0
         ? null

@@ -100,12 +100,13 @@ export function fitPercent(scale: number, fitScale: number): number {
 }
 
 /**
- * Relative factor that returns a stage at `scale` to its fitted scale.
+ * Relative factor that returns a stage at `scale` to its natural size, where the
+ * fitted scale is not the target: a stage that fits at 200% still reports 100%
+ * here once it shows actual pixels.
  * @param scale - current stage scale.
- * @param fitScale - scale produced by the last fit.
  * @returns the factor to hand a relative `rescale`.
  */
-export function actualFactor(scale: number, fitScale: number): number {
-  if (!Number.isFinite(scale) || scale <= 0 || !Number.isFinite(fitScale) || fitScale <= 0) return 1
-  return fitScale / scale
+export function actualFactor(scale: number): number {
+  if (!Number.isFinite(scale) || scale <= 0) return 1
+  return 1 / scale
 }

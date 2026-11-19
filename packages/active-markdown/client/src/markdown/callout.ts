@@ -54,3 +54,16 @@ export function calloutLabel(type: CalloutType, format: (key: string) => string)
   const localized = format(key)
   return localized === key ? type.label : localized
 }
+
+/**
+ * The one line a callout head shows. The type icon already carries the family, so
+ * the head reads as the author's title; a bare `> [!warning]` falls back to the
+ * type name instead of showing an empty head.
+ * @param title - the marker line's remaining text, possibly empty.
+ * @param typeLabel - the localized type name.
+ * @returns the title, or the type name when the marker carries no title.
+ */
+export function calloutHeadTitle(title: string, typeLabel: string): string {
+  const trimmed = title.trim()
+  return trimmed === '' ? typeLabel : trimmed
+}

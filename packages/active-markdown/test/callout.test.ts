@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { parseDocument } from '../client/src/markdown/blocks.ts'
-import { CALLOUT_TYPES, calloutLabel, resolveCallout } from '../client/src/markdown/callout.ts'
+import { CALLOUT_TYPES, calloutHeadTitle, calloutLabel, resolveCallout } from '../client/src/markdown/callout.ts'
 import { componentLabel, componentOf, type Block } from '../client/src/markdown/model.ts'
 
 /** Parse a source whose whole body must be one block. */
@@ -127,4 +127,11 @@ test('类型 label 走词条，缺词条时回到规范 label', () => {
   const example = CALLOUT_TYPES.find(type => type.id === 'example')!
   assert.equal(calloutLabel(example, key => key), example.label)
   assert.equal(calloutLabel(example, key => key === 'callout.example' ? 'Example' : key), 'Example')
+})
+
+test('头部只留一行：有标题用标题，空标题用类型名兜底', () => {
+  assert.equal(calloutHeadTitle('说明族', '说明'), '说明族')
+  assert.equal(calloutHeadTitle('  说明族  ', '说明'), '说明族')
+  assert.equal(calloutHeadTitle('', '说明'), '说明')
+  assert.equal(calloutHeadTitle('   ', '说明'), '说明')
 })

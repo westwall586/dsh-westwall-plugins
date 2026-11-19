@@ -87,7 +87,7 @@ test('按钮顺序固定为换行、复制、批注、全屏，callout 只有批
 test('图标集齐全：每个按钮与底栏都有 14px 的内联 SVG，与顶栏同网格', () => {
   // node:test 不能 import .tsx，这里核对图标源文件本身。
   const icons = readFileSync(new URL('../client/src/rich/icons.tsx', import.meta.url), 'utf8')
-  for (const name of ['ExpandIcon', 'CollapseIcon', 'CloseIcon', 'CopyIcon', 'WrapIcon', 'AnnotateIcon', 'FitIcon', 'ActualIcon']) {
+  for (const name of ['ExpandIcon', 'CollapseIcon', 'CloseIcon', 'CopyIcon', 'CheckIcon', 'WrapIcon', 'AnnotateIcon', 'FitIcon', 'ActualIcon']) {
     assert.match(icons, new RegExp(`export function ${name}\\(`), `缺少 ${name}`)
   }
   assert.match(icons, /strokeWidth=\{1\.3\}/)

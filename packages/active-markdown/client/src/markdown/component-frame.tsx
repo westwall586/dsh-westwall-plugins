@@ -35,6 +35,11 @@ export interface ComponentFrameProps {
   annotate?: (block: Block) => void
   /** Header text after the leading icon. */
   label: string
+  /**
+   * Whether the head shows `label`. Callouts set it off because their icon already
+   * names the type, and the type name then lives in the head's tooltip instead.
+   */
+  labelVisible?: boolean
   /** Leading icon; callouts carry their semantic type icon, other blocks have none. */
   icon?: ReactNode
   /** Extra header text after the label; callouts show their own title here. */
@@ -62,6 +67,7 @@ export function ComponentFrame({
   diff,
   annotate,
   label,
+  labelVisible = true,
   icon,
   title,
   family,
@@ -94,9 +100,9 @@ export function ComponentFrame({
 
   /** One header row; the panel copy swaps the expand button for a close button. */
   const head = (variant: 'inline' | 'panel'): ReactNode => (
-    <div className="am-component-head">
+    <div className="am-component-head" title={labelVisible ? undefined : label}>
       {icon === undefined ? null : <span className="am-component-icon" aria-hidden="true">{icon}</span>}
-      <span className="am-component-label">{label}</span>
+      {labelVisible ? <span className="am-component-label">{label}</span> : null}
       {title === undefined || title === '' ? null : <span className="am-component-title">{title}</span>}
       {annotation === undefined ? null : <span className="am-component-seq">#{annotation.seq}</span>}
       {copied ? <span className="am-component-feedback" role="status">{labels.copied}</span> : null}

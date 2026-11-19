@@ -6,7 +6,7 @@ import type { Inline, Block, ListItem } from './model.ts'
 import { componentOf } from './model.ts'
 import type { DiffStatus, DocumentDiff } from './diff.ts'
 import { ComponentFrame } from './component-frame.tsx'
-import { resolveCallout } from './callout.ts'
+import { calloutHeadTitle, resolveCallout } from './callout.ts'
 import { splitSourceLines, type SourceLine } from './lines.ts'
 import { isRemoteSource } from '../images.ts'
 import { MarkmapView } from '../rich/markmap.tsx'
@@ -186,6 +186,7 @@ function renderCallout(
   const component = componentOf(block)
   const type = resolveCallout(block.kind)
   if (component === null || type === undefined) return null
+  const typeLabel = labels.calloutType(block.kind)
   return (
     <ComponentFrame
       key={key}
@@ -194,9 +195,10 @@ function renderCallout(
       annotation={components.annotationOf(block)}
       diff={status}
       {...(components.annotate === undefined ? {} : { annotate: components.annotate })}
-      label={labels.calloutType(block.kind)}
+      label={typeLabel}
+      labelVisible={false}
       icon={<span dangerouslySetInnerHTML={{ __html: type.icon }} />}
-      title={block.title}
+      title={calloutHeadTitle(block.title, typeLabel)}
       family={block.family}
       labels={{
         annotate: labels.annotate,

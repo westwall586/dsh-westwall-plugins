@@ -198,14 +198,16 @@
   background: transparent;
 }
 
-.am-component[data-component='callout'] .am-component-icon,
-.am-component[data-component='callout'] .am-component-label {
+/* The icon names the type, so the head is one title line: no type text, and the
+   title sits a step above the body copy instead of beside a repeated name. */
+.am-component[data-component='callout'] .am-component-icon {
   flex: none;
   color: var(--am-callout-accent);
 }
 
-.am-component[data-component='callout'] .am-component-label {
-  font-size: 12px;
+.am-component[data-component='callout'] .am-component-title {
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .am-component[data-component='callout'] .am-component-seq {
@@ -610,6 +612,12 @@ svg.am-markmap-canvas {
   font-size: var(--dsh-content-font-size, 14px);
 }
 
+/* In place the map reads as a picture: the wheel scrolls the page and a click
+   opens the panel, the same contract mermaid keeps. */
+.am-rich-view .am-markmap-canvas {
+  pointer-events: none;
+}
+
 /* The expanded diagram fills the panel and keeps its zoom bar at the bottom. */
 .am-rich-panel {
   display: flex;
@@ -877,21 +885,39 @@ svg.am-markmap-canvas .markmap-foreign > div {
   text-transform: uppercase;
 }
 
-.am-frontmatter-copy {
+/* The copy control is the same icon button as the component shell, one step smaller
+   so the 30px head keeps its height. */
+.am-frontmatter-action {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
   margin-left: auto;
-  padding: 1px 6px;
-  border: 1px solid transparent;
-  border-radius: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
   background: transparent;
   color: var(--dsw-alias-label-tertiary);
   font: inherit;
-  font-size: 11px;
   cursor: pointer;
 }
 
-.am-frontmatter-copy:hover {
-  border-color: var(--dsw-alias-border-l2);
+.am-frontmatter-action:hover {
+  background: var(--dsw-alias-bg-layer-3);
   color: var(--dsw-alias-label-primary);
+}
+
+.am-frontmatter-action:focus-visible {
+  background: var(--dsw-alias-bg-layer-3);
+  color: var(--dsw-alias-label-primary);
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: 2px;
+}
+
+.am-frontmatter-action--done {
+  color: var(--dsw-alias-state-success-primary);
 }
 
 .am-frontmatter-grid {

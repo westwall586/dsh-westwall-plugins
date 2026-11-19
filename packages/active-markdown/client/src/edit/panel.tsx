@@ -82,19 +82,19 @@ export function EditToolbar(props: EditToolbarProps): ReactNode {
       <span className="am-toolbar-spacer" />
       <button
         type="button"
-        className="am-primary"
-        disabled={saving}
-        onClick={props.onSave}
-      >
-        {saving ? labels.saving : labels.save}
-      </button>
-      <button
-        type="button"
         className="am-toolbar-button am-toolbar-button--quiet"
         disabled={saving}
         onClick={props.onExit}
       >
         {labels.exit}
+      </button>
+      <button
+        type="button"
+        className="am-primary"
+        disabled={saving}
+        onClick={props.onSave}
+      >
+        {saving ? labels.saving : labels.save}
       </button>
     </>
   )

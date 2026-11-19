@@ -2,6 +2,8 @@
 import type { INode, IPureNode } from 'markmap-common'
 import { Markmap } from 'markmap-view'
 import type { MarkmapNode } from '../tree.ts'
+import { MAX_SCALE, MIN_SCALE } from '../stage-math.ts'
+import { interactionOptions, type MarkmapInteraction } from './options.ts'
 
 const ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
 
@@ -46,6 +48,7 @@ export default {
    * @param svg - the element markmap draws into.
    * @param tree - nodes derived from the fence body.
    * @param palette - resolved theme tokens; branch colors and text come from it.
+   * @param mode - the fence in place, or the expanded panel; it decides wheel and drag.
    * @param onScale - receives the scale after every pan and zoom.
    * @returns the controls the expanded panel drives, plus teardown.
    */
@@ -53,6 +56,7 @@ export default {
     svg: SVGSVGElement,
     tree: MarkmapNode,
     palette: Record<string, string>,
+    mode: MarkmapInteraction,
     onScale?: (scale: number) => void,
   ): MarkmapHandle {
     const colors = colorsOf(palette)
@@ -62,12 +66,14 @@ export default {
       duration: 0,
       initialExpandLevel: 2,
       color: (node: INode) => (colors.length === 0 ? fallback : colors[node.state.depth % colors.length]!),
+      ...interactionOptions(mode),
     }, toPure(tree))
-    // d3 keeps the live transform on the element; its own selection dispatch is
-    // the only reliable signal, so the scale hook rides that listener.
+    // d3 keeps the live transform on the element and re-emits zoom through the
+    // behavior rather than the element, so the scale hook rides that dispatch
+    // under its own name and leaves markmap's 'zoom' listener painting.
     const current = (): number => (svg as SVGSVGElement & { __zoom?: { k?: number } }).__zoom?.k ?? 1
     const emit = (): void => { onScale?.(current()) }
-    map.svg.on('zoom.scale-track', emit)
+    map.zoom.on('zoom.scale-track', emit).scaleExtent([MIN_SCALE, MAX_SCALE])
     // autoFit and this fit settle on the same transform; running it here is what
     // lets the handle record the fitted scale as the footer's 100%.
     let fitScale = current()
@@ -79,7 +85,7 @@ export default {
     fit()
     return {
       dispose: () => {
-        map.svg.on('zoom.scale-track', null)
+        map.zoom.on('zoom.scale-track', null)
         map.destroy()
       },
       scale: current,

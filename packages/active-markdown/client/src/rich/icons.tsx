@@ -57,6 +57,11 @@ export function CopyIcon({ size }: IconProps = {}): ReactElement {
   )
 }
 
+/** Confirm that a copy just landed. */
+export function CheckIcon({ size }: IconProps = {}): ReactElement {
+  return <IconShell size={size}><path d="M3 8.6 6.4 12 13 4.6" /></IconShell>
+}
+
 /** Annotate the component. */
 export function AnnotateIcon({ size }: IconProps = {}): ReactElement {
   return <IconShell size={size}><path d="M2.5 3.5h11v7H8L5 13v-2.5H2.5z" /></IconShell>

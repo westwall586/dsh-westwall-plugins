@@ -108,6 +108,8 @@ export type BodyContent =
 export interface BodyInjected {
   readBytes: WorkspaceFilesRemote['readBytes']
   openResource(address: string): void
+  /** Open an external address inside the product, or in a new tab when it cannot. */
+  openExternal(url: string): void
   host(): Promise<HostBridge>
   /** The plugin-owned draft store; one instance is shared by every body. */
   annotations: AnnotationStore
@@ -442,6 +444,7 @@ export function Body({
   content,
   readBytes,
   openResource,
+  openExternal,
   host,
   annotations,
   attachment,
@@ -724,12 +727,11 @@ export function Body({
       return
     }
     if (target.kind === 'external') {
-      const opened = window.open(target.url, '_blank', 'noopener,noreferrer')
-      if (opened !== null) opened.opener = null
+      openExternal(target.url)
       return
     }
     if (target.kind === 'file' || target.kind === 'resource') openResource(target.address)
-  }, [sessionId, state, path, openResource])
+  }, [sessionId, state, path, openResource, openExternal])
 
   const actions = useMemo(() => ({ openLink, resolveImage }), [openLink, resolveImage])
   const labels = useMemo(() => ({
@@ -742,12 +744,12 @@ export function Body({
     edit: t('component.edit'),
     wrap: t('code.wrap'),
     nowrap: t('code.nowrap'),
+    fullscreen: t('component.fullscreen'),
+    close: t('component.close'),
     rich: {
       rendering: t('rich.rendering'),
       copyError: t('rich.copyError'),
       copied: t('code.copied'),
-      expand: t('rich.expand'),
-      close: t('rich.close'),
       zoom: {
         controls: t('rich.zoom.controls'),
         menu: t('rich.zoom.menu'),

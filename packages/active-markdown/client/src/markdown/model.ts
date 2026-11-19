@@ -12,8 +12,8 @@ export interface ComponentDefinition {
 }
 
 export const COMPONENT_REGISTRY: Record<ComponentKind, ComponentDefinition> = {
-  table: { kind: 'table', actions: ['annotate'] },
-  code: { kind: 'code', actions: ['annotate', 'copy'] },
+  table: { kind: 'table', actions: ['annotate', 'fullscreen'] },
+  code: { kind: 'code', actions: ['annotate', 'copy', 'fullscreen'] },
   callout: { kind: 'callout', actions: ['annotate'] },
   mermaid: { kind: 'mermaid', actions: ['annotate', 'copy', 'fullscreen'] },
   markmap: { kind: 'markmap', actions: ['annotate', 'copy', 'fullscreen'] },

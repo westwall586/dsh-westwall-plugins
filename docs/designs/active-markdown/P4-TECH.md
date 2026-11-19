@@ -2,7 +2,7 @@
 
 > 状态：进行中（2026-11-19）。定位见 [POSITIONING.md](POSITIONING.md)，阶段见 [ROADMAP.md](ROADMAP.md)，块模型见 [P1-TECH.md](P1-TECH.md)，样式与批注壳见 [P2-ANNOTATION-TECH.md](P2-ANNOTATION-TECH.md)。
 >
-> 本文覆盖 P4：把“读得舒服”补齐。不做 WYSIWYG、主题系统、导出 PDF、Gherkin、代码块语法高亮。
+> 本文覆盖 P4：把“读得舒服”补齐。不做 WYSIWYG、主题系统、导出 PDF、Gherkin。代码块语法高亮复用平台 shiki，不另带高亮库。
 
 ## 1. 目标与非目标
 
@@ -15,7 +15,7 @@
 
 **非目标**
 
-- 语法高亮（shell 用 shiki，插件不带第二套）、代码补全、编辑态富渲染。
+- 自带一套高亮实现（直接复用 shell 的 shiki）、代码补全、编辑态富渲染。
 - Markmap 之外的第三方图表库（Gherkin、PlantUML、思维导图以外的图种）。
 - 主题系统、自定义配色、导出 PDF/HTML。
 - 富组件里的行级批注（只到组件级）。
@@ -28,10 +28,10 @@
 | 重资源交付 | 包内动态 chunk：`client.math.js`、`client.mermaid.js`、`client.markmap.js`，按需 `require.async` |
 | 数学 | KaTeX（与 chat 同一套渲染），chunk 只带 JS；CSS 与字体由 shell 全局加载，chunk 自带一份去 `@font-face` 的 CSS 兜底 |
 | Mermaid | 全量图类型，不做白名单；`securityLevel: 'strict'`；错误回退源码 + 复制错误 |
-| Mermaid 交互 | 照搬 friendly-expression 的全屏 / 缩放 / 主题：复用 `ui-primitives` 的 `ZoomControls`，不复用它的代码 |
+| Mermaid 交互 | 照搬 friendly-expression 的缩放与主题：复用 `ui-primitives` 的 `ZoomControls`，不复用它的代码；全屏壳改为组件框统一弹框 |
 | 思维导图 | Markmap 式：Markdown 大纲 → 可折叠导图，只取 `markmap-view`，大纲转树用本插件自己的块模型 |
 | 图片放大 | 复用 `ui-primitives` 的 `ImageLightbox` |
-| 代码块 | 已有复制与语言标签；本轮补换行开关，不加语法高亮 |
+| 代码块 | 已有复制与语言标签；本轮补换行开关，正文改用平台 `CodeBlock` 带 shiki 高亮 |
 | 表格 | 横向滚动已有，只做视觉打磨 |
 | front matter | 从原始 `<pre>` 改为元信息卡（key/value 行） |
 | 公式与译文 | 公式、Mermaid、导图不参与翻译：译文视图里保留原文块，与代码块同规则 |
@@ -85,12 +85,12 @@
 
 ## 6. 富组件
 
-已实现（P4b）。实测范围：`test/callout.test.ts` 覆盖 13 个规范类型、大小写、别名、未知类型、折叠语法、列表内与嵌套引用、空标题、`-` 开头的标题、标记行与正文同段时的切分与行号；`test/blocks.test.ts` 覆盖 front matter 条目（续行、空行、无冒号行）。Web 版逐项点过（暗色主题、窄栏与全屏两种宽度）：10 个 callout 的 family、类型名、标题与七族左边线都不重复，普通引用与列表内标记保持引用，front matter 卡两列表格与复制可用，点图开灯箱且 Esc 可关，代码换行开关把 `white-space` 切到 `pre-wrap`，callout 悬停出现批注入口并唤起批注输入框。亮色主题未切换验证。`pnpm build` 产出 `client.js` 843KB，低于 1.5 MiB 门。
+已实现（P4b）。实测范围：`test/callout.test.ts` 覆盖 13 个规范类型、大小写、别名、未知类型、折叠语法、列表内与嵌套引用、空标题、`-` 开头的标题、标记行与正文同段时的切分与行号；`test/blocks.test.ts` 覆盖 front matter 条目（续行、空行、无冒号行）。Web 版逐项点过（暗色主题、窄栏与全屏两种宽度）：10 个 callout 的 family、类型名、标题与七族左边线都不重复，普通引用与列表内标记保持引用，front matter 卡两列表格与复制可用，点图开灯箱且 Esc 可关，代码换行开关把 `white-space` 切到 `pre-wrap`，代码块在滚动进视口后换成 shiki 高亮（`pre.shiki.css-variables`，24 个着色 span），callout 悬停出现批注入口并唤起批注输入框。亮色主题未切换验证。`pnpm build` 产出 `client.js` 843KB，低于 1.5 MiB 门。
 
 - Callout：顶层引用首行是 `[!type]` 时识别。13 个规范类型、别名、label 与图标照抄组件规范的 `component.json`，映射到 7 个语义族；未知类型、`-`/`+` 折叠语法、列表内与嵌套引用都保持普通引用，读侧不报错。标题行去掉标记，剩余块照常渲染；`[!note] - 标题`（标记后有空格）仍算标题。批注落在 callout 整体，正文选区落在组件区间时按现有规则拒绝，只到组件级。
 - front matter：顶格 `key: value` 行拆成两列卡片，缩进续行并入上一条；不做 YAML 语义，原始文本仍可整块复制。
 - 图片：点图（或聚焦后按 Enter / Space）开 `ImageLightbox`，Esc、遮罩与关闭按钮都能关，关闭后焦点回到图片。
-- 代码块：头部加「换行 / 不换行」开关，作用到 `.am-code-body[data-wrap]`；默认不换行，状态只在组件本地，不入文档。
+- 代码块：头部加「换行 / 不换行」开关，作用到平台 `CodeBlock` 的 `wrap`；默认不换行，状态只在组件本地，不入文档。
 - 组件框：callout 用自己的 `section.am-callout` 头部（图标、类型名、标题），保留 `data-component` 锚点与组件级批注入口；math / mermaid / markmap 仍按各自阶段接入 `ComponentFrame`。
 - 颜色：family 到 token 的映射固定，样式只走 `--dsw-*` 与 `color-mix`，没有字面色值。
 
@@ -111,7 +111,7 @@
 - 兜底：`securityLevel: 'strict'`，不执行图内 HTML。
 - 渲染：chunk 内首次渲染时 `mermaid.initialize` 一次；主题由 `--dsw-alias-*` token 解析成 palette，palette 指纹变化时重新初始化并重渲染。同一源码 + 同一主题指纹走内存缓存（24 条上限），多个图在一条 Promise 队列里串行渲染。
 - 错误：捕获解析/渲染异常，回退显示源码 + 错误首行 + 「复制错误」；源码仍走组件框的「复制」，渲染失败不白屏。
-- 全屏：遮罩 + 居中容器 + `ZoomControls`（放大 / 缩小 / 复位 / 预设），Esc、关闭按钮与遮罩点击都能关，关闭后焦点回到「全屏」按钮。
+- 全屏：走组件框的统一弹框（见第 11 节），展开后的图挂 `ZoomControls`（放大 / 缩小 / 预设）；Esc、关闭按钮与遮罩点击都能关，关闭后焦点回到「全屏」按钮。
 - 缓存：同一源码 + 同一主题指纹只渲染一次，SVG 留在内存。
 
 实测范围：`test/blocks.test.ts` 覆盖 mermaid 围栏成块；`pnpm build` 产出 `client.mermaid.js` 3,317,876 字节（gzip 908,519），低于 chunk 的 4 MiB 门；入口 `client.js` 859,352 字节里 `flowchart`、`sequenceDiagram`、`mermaidAPI` 的 grep 计数都是 0。Web 版实测：没有图的文档零请求，含图的文档只请求 `client.mermaid.js` 与 `client.markmap.js` 两个 chunk；正常图渲染出 422×168 的 SVG，写坏的图回退成源码 + 「Parse error on line 2」+「复制错误」；全屏遮罩有关闭 / 缩小 / 缩放比例 / 放大四个控件，Esc 关闭后焦点回到「全屏」。暗色主题下实测，亮色未切换。
@@ -123,7 +123,7 @@
 - 入口：代码块语言为 `markmap` / `mindmap` 时走导图，不吃 Mermaid 的图类型。
 - 转换：H1–H6 与嵌套列表转成 Markmap 的节点树；段落并入最近节点的描述行，用第一个换行分隔。转树是 `client/src/rich/tree.ts` 的纯函数，只读本插件块模型。
 - 视图：`markmap-view` 只读模式，初始展开层级 2，支持缩放与拖拽；节点文本先转义再加换行，不执行图内 HTML；分支色从 palette 的语义色取；单个顶层标题直接作为根节点，不再套一个空根；节点文字与连线颜色由 `svg.am-markmap-canvas` 上的 `--markmap-*` 变量从主题 token 重设（markmap 自带的深色文字会压到 0.1 的层级）。
-- 全屏复用 Mermaid 那套壳；批注：整个导图是一个组件，可复制源码。
+- 全屏走组件框的统一弹框，展开后会新挂一个导图实例并带缩放条；批注：整个导图是一个组件，可复制源码。
 
 实测范围：`test/rich-trees.test.ts` 覆盖标题层级、列表嵌套、段落并入与多个 H1；`pnpm build` 产出 `client.markmap.js` 119,083 字节（gzip 39,475），低于 4 MiB 门；入口 `client.js` 里 `markmap-view`、`markmap-common`、`initialExpandLevel` 的 grep 计数都是 0。浏览器端的拖拽、折叠与明暗重渲染留待 P4d 验收实测。
 
@@ -144,9 +144,37 @@
 - 中文标点：`text-spacing-trim: trim-start`，纯 CSS，不做文本改写。
 - 复核：明暗、窄栏、全屏三形态各看一遍；200 段文档计时（待 P4f）。
 
-## 11. 风险与不做
+## 11. 链接路由、代码高亮与组件全屏
+
+已实现。三件事都落在浏览器半体，块模型与批注数据结构没有改动。
+
+### 11.1 链接路由
+
+- 分类仍是 `client/src/links.ts` 的 `classifyLink`，四种去向不变：`#标题` 在文内跳转，`http(s)` / `mailto` 与协议相对地址算外部，`dsh-resource://` 原样交侧栏，相对路径按文档目录解析成会话文件地址。
+- 外部地址不再由 `Body` 直接 `window.open`：`Body` 调注入的 `openExternal(url)`，`main.tsx` 按文档所在 session scope 取 `sidebarRight`，在 `browser` 页签已注册时调 `openTab('browser', { params: { url } })`，否则退回 `window.open(url, '_blank', 'noopener,noreferrer')`。页签类型按点击时刻查询，宿主晚些挂上浏览器也能用。
+- 文件与资源链接继续走 `openResource`（本来就是侧栏预览）；`#标题` 走现有滚动。图片点击仍是灯箱，图片作为链接目标时按链接规则打开预览。
+- 实测范围：`test/external.test.ts` 覆盖三条，「侧栏可打开时走侧栏浏览器」「侧栏服务缺失退回新标签页」「侧栏拒绝打开（没有 browser 页签或没有会话）时退回新标签页」。打开动作先尝试 `openTab('browser')`，抛错才退回新标签页，不做页签类型的预判。Web 版实测（该 profile 没有 `browser` 页签）：点外部链接开系统新标签页、点文件链接在侧栏开 `README.md`、点图片链接在侧栏开图片预览且不弹灯箱。桌面版侧栏浏览器未实测。
+
+### 11.2 代码块高亮
+
+- 正文改用平台共享模块 `@deepseek-ai/dsh-client-ui-primitives` 的 `CodeBlock`：`showHeader={false}`（组件框自己给头部）、`wrap` 跟随组件框的换行状态、`code` 传 `content + '\n'` 对齐围栏语义、`lang` 传围栏语言。高亮由平台 shiki 完成，不新增依赖；`client.js` 里 `shiki` 的 grep 计数是 0。
+- 样式按需覆盖：平台卡片自带背景与内边距，组件框把它的 `margin` 与圆角清零、内边距收成 `12px 16px 16px`，外边框与头部分隔线仍由组件框负责，避免双层卡片。
+- 取舍：旧实现的逐行 `<span data-line>` 删除，代码块不再有行级锚点。组件级批注、复制与更新标记不受影响；译文里选中代码块文字不再出现「查看原文」。
+- 实测范围：`pnpm build` 入口 `client.js` 861,031 字节（比改动前多 1,679 字节，低于 1.5 MiB 门）。Web 版实测 ts 围栏有高亮、`换行 / 不换行` 把 `data-code-wrap` 在 `true` / `false` 间切换且 `white-space` 从 `pre` 变 `pre-wrap`，无双层边框；暗色下复核了弹框里的代码块。
+
+### 11.3 组件全屏
+
+- 全屏上移到 `ComponentFrame`：头部动作顺序是「全屏、换行（仅代码）、批注、复制」，四种组件（code、table、mermaid、markmap）都在 `COMPONENT_REGISTRY` 里注册 `fullscreen`；各富视图自己的展开按钮与 `rich/fullscreen.tsx` 删除。
+- `children` 改为渲染函数 `({ wrap, expanded }) => ReactNode`；弹框内以 `expanded: true` 再渲染一次同一份内容。Mermaid 与导图在 `expanded` 时自挂 `ZoomPanel`（缩放舞台 + 底部缩放条），code 与 table 不挂底栏。
+- 弹框结构：遮罩 `position: fixed; inset: 0; z-index: 30; background: rgba(0, 0, 0, 0.62)`，`createPortal` 到 `document.body`；面板 `width: min(100%, clamp(940px, 72vw, 1600px))`、`height: min(100%, clamp(656px, 78vh, 1000px))`、14px 圆角、`--dsw-alias-bg-layer-1`；头部是组件标签 + 「关闭」，正文是可滚动的 flex 区，可缩放内容在底部留一条 52px 的缩放条。
+- 关闭：Esc（捕获阶段）、点遮罩、关闭按钮三条路径都关；打开时聚焦关闭按钮，关闭后焦点回到「全屏」按钮并恢复 `body` 滚动。
+- 实测范围：Web 版亮色下四种组件的全屏都能打开，暗色下复核了代码块弹框；1925×1070 视口里 1386×835 的面板居中；代码块保留换行偏好、宽表在弹框里撑满可滚动宽度、Mermaid 与导图居中且缩放条在底栏；Esc、点遮罩、关闭按钮都验证过，焦点每次回到「全屏」；组件既有的批注入口仍能打开批注框，复制按钮仍在顶栏（剪贴板写入本身未在自动化里验证）。桌面版未实测。
+
+## 12. 风险与不做
 
 - **产物变大**：`client.mermaid.js` 3.2MB（gzip 约 887KB）与 `client.markmap.js` 116KB（gzip 约 39KB）入库；构建时间与仓库体积上涨，换来首屏零成本。
 - **隐式依赖**：数学的字来自 shell 全局 CSS。shell 若换渲染方案，公式会退到系统衬线；兜底方案是 chunk 内联字体（+296KB 原始字体）。
 - **chunk 首次加载**：文档里有图/公式时多一次本地请求，宿主按 revision 缓存，不做预取。
-- **不做**：Markmap 之外的大纲视图、语法高亮、主题系统、导出 PDF、Gherkin、行级富组件批注。
+- **全屏层级**：弹框固定 `z-index: 30`，与 friendly-expression 一致；宿主若出现高于 30 的常驻浮层，弹框会压在它下面。
+- **侧栏浏览器是宿主能力**：Web profile 没有 `browser` 页签，外部链接退回系统新标签页；侧栏浏览器只在桌面版出现。
+- **不做**：Markmap 之外的大纲视图、自带高亮库、主题系统、导出 PDF、Gherkin、行级富组件批注。

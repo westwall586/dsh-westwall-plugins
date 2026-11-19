@@ -6,6 +6,7 @@ import { createPendingHub } from './annotate/committer.ts'
 import { createAnnotationStore } from './annotate/store.ts'
 import { Body, type BodyInjected } from './body.tsx'
 import type { ClientContext, ConversationPort, HostBridge, SidebarRight } from './context.ts'
+import { openExternal } from './external.ts'
 import { mountHostBridge } from './host.ts'
 import { SELECTION_MENU_KIND, selectionActions, type SelectionMenuValue } from './menus.ts'
 import { en, zh } from './locales.ts'
@@ -102,6 +103,15 @@ export default {
         inject: (): BodyInjected => ({
           readBytes: (sessionId, path, options, signal) => scoped.remote.workspaceFiles.readBytes(sessionId, path, options, signal),
           openResource: (address) => (scoped.get('sidebarRight') as SidebarRight | undefined)?.openResource(address),
+          // The browser page type is desktop-only and registers independently of
+          // this preview, so the lookup happens per click, not at mount.
+          openExternal: (url) => {
+            openExternal(
+              url,
+              scoped.get('sidebarRight') as SidebarRight | undefined,
+              (href) => { window.open(href, '_blank', 'noopener,noreferrer') },
+            )
+          },
           host,
           annotations: annotationStore,
           attachment,

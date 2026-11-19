@@ -1,11 +1,11 @@
-/** A Mermaid fence rendered inside the component frame, with an opt-in fullscreen view. */
+/** A Mermaid fence rendered inside the component frame, with a zoomable expanded view. */
 import * as React from 'react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { loadChunk } from '../chunks.ts'
 import { RichError } from './fallback.tsx'
-import { RichFullscreen } from './fullscreen.tsx'
 import type { RichLabels } from './labels.ts'
 import { paletteKey, usePalette } from './palette.ts'
+import { ZoomPanel } from './zoom-panel.tsx'
 
 interface MermaidChunk {
   render(code: string, palette: Record<string, string>): Promise<string>
@@ -32,19 +32,19 @@ function loadMermaid(): Promise<MermaidChunk> {
 export interface MermaidViewProps {
   code: string
   labels: RichLabels
+  /** Set on the panel's copy, which carries its own zoom bar. */
+  expanded: boolean
 }
 
 /**
- * Render one mermaid source and let it be inspected fullscreen.
- * @param props - the fence body and localized copy.
+ * Render one mermaid source, in place or filling the expanded panel.
+ * @param props - the fence body, localized copy, and whether this is the panel copy.
  * @returns the diagram, its loading state, or the source fallback.
  */
-export function MermaidView({ code, labels }: MermaidViewProps): ReactNode {
+export function MermaidView({ code, labels, expanded }: MermaidViewProps): ReactNode {
   const palette = usePalette()
   const identity = paletteKey(palette)
   const [state, setState] = useState<RenderState>({ kind: 'loading' })
-  const [expanded, setExpanded] = useState(false)
-  const expandRef = useRef<HTMLButtonElement | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -58,32 +58,14 @@ export function MermaidView({ code, labels }: MermaidViewProps): ReactNode {
 
   if (state.kind === 'error') return <RichError code={code} error={state.error} labels={labels} />
 
-  return (
-    <div className="am-rich-view">
-      {state.kind === 'loading'
-        ? <div className="am-rich-state" aria-busy="true">{labels.rendering}</div>
-        : (
-          <div className="am-rich-diagram am-rich-mermaid">
-            <div className="am-rich-figure" dangerouslySetInnerHTML={{ __html: state.svg }} />
-            <button
-              ref={expandRef}
-              type="button"
-              className="am-rich-expand"
-              aria-label={labels.expand}
-              title={labels.expand}
-              onClick={() => setExpanded(true)}
-            >
-              {labels.expand}
-            </button>
-            {expanded
-              ? (
-                <RichFullscreen labels={labels} returnFocus={expandRef} onClose={() => setExpanded(false)}>
-                  <div className="am-rich-figure" dangerouslySetInnerHTML={{ __html: state.svg }} />
-                </RichFullscreen>
-              )
-              : null}
-          </div>
-        )}
-    </div>
-  )
+  const diagram = state.kind === 'loading'
+    ? <div className="am-rich-state" aria-busy="true">{labels.rendering}</div>
+    : (
+      <div className="am-rich-diagram am-rich-mermaid">
+        <div className="am-rich-figure" dangerouslySetInnerHTML={{ __html: state.svg }} />
+      </div>
+    )
+
+  if (expanded) return <ZoomPanel labels={labels}>{diagram}</ZoomPanel>
+  return <div className="am-rich-view">{diagram}</div>
 }

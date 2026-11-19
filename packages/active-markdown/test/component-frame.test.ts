@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { parseDocument } from '../client/src/markdown/blocks.ts'
-import { componentLabel, componentOf } from '../client/src/markdown/model.ts'
+import { COMPONENT_REGISTRY, componentLabel, componentOf } from '../client/src/markdown/model.ts'
 import { annotateBlock, blockAnnotationOf, blockAnchor } from '../client/src/annotate/model.ts'
 import { locateBlockAnchor } from '../client/src/annotate/selection.ts'
 
@@ -34,7 +34,7 @@ test('文本块没有组件外壳，表格与代码块有类型、动作与签�
   const table = componentOf(TABLE)!
   assert.equal(table.kind, 'table')
   assert.deepEqual(table.label, { kind: 'table', columns: 2, rows: 1 })
-  assert.deepEqual(table.actions, ['annotate'])
+  assert.deepEqual(table.actions, ['annotate', 'fullscreen'])
   assert.match(table.signature, /^table:2x1:/)
   assert.equal(table.lineStart, TABLE.sourceStartLine)
   assert.equal(table.lineEnd, TABLE.sourceEndLine)
@@ -42,9 +42,28 @@ test('文本块没有组件外壳，表格与代码块有类型、动作与签�
   const code = componentOf(CODE)!
   assert.equal(code.kind, 'code')
   assert.deepEqual(code.label, { kind: 'code', lang: 'ts' })
-  assert.deepEqual(code.actions, ['annotate', 'copy'])
+  assert.deepEqual(code.actions, ['annotate', 'copy', 'fullscreen'])
   assert.equal(code.copyText, 'const a = 1')
   assert.match(code.signature, /^code:ts:/)
+})
+
+test('每个套组件框的富组件都能全屏，批注与复制仍按类型给', () => {
+  const source = [
+    '```mermaid',
+    'flowchart LR',
+    '  A --> B',
+    '```',
+    '',
+    '```markmap',
+    '# 根',
+    '```',
+  ].join('\n')
+  const components = parseDocument(source).blocks.map(componentOf)
+  assert.deepEqual(components.map(component => component?.kind), ['mermaid', 'markmap'])
+  for (const component of components) assert.ok(component!.actions.includes('fullscreen'))
+  assert.deepEqual(components[0]!.actions, ['annotate', 'copy', 'fullscreen'])
+  // A callout wears its own header and is never framed, so it has no action to give.
+  assert.deepEqual(COMPONENT_REGISTRY.callout.actions, ['annotate'])
 })
 
 test('标签走 locale 键，空语言显示 text', () => {

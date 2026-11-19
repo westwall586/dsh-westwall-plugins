@@ -1,13 +1,13 @@
-/** A mind-map fence rendered inside the component frame, with an opt-in fullscreen view. */
+/** A mind-map fence rendered inside the component frame, with a zoomable expanded view. */
 import * as React from 'react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { loadChunk } from '../chunks.ts'
 import { parseDocument } from '../markdown/blocks.ts'
 import { RichError } from './fallback.tsx'
-import { RichFullscreen } from './fullscreen.tsx'
 import type { RichLabels } from './labels.ts'
 import { usePalette } from './palette.ts'
 import { outlineToTree, type MarkmapNode } from './tree.ts'
+import { ZoomPanel } from './zoom-panel.tsx'
 
 interface MarkmapChunk {
   mount(svg: SVGSVGElement, tree: MarkmapNode, palette: Record<string, string>): () => void
@@ -68,14 +68,16 @@ function MarkmapCanvas({ tree, palette, className, onState }: MarkmapCanvasProps
 export interface MarkmapViewProps {
   code: string
   labels: RichLabels
+  /** Set on the panel's copy, which carries its own zoom bar. */
+  expanded: boolean
 }
 
 /**
- * Render one mind map from the fence's Markdown outline and let it be inspected fullscreen.
- * @param props - the fence body and localized copy.
+ * Render one mind map from the fence's Markdown outline, in place or filling the expanded panel.
+ * @param props - the fence body, localized copy, and whether this is the panel copy.
  * @returns the map, its loading state, or the source fallback.
  */
-export function MarkmapView({ code, labels }: MarkmapViewProps): ReactNode {
+export function MarkmapView({ code, labels, expanded }: MarkmapViewProps): ReactNode {
   const palette = usePalette()
   // A lone top heading becomes the root itself; otherwise the map would open on
   // an empty node just above it.
@@ -84,40 +86,26 @@ export function MarkmapView({ code, labels }: MarkmapViewProps): ReactNode {
     return full.children.length === 1 ? full.children[0]! : full
   }, [code])
   const [state, setState] = useState<MountState>({ kind: 'loading' })
-  const [expanded, setExpanded] = useState(false)
-  const [overlayState, setOverlayState] = useState<MountState>({ kind: 'loading' })
-  const expandRef = useRef<HTMLButtonElement | null>(null)
+  const [panelState, setPanelState] = useState<MountState>({ kind: 'loading' })
 
   if (state.kind === 'error') return <RichError code={code} error={state.error} labels={labels} />
+
+  if (expanded) {
+    return (
+      <ZoomPanel labels={labels}>
+        <MarkmapCanvas tree={tree} palette={palette} className="am-markmap-canvas" onState={setPanelState} />
+        {panelState.kind === 'loading' ? <div className="am-rich-state" aria-busy="true">{labels.rendering}</div> : null}
+        {panelState.kind === 'error' ? <RichError code={code} error={panelState.error} labels={labels} /> : null}
+      </ZoomPanel>
+    )
+  }
 
   return (
     <div className="am-rich-view">
       <div className="am-rich-diagram am-rich-markmap" data-state={state.kind}>
         <MarkmapCanvas tree={tree} palette={palette} className="am-markmap-canvas" onState={setState} />
         {state.kind === 'loading' ? <div className="am-rich-state" aria-busy="true">{labels.rendering}</div> : null}
-        {state.kind === 'ready'
-          ? (
-            <button
-              ref={expandRef}
-              type="button"
-              className="am-rich-expand"
-              aria-label={labels.expand}
-              title={labels.expand}
-              onClick={() => setExpanded(true)}
-            >
-              {labels.expand}
-            </button>
-          )
-          : null}
       </div>
-      {expanded && state.kind === 'ready'
-        ? (
-          <RichFullscreen labels={labels} returnFocus={expandRef} onClose={() => setExpanded(false)}>
-            <MarkmapCanvas tree={tree} palette={palette} className="am-markmap-canvas" onState={setOverlayState} />
-            {overlayState.kind === 'error' ? <RichError code={code} error={overlayState.error} labels={labels} /> : null}
-          </RichFullscreen>
-        )
-        : null}
     </div>
   )
 }

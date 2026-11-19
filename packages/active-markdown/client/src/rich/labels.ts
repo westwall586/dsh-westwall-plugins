@@ -7,7 +7,6 @@ export interface RichLabels {
   copyError: string
   /** Copy feedback shared with the rest of the component frame. */
   copied: string
-  expand: string
-  close: string
+  /** The expanded panel's zoom bar owns these. */
   zoom: DocumentZoomLabels
 }

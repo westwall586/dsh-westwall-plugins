@@ -1,7 +1,7 @@
 /** Render the block tree as themed React elements. */
 import * as React from 'react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { ImageLightbox } from '@deepseek-ai/dsh-client-ui-primitives'
+import { CodeBlock, ImageLightbox } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { Inline, Block, ListItem } from './model.ts'
 import { componentOf } from './model.ts'
 import type { DiffStatus, DocumentDiff } from './diff.ts'
@@ -24,6 +24,8 @@ export interface RenderLabels {
   edit: string
   wrap: string
   nowrap: string
+  fullscreen: string
+  close: string
   /** Localized copy for the lazily rendered diagrams. */
   rich: RichLabels
   /** One callout type's localized label. */
@@ -123,15 +125,18 @@ function renderBlock(
             copied: labels.copied,
             wrap: labels.wrap,
             nowrap: labels.nowrap,
+            fullscreen: labels.fullscreen,
+            close: labels.close,
           }}
         >
-          {block.type === 'table'
-            ? renderTable(block, key, labels, actions)
-            : block.type === 'code'
-              ? (wrap => renderCode(block, wrap))
-              : block.type === 'mermaid'
-                ? <MermaidView code={block.content} labels={labels.rich} />
-                : <MarkmapView code={block.content} labels={labels.rich} />}
+          {(context) => {
+            switch (block.type) {
+              case 'table': return renderTable(block, key, labels, actions)
+              case 'code': return renderCode(block, context.wrap, labels)
+              case 'mermaid': return <MermaidView code={block.content} labels={labels.rich} expanded={context.expanded} />
+              case 'markmap': return <MarkmapView code={block.content} labels={labels.rich} expanded={context.expanded} />
+            }
+          }}
         </ComponentFrame>
       )
     }
@@ -237,18 +242,25 @@ function renderTable(
   )
 }
 
-function renderCode(block: Extract<Block, { type: 'code' }>, wrap: boolean): ReactNode {
-  const lines = block.content.split('\n')
-  const firstLine = block.sourceStartLine + (block.fence ? 1 : 0)
+/**
+ * Render one fence body through the platform's code block, which carries the
+ * syntax highlighting, scrollport, and wrapping semantics chat uses.
+ */
+function renderCode(block: Extract<Block, { type: 'code' }>, wrap: boolean, labels: RenderLabels): ReactNode {
   return (
-    <pre className="am-code-body" data-wrap={wrap ? '' : undefined}><code>
-      {lines.map((line, index) => (
-        <React.Fragment key={index}>
-          <span className="am-code-line" data-line={firstLine + index}>{line}</span>
-          {index === lines.length - 1 ? null : '\n'}
-        </React.Fragment>
-      ))}
-    </code></pre>
+    <CodeBlock
+      // The frame owns the header, so the platform card only supplies the body;
+      // the appended newline is what its display trim expects of a fence.
+      code={`${block.content}\n`}
+      lang={block.lang}
+      showHeader={false}
+      // The card decides the wrap flag and hides its own toolbar action; the
+      // frame's header button is the only switch the reader sees.
+      toolbarLabels={{ codeLabel: block.lang === '' ? 'text' : block.lang, wrapLabel: labels.wrap, unwrapLabel: labels.nowrap }}
+      wrap={wrap}
+      copyLabel={labels.copy}
+      copiedLabel={labels.copied}
+    />
   )
 }
 

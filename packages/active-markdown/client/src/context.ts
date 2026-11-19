@@ -371,9 +371,15 @@ export interface ContextMenusService {
   }): () => void
 }
 
-/** The sidebar service used to open an addressed file. */
+/** The sidebar service used to open an addressed file or one of its page types. */
 export interface SidebarRight {
   openResource(address: string): void
+  /**
+   * Open one registered page type, such as the browser. Optional because a host
+   * may predate the method, or never register the page type; callers fall back
+   * to a plain new tab then.
+   */
+  openTab?(kind: string, options?: { params?: Record<string, unknown> }): void
 }
 
 export interface ClientContext {

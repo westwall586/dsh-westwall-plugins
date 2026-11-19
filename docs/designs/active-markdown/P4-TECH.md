@@ -95,13 +95,13 @@
 | markmap | ✓ | ✓ | ✓ | ✓ | | ✓ | ✓ |
 | callout | | | | | | | ✓ |
 
-- 头部：左侧类型图标与标签（callout 用规范图标、类型名与标题），右侧 28×28、圆角 6 的图标按钮（16 网格、1.3 描边，与顶栏工具栏同一套画法），悬停 `--dsw-alias-bg-layer-3`。顺序固定为换行（仅 code）、复制、批注、全屏；能力关掉、没有可复制文本或视图只读时对应按钮不出现。面板里的全屏按钮换成关闭图标。
-- 图标：`client/src/rich/icons.tsx` 里的内联 SVG（`ExpandIcon`、`CloseIcon`、`CopyIcon`、`WrapIcon`、`AnnotateIcon`、`FitIcon`、`ActualIcon`），15–16px、`currentColor`、`stroke-width 1.7`，每个按钮都带 `aria-label` 与 `title`。
+- 头部：左侧类型图标与标签。callout 是例外：图标已经表达类型，头部只留语义图标 + 标题（有标题用标题，空标题用类型名兜底，标题 13px / 600），类型名放进 head 的 `title`，不丢信息。右侧 28×28、圆角 6 的图标按钮（16 网格、1.3 描边，与顶栏工具栏同一套画法），悬停 `--dsw-alias-bg-layer-3`。顺序固定为换行（仅 code）、复制、批注、全屏；能力关掉、没有可复制文本或视图只读时对应按钮不出现。面板里的全屏按钮换成关闭图标。
+- 图标：`client/src/rich/icons.tsx` 里的内联 SVG（`ExpandIcon`、`CollapseIcon`、`CloseIcon`、`CopyIcon`、`CheckIcon`、`WrapIcon`、`AnnotateIcon`、`FitIcon`、`ActualIcon`），14px、`currentColor`、`stroke-width 1.3`，每个按钮都带 `aria-label` 与 `title`。front matter 卡的复制按钮复用同一套。
 - 面板：遮罩 `rgba(0, 0, 0, 0.62)`；面板 `width: min(100%, clamp(940px, 72vw, 1600px))`、`height: min(100%, clamp(656px, 78vh, 1000px))`、14px 圆角、`--dsw-alias-bg-layer-1`。Esc、点遮罩与关闭按钮三条路径都关，打开时聚焦关闭按钮，关闭后焦点回到全屏按钮并恢复 `body` 滚动。
 - 底栏：只在 `zoom` 能力下出现，居中为 `−`、百分比、`+`、分隔线、「适配」与「实际大小」；百分比以适配为 100%。表格与代码的正文不挂底栏，也不铺点状底。
 - 点击放大：`clickToExpand` 的组件把内联正文设成 `role="button"`、`tabIndex=0`，点内容或按 Enter / Space 打开面板；代码与表格点击保持选区行为。
 - Callout：顶层引用首行是 `[!type]` 时识别。13 个规范类型、别名、label 与图标照抄组件规范的 `component.json`，映射到 7 个语义族；未知类型、`-`/`+` 折叠语法、列表内与嵌套引用都保持普通引用，读侧不报错。标题行去掉标记，剩余块照常渲染；`[!note] - 标题`（标记后有空格）仍算标题。视觉保留语义色，头部换进外壳的图标按钮，正文不进面板。批注落在 callout 整体，正文选区落在组件区间时按现有规则拒绝，只到组件级。
-- front matter：顶格 `key: value` 行拆成两列卡片，缩进续行并入上一条；不做 YAML 语义，原始文本仍可整块复制。
+- front matter：顶格 `key: value` 行拆成两列卡片，缩进续行并入上一条；不做 YAML 语义，原始文本仍可整块复制。复制入口是组件外壳同款的 24×24 图标按钮，复制后 1.6s 换成对勾，`aria-label` 与 `title` 同时变「已复制」。
 - 图片：点图（或聚焦后按 Enter / Space）开 `ImageLightbox`，Esc、遮罩与关闭按钮都能关，关闭后焦点回到图片。
 - 代码块：注入平台 `CodeBlock` 并传 `showHeader={false}`；头部的换行按钮切 `wrap`，默认不换行，状态只在组件本地，不入文档。
 - 颜色：family 到 token 的映射固定，样式只走 `--dsw-*` 与 `color-mix`，没有字面色值。
@@ -116,7 +116,7 @@
 | example | `--dsw-alias-state-done-primary` |
 | quote | `--dsw-alias-label-tertiary` |
 
-实测范围：`test/component-frame.test.ts` 按能力表断言四种组件的按钮顺序与图标集，`test/callout.test.ts` 覆盖 13 个规范类型、大小写、别名、未知类型、折叠语法、列表内与嵌套引用、空标题与行号，`test/blocks.test.ts` 覆盖 front matter 条目；`pnpm build` 产出 `client.js` 870,031 字节（850KB），低于 1.5 MiB 门。Web 端本轮未重做实测。
+实测范围：`test/component-frame.test.ts` 按能力表断言四种组件的按钮顺序与图标集，`test/callout.test.ts` 覆盖 13 个规范类型、大小写、别名、未知类型、折叠语法、列表内与嵌套引用、空标题、行号与「空标题回退类型名」的头部取词，`test/blocks.test.ts` 覆盖 front matter 条目；`pnpm build` 产出 `client.js` 876,265 字节（856KB），低于 1.5 MiB 门。Web 实测（2026-11-19 复核）：callout 头部只剩标题，`title` 属性是类型名，裸 `[!note]` 显示「说明」；front matter 复制按钮 24×24、点后换对勾且文案变「已复制」。
 
 ## 7. Mermaid
 
@@ -135,7 +135,7 @@
 两个图种在面板里共用同一条底栏：`−`、百分比、`+`、分隔线、「适配」、「实际大小」，百分比以适配为 100%。换算都在 `client/src/rich/stage-math.ts`（`fitTransform`、`actualTransform`、`fitPercent`、`actualFactor`），由 `test/stage-math.test.ts` 覆盖。
 
 - Mermaid：本插件驱动平移与缩放（`translate` + `scale`，滚轮以指针为中心）。「适配」用 `fitTransform` 重新算并把这次的 scale 记作 100%，「实际大小」用 `actualTransform` 回到 scale 1 并居中。
-- 导图：平移与滚轮缩放沿用 markmap 自带的 d3 zoom。chunk 在挂载时适配一次，把当时的 k 记为 `fitScale`；「适配」调 `fit()`，并在过渡结束后把 `fitScale` 更新为当前 k；「实际大小」调 `rescale(fitScale / k)`（`rescale` 是相对倍率），视图用 `k / fitScale` 显示百分比。
+- 导图：交互由 markmap 自带的 d3 zoom 承担，但按位置分成两种契约（`client/src/rich/markmap/options.ts` 的 `interactionOptions`）。内嵌形态关掉 `zoom` 与 `pan`，并让内嵌 SVG 不接收指针事件，于是滚轮交还页面、点击落到外壳上开全屏；全屏形态开 `zoom`、关 `pan`（markmap 的 `pan` 只是它自己的滚轮平移，拖拽平移仍来自 d3 zoom），并把 `scrollForPan` 显式设成 `false`——macOS 上它默认为真，会把滚轮当平移，不关就永远滚不到缩放。chunk 在挂载时适配一次，把当时的 k 记为 `fitScale`；「适配」调 `fit()`，并在过渡结束后把 `fitScale` 更新为当前 k；「实际大小」调 `rescale(1 / k)`（`rescale` 是相对倍率），视图用 `k / fitScale` 显示百分比。百分比监听挂 `map.zoom.on('zoom.scale-track')`：d3-zoom 的 `zoom` 事件走 behavior 自己的 dispatch，挂在元素上的同名 DOM 事件不会触发。d3 zoom 另加 `scaleExtent([0.1, 8])`，与 Mermaid 舞台的上下限一致。
 - 导图的标签裁切是 markmap 自身把每个标签盒设成 9999px 宽导致的，样式里改成 `max-content` 后测量与渲染一致。
 
 ## 8. 思维导图
@@ -144,10 +144,10 @@
 
 - 入口：代码块语言为 `markmap` / `mindmap` 时走导图，不吃 Mermaid 的图类型。
 - 转换：H1–H6 与嵌套列表转成 Markmap 的节点树；段落并入最近节点的描述行，用第一个换行分隔。转树是 `client/src/rich/tree.ts` 的纯函数，只读本插件块模型。
-- 视图：`markmap-view` 只读模式，初始展开层级 2，支持缩放与拖拽；节点文本先转义再加换行，不执行图内 HTML；分支色从 palette 的语义色取；单个顶层标题直接作为根节点，不再套一个空根；节点文字与连线颜色由 `svg.am-markmap-canvas` 上的 `--markmap-*` 变量从主题 token 重设（markmap 自带的深色文字会压到 0.1 的层级）。
+- 视图：`markmap-view` 只读模式，初始展开层级 2；内嵌形态不接收指针事件（滚轮归页面、点击归外壳），因此正文里不能折叠节点；全屏形态可折叠、滚轮缩放、拖拽平移（见 7.1）。节点文本先转义再加换行，不执行图内 HTML；分支色从 palette 的语义色取；单个顶层标题直接作为根节点，不再套一个空根；节点文字与连线颜色由 `svg.am-markmap-canvas` 上的 `--markmap-*` 变量从主题 token 重设（markmap 自带的深色文字会压到 0.1 的层级）。
 - 全屏：走组件框的统一弹框；打开时新挂一个导图实例，底栏与 Mermaid 同一套（见 7.1）。chunk 的 handle 暴露 `scale()`、`fitScale()`、`rescale()`、`fit()`，视图按 `k / fitScale` 显示百分比。批注：整个导图是一个组件，可复制源码。
 
-实测范围：`test/rich-trees.test.ts` 覆盖标题层级、列表嵌套、段落并入与多个 H1；`pnpm build` 产出 `client.markmap.js` 119,310 字节，低于 4 MiB 门；入口 `client.js` 里 `markmap-view`、`markmap-common`、`initialExpandLevel` 的 grep 计数都是 0。浏览器端的拖拽、折叠与明暗重渲染本轮未重做实测。
+实测范围：`test/rich-trees.test.ts` 覆盖标题层级、列表嵌套、段落并入与多个 H1，`test/markmap-options.test.ts` 断言两种形态的滚轮契约；`pnpm build` 产出 `client.markmap.js` 119,404 字节，低于 4 MiB 门；入口 `client.js` 里 `markmap-view`、`markmap-common`、`initialExpandLevel` 的 grep 计数都是 0。Web 实测（2026-11-19 复核）：内嵌滚轮让页面滚 300px 而图的 transform 不变，点击打开面板；全屏滚轮 k 1 → 2.789、底栏 100% → 139%，拖拽只改平移不改 k；「实际大小」k → 1、底栏 50%，「适配」回到 100%。暗色下的明暗重渲染本轮未重做。
 
 ## 9. 数学
 
@@ -199,7 +199,18 @@
 - 关闭：Esc（捕获阶段）、点遮罩、关闭按钮三条路径都关；打开时聚焦关闭按钮，关闭后焦点回到全屏按钮并恢复 `body` 滚动。
 - 实测范围：`test/component-frame.test.ts` 断言能力表、按钮顺序与图标集；本轮 `pnpm build` 入口 `client.js` 870,031 字节。Web 端本轮未重做实测：亮色与暗色下的面板、底栏与关闭后的焦点待验收。
 
-## 12. 风险与不做
+## 12. 桌面复核后的四项调整（2026-11-19）
+
+维护者在桌面端试用后提了四点，另外顺手修掉两个实测暴露的 P4 遗留问题。
+
+- 编辑工具栏顺序：保存与退出对调，主按钮固定在最右，与工具栏其它位置（「加入对话」在右端）一致；Esc 仍是退出、`Mod-s` 仍是保存，行为不变。Web 实测：编辑态按钮依次为「退出」「保存」，`x` 分别是 1809 与 1861。
+- front matter 复制：文字按钮换成组件外壳同款的图标按钮，见第 6 节。
+- Callout 头部：去掉类型文字，只留图标 + 标题，见第 6 节。
+- 导图交互对齐 Mermaid：内嵌不吃滚轮、点击进全屏；全屏滚轮缩放、拖拽平移，见 7.1 与第 8 节。
+- 底栏百分比不跟随缩放：chunk 原来把监听挂在 `map.svg.on('zoom.scale-track')` 上，而 d3-zoom 的 `zoom` 事件走 behavior 自己的 dispatch，元素上收不到，底栏因此一直停在 100%。改挂 `map.zoom.on('zoom.scale-track')` 后实测跟随。
+- 「实际大小」回到自然尺寸：markmap 的 `rescale()` 是相对倍率，原实现乘 `fitScale / k`，落到「回到适配」而不是「回到 1」；`actualFactor` 改成 `1 / k` 并同步改测试与调用点，实测 k 3.125 → 1、百分比 156% → 50%（该图适配在 200%）。
+
+## 13. 风险与不做
 
 - **产物变大**：`client.mermaid.js` 3.2MB（gzip 约 887KB）与 `client.markmap.js` 116KB（gzip 约 39KB）入库；构建时间与仓库体积上涨，换来首屏零成本。
 - **隐式依赖**：数学的字来自 shell 全局 CSS。shell 若换渲染方案，公式会退到系统衬线；兜底方案是 chunk 内联字体（+296KB 原始字体）。

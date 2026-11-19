@@ -65,6 +65,9 @@
 
 .am-doc {
   position: relative;
+  max-width: 44em;
+  margin-inline: auto;
+  text-spacing-trim: trim-start;
 }
 
 .am-heading {
@@ -136,6 +139,122 @@
 }
 
 .am-quote > :last-child {
+  margin-bottom: 0;
+}
+
+/* Callouts are quotes with one semantic edge; the family token drives edge and wash.
+   Info is the fallback family, so its token is the base value. */
+.am-callout {
+  --am-callout-accent: var(--dsw-alias-state-business-primary);
+  margin: 1em 0;
+  padding: 10px 14px 12px;
+  border-left: 3px solid var(--am-callout-accent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--am-callout-accent) 8%, transparent);
+}
+
+.am-callout[data-family='abstract'] {
+  --am-callout-accent: var(--dsw-alias-link);
+}
+
+.am-callout[data-family='success'] {
+  --am-callout-accent: var(--dsw-alias-state-success-primary);
+}
+
+.am-callout[data-family='warning'] {
+  --am-callout-accent: var(--dsw-alias-state-warn-primary);
+}
+
+.am-callout[data-family='danger'] {
+  --am-callout-accent: var(--dsw-alias-state-error-primary);
+}
+
+.am-callout[data-family='example'] {
+  --am-callout-accent: var(--dsw-alias-state-done-primary);
+}
+
+.am-callout[data-family='quote'] {
+  --am-callout-accent: var(--dsw-alias-label-tertiary);
+}
+
+.am-callout-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.am-callout-icon {
+  display: inline-flex;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--am-callout-accent);
+}
+
+.am-callout-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.am-callout-type {
+  flex: none;
+  color: var(--am-callout-accent);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.am-callout-title {
+  min-width: 0;
+  font-weight: 600;
+}
+
+.am-callout-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding-left: 8px;
+}
+
+.am-callout-seq {
+  color: var(--am-callout-accent);
+  font-size: 11px;
+}
+
+/* The annotation entry waits until the reader points at the callout. */
+.am-callout-action {
+  padding: 1px 6px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.am-callout:hover .am-callout-action,
+.am-callout:focus-within .am-callout-action {
+  opacity: 1;
+}
+
+.am-callout-action:hover {
+  border-color: var(--dsw-alias-border-l2);
+  color: var(--dsw-alias-label-primary);
+}
+
+.am-callout-body {
+  margin-top: 4px;
+}
+
+.am-callout-body > :first-child {
+  margin-top: 0;
+}
+
+.am-callout-body > :last-child {
   margin-bottom: 0;
 }
 
@@ -232,6 +351,11 @@
   white-space: pre;
 }
 
+.am-code-body[data-wrap] {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .am-table-wrap {
   margin: 1em 0;
   overflow-x: auto;
@@ -273,6 +397,12 @@
   max-width: 100%;
   margin: 0.35em 0;
   border-radius: 8px;
+  cursor: zoom-in;
+}
+
+.am-image img:focus-visible {
+  outline: 2px solid var(--dsw-alias-link);
+  outline-offset: 2px;
 }
 
 .am-image-pending,
@@ -356,32 +486,69 @@
 }
 
 .am-frontmatter {
-  margin: 0 0 1.4em;
+  max-width: 44em;
+  margin: 0 auto 1.4em;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 8px;
   overflow: hidden;
   background: var(--dsw-alias-bg-layer-1);
 }
 
-.am-frontmatter-label {
-  padding: 5px 12px;
+.am-frontmatter-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px 5px 12px;
   border-bottom: 1px solid var(--dsw-alias-border-l1);
   background: var(--dsw-alias-bg-layer-2);
+}
+
+.am-frontmatter-label {
   color: var(--dsw-alias-label-tertiary);
   font-size: 11px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
-.am-frontmatter-source {
+.am-frontmatter-copy {
+  margin-left: auto;
+  padding: 1px 6px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.am-frontmatter-copy:hover {
+  border-color: var(--dsw-alias-border-l2);
+  color: var(--dsw-alias-label-primary);
+}
+
+.am-frontmatter-grid {
+  display: grid;
+  grid-template-columns: minmax(72px, max-content) 1fr;
+  gap: 6px 16px;
   margin: 0;
   padding: 10px 12px;
-  overflow-x: auto;
+}
+
+.am-frontmatter-grid dt {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+}
+
+.am-frontmatter-grid dd {
+  margin: 0;
+  min-width: 0;
   color: var(--dsw-alias-label-secondary);
   font-family: var(--dsh-font-family-code);
   font-size: 12px;
   line-height: 1.55;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* The view row bleeds to the pane edges so it reads as chrome, not as content. */

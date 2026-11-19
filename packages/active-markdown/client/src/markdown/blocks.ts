@@ -1,9 +1,10 @@
 /** The block tree: source lines, ids, heading paths, and plain text for every block. */
 import {
   blockText, hashText, inlineText, slugify,
-  type Block, type CodeBlock, type DividerBlock, type HeadingBlock, type ListBlock, type ListItem,
-  type ParagraphBlock, type QuoteBlock, type TableBlock, type TableCell,
+  type Block, type CalloutBlock, type CodeBlock, type DividerBlock, type HeadingBlock, type ListBlock,
+  type ListItem, type ParagraphBlock, type QuoteBlock, type TableBlock, type TableCell,
 } from './model.ts'
+import { resolveCallout, type CalloutType } from './callout.ts'
 import { inlineOf, parseMarkdown, splitFrontmatter, type Frontmatter, type Token } from './parse.ts'
 
 /** A whole parsed document, front matter included. */
@@ -33,7 +34,7 @@ export function parseDocument(text: string): ParsedDocument {
     counters: new Map(),
     anchors: new Set(),
   }
-  return { frontmatter: split.frontmatter, blocks: buildBlocks(tokens, 0, tokens.length, context) }
+  return { frontmatter: split.frontmatter, blocks: buildBlocks(tokens, 0, tokens.length, context, true) }
 }
 
 /** 1-based inclusive source lines of one token. */
@@ -82,8 +83,49 @@ function inlineAfter(tokens: readonly Token[], open: number): Token[] | null | u
   return next?.type === 'inline' ? next.children : undefined
 }
 
-/** Build the blocks of one token range, sharing id and anchor counters. */
-function buildBlocks(tokens: readonly Token[], start: number, end: number, context: BuildContext): Block[] {
+/** `[!type] title`, anchored to the start of the quote's opening line. */
+const CALLOUT_MARKER = /^\[!([A-Za-z][A-Za-z0-9-]*)\](.*)$/
+
+/** Read the callout marker from the opening paragraph of one quote; undefined for a plain quote. */
+function calloutHeadOf(tokens: readonly Token[], open: number): { type: CalloutType, title: string } | undefined {
+  if (tokens[open + 1]?.type !== 'paragraph_open') return undefined
+  const inline = tokens[open + 2]
+  if (inline?.type !== 'inline') return undefined
+  const firstLine = inline.content.split('\n', 1)[0] ?? ''
+  const match = CALLOUT_MARKER.exec(firstLine)
+  if (match === null) return undefined
+  const rest: string = match[2]
+  // Obsidian binds `-`/`+` straight to the marker to fold the block; keep those quotes.
+  if (rest.startsWith('-') || rest.startsWith('+')) return undefined
+  const type = resolveCallout(match[1])
+  if (type === undefined) return undefined
+  return { type, title: rest.trim() }
+}
+
+/** Shallow-copy one parser token, keeping the prototype methods `attrGet` and friends live. */
+function patchToken(token: Token, patch: Partial<Token>): Token {
+  return Object.assign(Object.create(Object.getPrototypeOf(token)) as Token, token, patch)
+}
+
+/** Build the callout body: the quote's blocks without the marker line. */
+function calloutChildren(tokens: readonly Token[], open: number, close: number, context: BuildContext): Block[] {
+  const paragraph = tokens[open + 1]
+  const inline = tokens[open + 2]
+  const children = inline.children ?? []
+  const breakAt = children.findIndex(child => child.type === 'softbreak' || child.type === 'hardbreak')
+  // A marker-only paragraph leaves the remaining blocks untouched.
+  if (breakAt === -1) return buildBlocks(tokens, open + 4, close, context)
+  const startLine = (paragraph.map?.[0] ?? 0) + 1
+  const patched: Token[] = [
+    patchToken(paragraph, { map: [startLine, paragraph.map?.[1] ?? startLine] }),
+    patchToken(inline, { children: children.slice(breakAt + 1) }),
+    ...tokens.slice(open + 3, close),
+  ]
+  return buildBlocks(patched, 0, patched.length, context)
+}
+
+/** Build the blocks of one token range, sharing id and anchor counters; callouts only at the top level. */
+function buildBlocks(tokens: readonly Token[], start: number, end: number, context: BuildContext, allowCallout = false): Block[] {
   const blocks: Block[] = []
   let index = start
   while (index < end) {
@@ -151,6 +193,25 @@ function buildBlocks(tokens: readonly Token[], start: number, end: number, conte
       }
       case 'blockquote_open': {
         const close = matching(tokens, index, 'blockquote_open', 'blockquote_close')
+        const head = allowCallout ? calloutHeadOf(tokens, index) : undefined
+        if (head !== undefined) {
+          const children = calloutChildren(tokens, index, close, { ...context, headingPath: [...context.headingPath] })
+          const text = [head.title, ...children.map(blockText)].filter(part => part !== '').join('\n')
+          const block: CalloutBlock = {
+            id: makeId(context, 'callout', text),
+            type: 'callout',
+            ...linesOf(token, context),
+            headingPath: [...context.headingPath],
+            text,
+            kind: head.type.id,
+            family: head.type.family,
+            title: head.title,
+            blocks: children,
+          }
+          blocks.push(block)
+          index = close + 1
+          break
+        }
         const children = buildBlocks(tokens, index + 1, close, { ...context, headingPath: [...context.headingPath] })
         const text = children.map(blockText).join('\n')
         const block: QuoteBlock = {

@@ -92,11 +92,11 @@ export function collectLineAtoms(blocks: readonly Block[]): TextLineAtom[] {
   return atoms
 }
 
-/** 表格与代码块占用的源行区间；文本选区跨到它们就拒绝。 */
+/** Source-line ranges held by components; a text selection that reaches one is refused. */
 export function collectComponentRanges(blocks: readonly Block[]): ComponentRange[] {
   const ranges: ComponentRange[] = []
   walkBlocks(blocks, (block) => {
-    if (block.type !== 'code' && block.type !== 'table') return
+    if (block.type !== 'code' && block.type !== 'table' && block.type !== 'callout') return
     ranges.push({ blockId: block.id, lineStart: block.sourceStartLine, lineEnd: block.sourceEndLine })
   })
   return ranges

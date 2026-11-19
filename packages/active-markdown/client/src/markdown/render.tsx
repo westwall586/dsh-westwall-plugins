@@ -1,10 +1,12 @@
 /** Render the block tree as themed React elements. */
 import * as React from 'react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { ImageLightbox } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { Inline, Block, ListItem } from './model.ts'
 import { componentOf } from './model.ts'
 import type { DiffStatus, DocumentDiff } from './diff.ts'
 import { ComponentFrame } from './component-frame.tsx'
+import { resolveCallout } from './callout.ts'
 import { splitSourceLines, type SourceLine } from './lines.ts'
 import { isRemoteSource } from '../images.ts'
 
@@ -13,8 +15,14 @@ export interface RenderLabels {
   copy: string
   copied: string
   imageFailed: string
+  imageDialog: string
+  imageClose: string
   annotate: string
   edit: string
+  wrap: string
+  nowrap: string
+  /** One callout type's localized label. */
+  calloutType: (id: string) => string
 }
 
 /** Side effects the view delegates to the body. */
@@ -101,12 +109,20 @@ function renderBlock(
           diff={status}
           {...(components.annotate === undefined ? {} : { annotate: components.annotate })}
           label={components.labelOf(block)}
-          labels={{ annotate: labels.annotate, edit: labels.edit, copy: labels.copy, copied: labels.copied }}
+          labels={{
+            annotate: labels.annotate,
+            edit: labels.edit,
+            copy: labels.copy,
+            copied: labels.copied,
+            wrap: labels.wrap,
+            nowrap: labels.nowrap,
+          }}
         >
-          {block.type === 'table' ? renderTable(block, key, labels, actions) : renderCode(block)}
+          {block.type === 'table' ? renderTable(block, key, labels, actions) : wrap => renderCode(block, wrap)}
         </ComponentFrame>
       )
     }
+    case 'callout': return renderCallout(block, key, labels, actions, components, status)
     case 'list': {
       const items = block.items.map((item, index) => renderItem(item, `${key}-i${index}`, labels, actions, components))
       return block.ordered
@@ -137,6 +153,61 @@ function renderItem(
   )
 }
 
+/** A callout keeps the component shell's annotation rules but its own header. */
+function renderCallout(
+  block: Extract<Block, { type: 'callout' }>,
+  key: string,
+  labels: RenderLabels,
+  actions: RenderActions,
+  components: ComponentContext,
+  status?: DiffStatus,
+): ReactNode {
+  const type = resolveCallout(block.kind)
+  if (type === undefined) return null
+  const annotate = components.annotate
+  const annotation = components.annotationOf(block)
+  return (
+    <section
+      key={key}
+      className="am-callout"
+      data-component="callout"
+      data-block-id={block.id}
+      data-block-type="callout"
+      data-source-line={block.sourceStartLine}
+      data-family={block.family}
+      data-annotated={annotation === undefined ? undefined : ''}
+      data-diff={status}
+    >
+      <div className="am-callout-head">
+        <span className="am-callout-icon" aria-hidden="true" dangerouslySetInnerHTML={{ __html: type.icon }} />
+        <span className="am-callout-type">{labels.calloutType(block.kind)}</span>
+        {block.title === '' ? null : <span className="am-callout-title">{block.title}</span>}
+        {annotation === undefined && annotate === undefined
+          ? null
+          : (
+            <div className="am-callout-actions">
+              {annotation === undefined ? null : <span className="am-callout-seq">#{annotation.seq}</span>}
+              {annotate === undefined
+                ? null
+                : (
+                  <button type="button" className="am-callout-action" onClick={() => annotate(block)}>
+                    {annotation === undefined ? labels.annotate : labels.edit}
+                  </button>
+                )}
+            </div>
+          )}
+      </div>
+      {block.blocks.length === 0
+        ? null
+        : (
+          <div className="am-callout-body">
+            {block.blocks.map((child, index) => renderBlock(child, `${key}-c${index}`, labels, actions, components))}
+          </div>
+        )}
+    </section>
+  )
+}
+
 function renderTable(
   block: Extract<Block, { type: 'table' }>,
   key: string,
@@ -153,11 +224,11 @@ function renderTable(
   )
 }
 
-function renderCode(block: Extract<Block, { type: 'code' }>): ReactNode {
+function renderCode(block: Extract<Block, { type: 'code' }>, wrap: boolean): ReactNode {
   const lines = block.content.split('\n')
   const firstLine = block.sourceStartLine + (block.fence ? 1 : 0)
   return (
-    <pre className="am-code-body"><code>
+    <pre className="am-code-body" data-wrap={wrap ? '' : undefined}><code>
       {lines.map((line, index) => (
         <React.Fragment key={index}>
           <span className="am-code-line" data-line={firstLine + index}>{line}</span>
@@ -229,6 +300,7 @@ function InlineImage({ src, alt, title, labels, actions }: InlineImageProps): Re
   const [url, setUrl] = useState<string | undefined>(remote ? src : undefined)
   const [visible, setVisible] = useState(remote)
   const [failed, setFailed] = useState(false)
+  const [zoom, setZoom] = useState(false)
   const holder = useRef<HTMLSpanElement | null>(null)
   useEffect(() => {
     if (remote || holder.current === null) return
@@ -251,11 +323,44 @@ function InlineImage({ src, alt, title, labels, actions }: InlineImageProps): Re
     return () => { alive = false }
   }, [visible, url, src, actions])
   if (failed) return <span className="am-image-failed">{alt === '' ? labels.imageFailed : alt}</span>
+  const open = (image: HTMLImageElement): void => {
+    image.focus()
+    setZoom(true)
+  }
   return (
     <span ref={holder} className="am-image">
       {url === undefined
         ? <span className="am-image-pending">{alt}</span>
-        : <img src={url} alt={alt} title={title} loading="lazy" onError={() => setFailed(true)} />}
+        : (
+          <React.Fragment>
+            <img
+              src={url}
+              alt={alt}
+              title={title}
+              loading="lazy"
+              role="button"
+              tabIndex={0}
+              aria-label={alt === '' ? labels.imageDialog : undefined}
+              onClick={event => open(event.currentTarget)}
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return
+                event.preventDefault()
+                open(event.currentTarget)
+              }}
+              onError={() => setFailed(true)}
+            />
+            {zoom
+              ? (
+                <ImageLightbox
+                  src={url}
+                  alt={alt}
+                  labels={{ dialog: labels.imageDialog, close: labels.imageClose }}
+                  onClose={() => setZoom(false)}
+                />
+              )
+              : null}
+          </React.Fragment>
+        )}
     </span>
   )
 }

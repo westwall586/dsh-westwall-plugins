@@ -42,6 +42,31 @@ export function parseMarkdown(body: string): Token[] {
   return parser.parse(body, {})
 }
 
+/**
+ * Split one front matter block into display entries. This is a line scan, not
+ * YAML: top-level `key: value` lines become entries and indented lines continue
+ * the previous value.
+ * @param source - the front matter text between the `---` markers.
+ * @returns the entries in source order; lines without a colon are ignored.
+ */
+export function frontmatterEntries(source: string): { key: string, value: string }[] {
+  const entries: { key: string, value: string }[] = []
+  for (const line of source.split('\n')) {
+    if (line.trim() === '') continue
+    const previous = entries[entries.length - 1]
+    if (/^\s/.test(line)) {
+      if (previous === undefined) continue
+      const continued = line.trim()
+      previous.value = previous.value === '' ? continued : `${previous.value}\n${continued}`
+      continue
+    }
+    const colon = line.indexOf(':')
+    if (colon <= 0) continue
+    entries.push({ key: line.slice(0, colon).trim(), value: line.slice(colon + 1).trim() })
+  }
+  return entries
+}
+
 /** A frame while walking the flat inline stream. */
 interface InlineFrame {
   children: Inline[]

@@ -85,11 +85,24 @@
 
 ## 6. 富组件
 
-- Callout：一级引用块首行是 `[!type]` 时识别，类型映射到语义色（note / tip / important / warning / caution），标题行去掉标记，剩余块照常渲染；批注落在 callout 整体。
-- front matter：按 `key: value` 行拆成两列表，值原样显示（不做 YAML 语义解释）；原文本仍可复制。
-- 图片：点击开 `ImageLightbox`，关闭恢复焦点。
-- 代码块：头部加换行开关（`white-space: pre-wrap` 切换），状态只在本地，不入文档。
-- 组件框：callout / math / mermaid / markmap 都走 `ComponentFrame`，标签与批注入口沿用现有文案。
+已实现（P4b）。实测范围：`test/callout.test.ts` 覆盖 13 个规范类型、大小写、别名、未知类型、折叠语法、列表内与嵌套引用、空标题、`-` 开头的标题、标记行与正文同段时的切分与行号；`test/blocks.test.ts` 覆盖 front matter 条目（续行、空行、无冒号行）。`pnpm build` 产出 `client.js` 842KB，低于 1.5 MiB 门。明暗、窄栏、全屏三形态的观感，以及图片放大与代码换行的交互，尚未在浏览器实测。
+
+- Callout：顶层引用首行是 `[!type]` 时识别。13 个规范类型、别名、label 与图标照抄组件规范的 `component.json`，映射到 7 个语义族；未知类型、`-`/`+` 折叠语法、列表内与嵌套引用都保持普通引用，读侧不报错。标题行去掉标记，剩余块照常渲染；`[!note] - 标题`（标记后有空格）仍算标题。批注落在 callout 整体，正文选区落在组件区间时按现有规则拒绝，只到组件级。
+- front matter：顶格 `key: value` 行拆成两列卡片，缩进续行并入上一条；不做 YAML 语义，原始文本仍可整块复制。
+- 图片：点图（或聚焦后按 Enter / Space）开 `ImageLightbox`，Esc、遮罩与关闭按钮都能关，关闭后焦点回到图片。
+- 代码块：头部加「换行 / 不换行」开关，作用到 `.am-code-body[data-wrap]`；默认不换行，状态只在组件本地，不入文档。
+- 组件框：callout 用自己的 `section.am-callout` 头部（图标、类型名、标题），保留 `data-component` 锚点与组件级批注入口；math / mermaid / markmap 仍按各自阶段接入 `ComponentFrame`。
+- 颜色：family 到 token 的映射固定，样式只走 `--dsw-*` 与 `color-mix`，没有字面色值。
+
+| family | token |
+|---|---|
+| info | `--dsw-alias-state-business-primary` |
+| abstract | `--dsw-alias-link` |
+| success | `--dsw-alias-state-success-primary` |
+| warning | `--dsw-alias-state-warn-primary` |
+| danger | `--dsw-alias-state-error-primary` |
+| example | `--dsw-alias-state-done-primary` |
+| quote | `--dsw-alias-label-tertiary` |
 
 ## 7. Mermaid
 
@@ -116,10 +129,12 @@
 
 ## 10. 排版
 
+已实现（P4b）的阅读宽度与中文标点部分。正文与 front matter 卡都是 `max-width: 44em` 居中，`.am-doc` 加 `text-spacing-trim: trim-start`；字阶、行高与标题层级不动。窄栏下 44em 大于可用宽度，观感与改动前一致；全屏下正文不再随窗口拉长。明暗、窄栏、全屏三形态复核与 200 段计时还没做，作为 P4f 的验收项。
+
 - 正文宽度：窄栏与全屏都限制阅读宽度，超出时居中；不与目录浮层抢位。
 - 字阶与行高：沿用 `--dsh-content-font-size` 与 1.7 行高，标题层级在 P3 已调过，本轮只补段间距与列表缩进。
-- 中文标点：`text-spacing-trim` / 引号与省略号不换行首，纯 CSS，不做文本改写。
-- 复核：明暗、窄栏、全屏三形态各看一遍；200 段文档计时。
+- 中文标点：`text-spacing-trim: trim-start`，纯 CSS，不做文本改写。
+- 复核：明暗、窄栏、全屏三形态各看一遍；200 段文档计时（待 P4f）。
 
 ## 11. 风险与不做
 

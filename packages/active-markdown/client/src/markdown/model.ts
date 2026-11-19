@@ -1,4 +1,5 @@
 /** The block model P0 renders and later phases annotate. */
+import { calloutLabel, resolveCallout, type CalloutFamily, type CalloutType } from './callout.ts'
 
 export type ComponentKind = 'table' | 'code' | 'callout' | 'mermaid' | 'markmap'
 
@@ -22,6 +23,7 @@ export const COMPONENT_REGISTRY: Record<ComponentKind, ComponentDefinition> = {
 export type ComponentLabel =
   | { kind: 'table', columns: number, rows: number }
   | { kind: 'code', lang: string }
+  | { kind: 'callout', type: CalloutType }
 
 export interface ComponentView {
   kind: ComponentKind
@@ -113,11 +115,22 @@ export interface QuoteBlock extends BlockBase {
   blocks: Block[]
 }
 
+export interface CalloutBlock extends BlockBase {
+  type: 'callout'
+  /** Canonical type id from `CALLOUT_TYPES`. */
+  kind: string
+  family: CalloutFamily
+  /** The marker line's remaining text; may be empty. */
+  title: string
+  blocks: Block[]
+}
+
 export interface DividerBlock extends BlockBase {
   type: 'divider'
 }
 
-export type Block = HeadingBlock | ParagraphBlock | CodeBlock | TableBlock | ListBlock | QuoteBlock | DividerBlock
+export type Block =
+  | HeadingBlock | ParagraphBlock | CodeBlock | TableBlock | ListBlock | QuoteBlock | CalloutBlock | DividerBlock
 
 /** Concatenate the readable text of one inline tree. */
 export function inlineText(inlines: readonly Inline[]): string {
@@ -147,6 +160,7 @@ export function blockText(block: Block): string {
     case 'table': return [...block.header, ...block.rows.flat()].map(cell => inlineText(cell.inline)).join(' | ')
     case 'list': return block.items.map(item => item.text).join('\n')
     case 'quote': return block.blocks.map(blockText).join('\n')
+    case 'callout': return [block.title, ...block.blocks.map(blockText)].filter(part => part !== '').join('\n')
     case 'divider': return ''
   }
 }
@@ -175,8 +189,8 @@ export function hashText(text: string): string {
 
 /**
  * Project one block onto its component shell; text blocks have no frame.
- * Callout/Mermaid/Markmap blocks do not exist in the parser yet, so the registry
- * entry is the only thing future kinds need to fill in.
+ * Mermaid and Markmap blocks do not exist in the parser yet, so their registry
+ * entries are the only thing those future kinds need to fill in.
  */
 export function componentOf(block: Block): ComponentView | null {
   switch (block.type) {
@@ -199,6 +213,18 @@ export function componentOf(block: Block): ComponentView | null {
         actions: COMPONENT_REGISTRY.code.actions,
         copyText: block.content,
       }
+    case 'callout': {
+      const type = resolveCallout(block.kind)
+      if (type === undefined) return null
+      return {
+        kind: 'callout',
+        label: { kind: 'callout', type },
+        signature: `callout:${block.kind}:${hashText(block.text)}:${block.text.length}`,
+        lineStart: block.sourceStartLine,
+        lineEnd: block.sourceEndLine,
+        actions: COMPONENT_REGISTRY.callout.actions,
+      }
+    }
     default:
       return null
   }
@@ -211,5 +237,7 @@ export function componentLabel(view: ComponentView, format: (key: string, params
       return format('component.table', { columns: view.label.columns, rows: view.label.rows })
     case 'code':
       return format('component.code', { lang: view.label.lang === '' ? 'text' : view.label.lang })
+    case 'callout':
+      return format('component.callout', { type: calloutLabel(view.label.type, format) })
   }
 }

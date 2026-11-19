@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { parseDocument } from '../client/src/markdown/blocks.ts'
-import { splitFrontmatter } from '../client/src/markdown/parse.ts'
+import { frontmatterEntries, splitFrontmatter } from '../client/src/markdown/parse.ts'
 
 const DOC = `---
 title: Demo
@@ -94,4 +94,29 @@ test('同名标题有不同锚点', () => {
   const { blocks } = parseDocument('# 同名\n\n# 同名\n')
   const anchors = blocks.filter(block => block.type === 'heading').map(block => block.anchor)
   assert.deepEqual(anchors, ['同名', '同名-2'])
+})
+
+test('front matter 拆成 key/value 条目，缩进续行并入上一条', () => {
+  const entries = frontmatterEntries([
+    'title: Demo',
+    'tags:',
+    '  - a',
+    '  - b',
+    '',
+    '没有冒号的行',
+    'draft: true',
+    'link: https://example.com/x',
+  ].join('\n'))
+  assert.deepEqual(entries, [
+    { key: 'title', value: 'Demo' },
+    { key: 'tags', value: '- a\n- b' },
+    { key: 'draft', value: 'true' },
+    { key: 'link', value: 'https://example.com/x' },
+  ])
+})
+
+test('没有上一条时缩进行被忽略，空 key 不成条目', () => {
+  assert.deepEqual(frontmatterEntries('  孤立的缩进行\n: 空 key\nname: 值'), [
+    { key: 'name', value: '值' },
+  ])
 })

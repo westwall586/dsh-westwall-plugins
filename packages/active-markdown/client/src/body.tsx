@@ -60,9 +60,11 @@ import { dirty as draftDirty, editReduce, sessionOf, type EditEvent, type EditSt
 import { createImageResolver, type ImageResolver } from './images.ts'
 import { classifyLink } from './links.ts'
 import { parseDocument, type ParsedDocument } from './markdown/blocks.ts'
+import { calloutLabel, resolveCallout } from './markdown/callout.ts'
 import { diffBlocks, tocEntries, updatedSections, type DocumentDiff } from './markdown/diff.ts'
 import { componentLabel, componentOf, type Block } from './markdown/model.ts'
-import { MarkdownView, type ComponentContext } from './markdown/render.tsx'
+import { frontmatterEntries } from './markdown/parse.ts'
+import { MarkdownView, type ComponentContext, type RenderLabels } from './markdown/render.tsx'
 import { MarkdownToc } from './markdown/toc.tsx'
 import { activeAnchorOf, tocRows } from './markdown/toc-model.ts'
 import {
@@ -734,8 +736,16 @@ export function Body({
     copy: t('code.copy'),
     copied: t('code.copied'),
     imageFailed: t('image.failed'),
+    imageDialog: t('image.dialog'),
+    imageClose: t('image.close'),
     annotate: t('component.annotate'),
     edit: t('component.edit'),
+    wrap: t('code.wrap'),
+    nowrap: t('code.nowrap'),
+    calloutType: (id: string): string => {
+      const type = resolveCallout(id)
+      return type === undefined ? id : calloutLabel(type, t)
+    },
   }), [t])
 
   const reload = useCallback(() => { rendererRef.current?.reload() }, [])
@@ -2541,7 +2551,7 @@ export function Body({
 
 interface DocumentViewProps {
   parsed: ParsedDocument
-  labels: { copy: string, copied: string, imageFailed: string, annotate: string, edit: string }
+  labels: RenderLabels
   actions: { openLink(href: string): void, resolveImage(src: string): Promise<string | undefined> }
   components: ComponentContext
   t: Translate
@@ -2552,14 +2562,51 @@ interface DocumentViewProps {
 function DocumentView({ parsed, labels, actions, components, t, diff }: DocumentViewProps): ReactNode {
   return (
     <>
-      {parsed.frontmatter === undefined ? null : (
-        <section className="am-frontmatter" data-active-markdown-frontmatter>
-          <div className="am-frontmatter-label">{t('frontmatter')}</div>
-          <pre className="am-frontmatter-source">{parsed.frontmatter.source}</pre>
-        </section>
-      )}
+      {parsed.frontmatter === undefined
+        ? null
+        : <FrontmatterCard source={parsed.frontmatter.source} labels={{ title: t('frontmatter'), copy: labels.copy, copied: labels.copied }} />}
       <MarkdownView blocks={parsed.blocks} labels={labels} actions={actions} components={components} diff={diff} />
     </>
+  )
+}
+
+interface FrontmatterCardProps {
+  source: string
+  labels: { title: string, copy: string, copied: string }
+}
+
+/** Show front matter as a key/value card; the raw block stays one click away. */
+function FrontmatterCard({ source, labels }: FrontmatterCardProps): ReactNode {
+  const entries = useMemo(() => frontmatterEntries(source), [source])
+  const [copied, setCopied] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  useEffect(() => () => clearTimeout(timer.current), [])
+  const copy = (): void => {
+    void navigator.clipboard?.writeText(source).then(() => {
+      setCopied(true)
+      clearTimeout(timer.current)
+      timer.current = setTimeout(() => setCopied(false), 1600)
+    }).catch(() => {})
+  }
+  return (
+    <section className="am-frontmatter" data-active-markdown-frontmatter>
+      <div className="am-frontmatter-head">
+        <span className="am-frontmatter-label">{labels.title}</span>
+        <button type="button" className="am-frontmatter-copy" onClick={copy}>{copied ? labels.copied : labels.copy}</button>
+      </div>
+      {entries.length === 0
+        ? null
+        : (
+          <dl className="am-frontmatter-grid">
+            {entries.map((entry, index) => (
+              <React.Fragment key={index}>
+                <dt>{entry.key}</dt>
+                <dd>{entry.value}</dd>
+              </React.Fragment>
+            ))}
+          </dl>
+        )}
+    </section>
   )
 }
 

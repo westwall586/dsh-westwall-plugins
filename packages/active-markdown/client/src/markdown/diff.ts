@@ -101,6 +101,8 @@ function blockKey(block: Block): string {
       ])
     case 'quote':
       return JSON.stringify(['quote', block.blocks.map(blockKey)])
+    case 'callout':
+      return JSON.stringify(['callout', block.kind, block.title, block.blocks.map(blockKey)])
     case 'divider':
       return JSON.stringify(['divider'])
   }

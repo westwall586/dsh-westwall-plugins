@@ -14,8 +14,9 @@ export interface ComponentFrameProps {
   /** Absent in the translated view, where annotations are read-only. */
   annotate?: (block: Block) => void
   label: string
-  labels: { annotate: string, edit: string, copy: string, copied: string }
-  children: ReactNode
+  labels: { annotate: string, edit: string, copy: string, copied: string, wrap: string, nowrap: string }
+  /** The frame body; a code block receives its local wrap state instead of a fixed child. */
+  children: ReactNode | ((wrap: boolean) => ReactNode)
 }
 
 /**
@@ -33,6 +34,7 @@ export function ComponentFrame({
   children,
 }: ComponentFrameProps): ReactNode {
   const [copied, setCopied] = useState(false)
+  const [wrap, setWrap] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const copy = useCallback(() => {
     if (component.copyText === undefined) return
@@ -58,6 +60,13 @@ export function ComponentFrame({
         <span className="am-component-label">{label}</span>
         {annotation === undefined ? null : <span className="am-component-seq">#{annotation.seq}</span>}
         <div className="am-component-actions">
+          {component.kind === 'code'
+            ? (
+              <button type="button" className="am-component-action" aria-pressed={wrap} onClick={() => setWrap(value => !value)}>
+                {wrap ? labels.nowrap : labels.wrap}
+              </button>
+            )
+            : null}
           {annotate === undefined
             ? null
             : (
@@ -70,7 +79,7 @@ export function ComponentFrame({
             : null}
         </div>
       </div>
-      <div className="am-component-body">{children}</div>
+      <div className="am-component-body">{typeof children === 'function' ? children(wrap) : children}</div>
     </div>
   )
 }

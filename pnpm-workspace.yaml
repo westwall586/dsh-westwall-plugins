@@ -11,3 +11,5 @@ autoInstallPeers: false
 allowBuilds:
   # feed-ultra 用 esbuild 打浏览器半体（client.js）。
   esbuild: true
+minimumReleaseAgeExclude:
+  - '@deepseek-ai/dsh-client-ui-primitives@0.2.2-rc.5'

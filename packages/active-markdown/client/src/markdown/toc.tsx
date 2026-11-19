@@ -82,8 +82,8 @@ export function MarkdownToc({
               {...(isUpdated ? { title: updatedLabel, 'aria-label': `${row.text} · ${updatedLabel}` } : {})}
               onClick={() => onJump(row.anchor)}
             >
-              {isUpdated ? <span className="am-toc-dot" aria-hidden="true" /> : null}
               <span className="am-toc-text">{row.text}</span>
+              {isUpdated ? <span className="am-toc-dot" aria-hidden="true" /> : null}
             </button>
           </div>
         )

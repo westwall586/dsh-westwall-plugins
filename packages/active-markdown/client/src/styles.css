@@ -21,12 +21,13 @@
 }
 
 /* A block's change mark lives in the margin: a short tick at the block start.
-   No wash or left border, so an updated paragraph never reads as a quote. */
+   No wash or left border, so an updated paragraph never reads as a quote.
+   Components clip their own overflow, so they draw the same tick inside the head. */
 [data-active-markdown] [data-diff='updated'] {
   position: relative;
 }
 
-[data-active-markdown] [data-diff='updated']::before {
+[data-active-markdown] [data-diff='updated']:not([data-component])::before {
   content: '';
   position: absolute;
   left: -14px;
@@ -293,6 +294,7 @@
 }
 
 .am-component-head {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -304,6 +306,29 @@
   color: var(--dsw-alias-label-secondary);
   font-size: 12px;
   line-height: 1.4;
+}
+
+/* The card clips overflow, so the change tick rides the head's left edge instead
+   of the outside gutter; it sits on the title row, the anchor for the whole card. */
+.am-component[data-diff='updated'] > .am-component-head::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: calc(50% - 0.525em);
+  width: 3px;
+  height: 1.05em;
+  border-radius: 2px;
+  background: var(--dsw-alias-link);
+  pointer-events: none;
+}
+
+/* A callout's head starts inside the card padding, past its semantic edge. */
+.am-component[data-component='callout'][data-diff='updated'] > .am-component-head::before {
+  left: -9px;
+}
+
+.am-component[data-diff='updated'].am-diff-flash > .am-component-head::before {
+  animation: am-diff-flash 1.2s ease-out;
 }
 
 .am-component-icon {
@@ -1315,11 +1340,13 @@ svg.am-markmap-canvas .markmap-foreign > div {
   flex: none;
   width: 6px;
   height: 6px;
+  margin-left: 2px;
   border-radius: 50%;
   background: var(--dsw-alias-link);
 }
 
 .am-toc-text {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

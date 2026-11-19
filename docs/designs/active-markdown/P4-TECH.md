@@ -166,7 +166,7 @@
 
 ## 10. 排版
 
-已实现（P4b）的阅读宽度与中文标点部分。正文与 front matter 卡都是 `max-width: 44em` 居中，`.am-doc` 加 `text-spacing-trim: trim-start`；字阶、行高与标题层级不动。窄栏下 44em 大于可用宽度，观感与改动前一致；全屏下正文不再随窗口拉长。明暗、窄栏、全屏三形态复核与 200 段计时还没做，作为 P4f 的验收项。
+已实现（P4f）。字号、行高与字重回主题的 markdown token，不自己写数值：正文用 `font: var(--dsw-font-markdown-base)`，H1–H3 用对应的 token，H4–H6 用 h4 token；实测 H1 21/30、H2 19/28、H3 18/26，字重随主题（当前主题里是 600）。正文保持 44em 阅读宽度，代码、表格、公式等组件可以撑满容器宽度；在 900px 宽的面板里实测正文 616px、组件 788px。中文侧开了 `text-spacing-trim: trim-start`、`text-autospace: normal` 与 `line-break: strict`，段落加 `text-wrap: pretty`；窄栏左右内边距从 24px 起降到 16px。段落与列表间距按 24px 行高收成 0.85em 与 1.6em 缩进。200 段 3.4 万字节的文档在页面内合成渲染用时 8ms（`innerHTML` 加一次强制布局，属于下限值，不含 React 与解析）。明暗与窄栏、全屏三态的人工观看留给桌面端验收。
 
 - 正文宽度：窄栏与全屏都限制阅读宽度，超出时居中；不与目录浮层抢位。
 - 字阶与行高：沿用 `--dsh-content-font-size` 与 1.7 行高，标题层级在 P3 已调过，本轮只补段间距与列表缩进。

@@ -1,13 +1,18 @@
 [data-active-markdown] {
-  --am-pad-x: clamp(24px, 4%, 56px);
+  --am-pad-x: clamp(16px, 4%, 56px);
   position: relative;
   container-type: inline-size;
   box-sizing: border-box;
   padding: 20px var(--am-pad-x) 72px;
   color: var(--dsw-alias-label-primary);
-  font-size: var(--dsh-content-font-size);
-  line-height: 1.7;
+  /* The theme's markdown scale is the single source for size, leading, and family. */
+  font: var(--dsw-font-markdown-base);
   overflow-wrap: break-word;
+  /* Punctuation trims at the line edge, CJK/Latin gaps come from the browser,
+     and no closing mark is left alone at the start of a line. */
+  text-spacing-trim: trim-start;
+  text-autospace: normal;
+  line-break: strict;
 }
 
 /* The Custom Highlight API keeps annotations out of the React text tree. */
@@ -65,37 +70,43 @@
 
 .am-doc {
   position: relative;
+}
+
+/* Prose keeps a 44em reading measure; a component may use the whole pane, so a
+   wide table or a long code line needs less horizontal scrolling. */
+.am-doc > :where(.am-heading, .am-paragraph, .am-list, .am-quote, .am-callout, .am-divider) {
   max-width: 44em;
   margin-inline: auto;
-  text-spacing-trim: trim-start;
 }
 
 .am-heading {
-  margin: 1.6em 0 0.6em;
-  font-weight: 600;
-  line-height: 1.35;
+  margin: 1.6em 0 0.5em;
+  font: var(--dsw-font-markdown-h4);
   /* Keep a jumped-to heading clear of the sticky toolbar. */
   scroll-margin-top: 56px;
 }
 
 .am-heading:is(h1) {
-  font-size: 1.6em;
+  margin-top: 2em;
+  font: var(--dsw-font-markdown-h1);
 }
 
 .am-heading:is(h2) {
-  font-size: 1.32em;
+  font: var(--dsw-font-markdown-h2);
 }
 
 .am-heading:is(h3) {
-  font-size: 1.14em;
+  font: var(--dsw-font-markdown-h3);
 }
 
-.am-heading:is(h4, h5, h6) {
-  font-size: 1em;
+/* A heading already separates itself from what follows. */
+.am-heading + :where(.am-paragraph, .am-list, .am-quote, .am-component) {
+  margin-top: 0;
 }
 
 .am-paragraph {
-  margin: 0.9em 0;
+  margin: 0.85em 0;
+  text-wrap: pretty;
 }
 
 .am-link {
@@ -108,12 +119,12 @@
 }
 
 .am-list {
-  margin: 0.9em 0;
-  padding-left: 1.5em;
+  margin: 0.85em 0;
+  padding-left: 1.6em;
 }
 
 .am-item {
-  margin: 0.3em 0;
+  margin: 0.2em 0;
 }
 
 .am-item-task {
@@ -128,7 +139,7 @@
 }
 
 .am-quote {
-  margin: 1em 0;
+  margin: 0.9em 0;
   padding: 0.1em 0 0.1em 0.95em;
   border-left: 3px solid var(--dsw-alias-border-l3);
   color: var(--dsw-alias-label-secondary);

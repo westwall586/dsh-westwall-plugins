@@ -3,15 +3,20 @@ window.__ModuleLoader__.load({ id: '@westwall/dsh-active-markdown',
   factory(require) {
     return (function (__dshRequire) {
 "use strict";var DshActiveMarkdownClient=(()=>{var xw=Object.create;var Ko=Object.defineProperty;var yw=Object.getOwnPropertyDescriptor;var kw=Object.getOwnPropertyNames;var ww=Object.getPrototypeOf,vw=Object.prototype.hasOwnProperty;var ue=(t=>typeof require<"u"?require:typeof Proxy<"u"?new Proxy(t,{get:(e,n)=>(typeof require<"u"?require:e)[n]}):t)(function(t){if(typeof require<"u")return require.apply(this,arguments);throw Error('Dynamic require of "'+t+'" is not supported')});var Ps=(t,e)=>{for(var n in e)Ko(t,n,{get:e[n],enumerable:!0})},Qm=(t,e,n,r)=>{if(e&&typeof e=="object"||typeof e=="function")for(let i of kw(e))!vw.call(t,i)&&i!==n&&Ko(t,i,{get:()=>e[i],enumerable:!(r=yw(e,i))||r.enumerable});return t};var Ye=(t,e,n)=>(n=t!=null?xw(ww(t)):{},Qm(e||!t||!t.__esModule?Ko(n,"default",{value:t,enumerable:!0}):n,t)),Sw=t=>Qm(Ko({},"__esModule",{value:!0}),t);var cA={};Ps(cA,{default:()=>uA});var $m=`[data-active-markdown] {
-  --am-pad-x: clamp(24px, 4%, 56px);
+  --am-pad-x: clamp(16px, 4%, 56px);
   position: relative;
   container-type: inline-size;
   box-sizing: border-box;
   padding: 20px var(--am-pad-x) 72px;
   color: var(--dsw-alias-label-primary);
-  font-size: var(--dsh-content-font-size);
-  line-height: 1.7;
+  /* The theme's markdown scale is the single source for size, leading, and family. */
+  font: var(--dsw-font-markdown-base);
   overflow-wrap: break-word;
+  /* Punctuation trims at the line edge, CJK/Latin gaps come from the browser,
+     and no closing mark is left alone at the start of a line. */
+  text-spacing-trim: trim-start;
+  text-autospace: normal;
+  line-break: strict;
 }
 
 /* The Custom Highlight API keeps annotations out of the React text tree. */
@@ -69,37 +74,43 @@ window.__ModuleLoader__.load({ id: '@westwall/dsh-active-markdown',
 
 .am-doc {
   position: relative;
+}
+
+/* Prose keeps a 44em reading measure; a component may use the whole pane, so a
+   wide table or a long code line needs less horizontal scrolling. */
+.am-doc > :where(.am-heading, .am-paragraph, .am-list, .am-quote, .am-callout, .am-divider) {
   max-width: 44em;
   margin-inline: auto;
-  text-spacing-trim: trim-start;
 }
 
 .am-heading {
-  margin: 1.6em 0 0.6em;
-  font-weight: 600;
-  line-height: 1.35;
+  margin: 1.6em 0 0.5em;
+  font: var(--dsw-font-markdown-h4);
   /* Keep a jumped-to heading clear of the sticky toolbar. */
   scroll-margin-top: 56px;
 }
 
 .am-heading:is(h1) {
-  font-size: 1.6em;
+  margin-top: 2em;
+  font: var(--dsw-font-markdown-h1);
 }
 
 .am-heading:is(h2) {
-  font-size: 1.32em;
+  font: var(--dsw-font-markdown-h2);
 }
 
 .am-heading:is(h3) {
-  font-size: 1.14em;
+  font: var(--dsw-font-markdown-h3);
 }
 
-.am-heading:is(h4, h5, h6) {
-  font-size: 1em;
+/* A heading already separates itself from what follows. */
+.am-heading + :where(.am-paragraph, .am-list, .am-quote, .am-component) {
+  margin-top: 0;
 }
 
 .am-paragraph {
-  margin: 0.9em 0;
+  margin: 0.85em 0;
+  text-wrap: pretty;
 }
 
 .am-link {
@@ -112,12 +123,12 @@ window.__ModuleLoader__.load({ id: '@westwall/dsh-active-markdown',
 }
 
 .am-list {
-  margin: 0.9em 0;
-  padding-left: 1.5em;
+  margin: 0.85em 0;
+  padding-left: 1.6em;
 }
 
 .am-item {
-  margin: 0.3em 0;
+  margin: 0.2em 0;
 }
 
 .am-item-task {
@@ -132,7 +143,7 @@ window.__ModuleLoader__.load({ id: '@westwall/dsh-active-markdown',
 }
 
 .am-quote {
-  margin: 1em 0;
+  margin: 0.9em 0;
   padding: 0.1em 0 0.1em 0.95em;
   border-left: 3px solid var(--dsw-alias-border-l3);
   color: var(--dsw-alias-label-secondary);

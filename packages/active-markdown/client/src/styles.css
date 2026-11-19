@@ -576,6 +576,9 @@ svg.am-markmap-canvas {
 
 .am-table {
   width: 100%;
+  /* Narrow tables fill the pane; a table whose columns cannot shrink scrolls
+     inside .am-table-wrap instead of squeezing every cell to one character. */
+  min-width: max-content;
   border-collapse: collapse;
   font-size: 0.95em;
 }

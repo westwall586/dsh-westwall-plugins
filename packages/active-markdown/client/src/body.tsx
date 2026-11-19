@@ -333,7 +333,7 @@ function rangeForOffsets(
  * version keep a run possible, and the next run reads the Host again.
  */
 const FALLBACK_DESCRIBE: DescribeView = {
-  promptVersion: 'am.translate.v1',
+  promptVersion: 'am.translate.v2',
   settings: { lang: 'zh', model: null, translateComments: true },
   languages: [],
 }

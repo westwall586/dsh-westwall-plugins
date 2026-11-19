@@ -11,6 +11,7 @@ import { splitSourceLines, type SourceLine } from './lines.ts'
 import { isRemoteSource } from '../images.ts'
 import { MarkmapView } from '../rich/markmap.tsx'
 import { MermaidView } from '../rich/mermaid.tsx'
+import { MathInline, MathView } from '../rich/math.tsx'
 import type { RichLabels } from '../rich/labels.ts'
 
 /** Copy the labels this view needs. */
@@ -106,7 +107,8 @@ function renderBlock(
     case 'code':
     case 'table':
     case 'mermaid':
-    case 'markmap': {
+    case 'markmap':
+    case 'math': {
       const component = componentOf(block)
       if (component === null) return null
       return (
@@ -135,6 +137,7 @@ function renderBlock(
               case 'code': return renderCode(block, context.wrap, labels)
               case 'mermaid': return <MermaidView code={block.content} labels={labels.rich} expanded={context.expanded} />
               case 'markmap': return <MarkmapView code={block.content} labels={labels.rich} expanded={context.expanded} />
+              case 'math': return <MathView tex={block.tex} labels={labels.rich} />
             }
           }}
         </ComponentFrame>
@@ -279,6 +282,7 @@ function renderInline(inlines: readonly Inline[], key: string, labels: RenderLab
       case 'softbreak': return <React.Fragment key={itemKey}> </React.Fragment>
       case 'hardbreak': return <br key={itemKey} />
       case 'code': return <code key={itemKey} className="am-inline-code">{inline.text}</code>
+      case 'math': return <MathInline key={itemKey} tex={inline.tex} />
       case 'strong': return <strong key={itemKey}>{renderInline(inline.children, itemKey, labels, actions)}</strong>
       case 'em': return <em key={itemKey}>{renderInline(inline.children, itemKey, labels, actions)}</em>
       case 'del': return <del key={itemKey}>{renderInline(inline.children, itemKey, labels, actions)}</del>

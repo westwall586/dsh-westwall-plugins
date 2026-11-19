@@ -63,6 +63,10 @@ function inlineKeys(inlines: readonly Inline[]): unknown[] {
         flush()
         keys.push(['image', inline.src, inline.title ?? '', inline.alt])
         break
+      case 'math':
+        flush()
+        keys.push(['math', collapse(inline.tex)])
+        break
     }
   }
   flush()
@@ -94,6 +98,8 @@ function blockKey(block: Block): string {
       return JSON.stringify(['mermaid', normalizeCode(block.content)])
     case 'markmap':
       return JSON.stringify(['markmap', block.lang, normalizeCode(block.content)])
+    case 'math':
+      return JSON.stringify(['math', normalizeCode(block.tex)])
     case 'table':
       return JSON.stringify(['table', block.header.map(cellKey), block.rows.map(row => row.map(cellKey))])
     case 'list':

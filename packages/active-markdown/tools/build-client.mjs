@@ -22,6 +22,11 @@ const CHUNKS = [
     globalName: 'DshActiveMarkdownMarkmap',
     fileName: 'client.markmap.js',
   },
+  {
+    entryPoint: 'client/src/rich/math/chunk.tsx',
+    globalName: 'DshActiveMarkdownMath',
+    fileName: 'client.math.js',
+  },
 ]
 
 /**

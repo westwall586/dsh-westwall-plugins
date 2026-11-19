@@ -48,6 +48,12 @@ function projectInline(inlines: readonly Inline[]): string {
       case 'code':
         text += inline.text
         break
+      case 'math':
+        // KaTeX's rendered text is not the TeX source, so a line holding a
+        // formula projects to its source and an annotation offset inside it can
+        // drift; the component-level ranges still refuse selections across a block.
+        text += inline.tex
+        break
       case 'softbreak':
       case 'hardbreak':
       case 'image':
@@ -97,7 +103,7 @@ export function collectComponentRanges(blocks: readonly Block[]): ComponentRange
   const ranges: ComponentRange[] = []
   walkBlocks(blocks, (block) => {
     if (block.type !== 'code' && block.type !== 'table' && block.type !== 'callout'
-      && block.type !== 'mermaid' && block.type !== 'markmap') return
+      && block.type !== 'mermaid' && block.type !== 'markmap' && block.type !== 'math') return
     ranges.push({ blockId: block.id, lineStart: block.sourceStartLine, lineEnd: block.sourceEndLine })
   })
   return ranges

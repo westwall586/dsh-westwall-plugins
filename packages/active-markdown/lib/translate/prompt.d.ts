@@ -1,5 +1,5 @@
 /** Changing the prompt requires bumping this, because it is part of every cache key. */
-export declare const PROMPT_VERSION = "am.translate.v1";
+export declare const PROMPT_VERSION = "am.translate.v2";
 export interface PromptInput {
     /** The language code from the wire; the prompt interpolates its label. */
     readonly lang: string;

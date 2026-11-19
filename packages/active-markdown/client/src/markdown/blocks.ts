@@ -2,7 +2,7 @@
 import {
   blockText, hashText, inlineText, slugify,
   type Block, type CalloutBlock, type CodeBlock, type DividerBlock, type HeadingBlock, type ListBlock,
-  type ListItem, type ParagraphBlock, type QuoteBlock, type TableBlock, type TableCell,
+  type ListItem, type MathBlock, type ParagraphBlock, type QuoteBlock, type TableBlock, type TableCell,
 } from './model.ts'
 import { resolveCallout, type CalloutType } from './callout.ts'
 import { inlineOf, parseMarkdown, splitFrontmatter, type Frontmatter, type Token } from './parse.ts'
@@ -124,6 +124,19 @@ function calloutChildren(tokens: readonly Token[], open: number, close: number, 
   return buildBlocks(patched, 0, patched.length, context)
 }
 
+/** One display formula block, from the token that produced it and its TeX source. */
+function makeMathBlock(token: Token, tex: string, context: BuildContext): MathBlock {
+  return {
+    id: makeId(context, 'math', tex),
+    type: 'math',
+    ...linesOf(token, context),
+    headingPath: [...context.headingPath],
+    text: tex,
+    tex,
+    display: true,
+  }
+}
+
 /** Build the blocks of one token range, sharing id and anchor counters; callouts only at the top level. */
 function buildBlocks(tokens: readonly Token[], start: number, end: number, context: BuildContext, allowCallout = false): Block[] {
   const blocks: Block[] = []
@@ -166,10 +179,19 @@ function buildBlocks(tokens: readonly Token[], start: number, end: number, conte
         index += 3
         break
       }
+      case 'math_block':
+        blocks.push(makeMathBlock(token, token.content, context))
+        index += 1
+        break
       case 'fence':
       case 'code_block': {
         const content = token.content.replace(/\n$/, '')
         const lang = token.info.trim().split(/\s+/)[0] ?? ''
+        if (lang === 'math') {
+          blocks.push(makeMathBlock(token, content.trim(), context))
+          index += 1
+          break
+        }
         if (lang === 'mermaid' || lang === 'markmap' || lang === 'mindmap') {
           const base = {
             id: makeId(context, lang === 'mermaid' ? 'mermaid' : 'markmap', content),

@@ -26,7 +26,7 @@
 |---|---|
 | 顺序 | 懒加载基建 → 富组件 → Mermaid → 思维导图 → 数学 → 排版 |
 | 重资源交付 | 包内动态 chunk：`client.math.js`、`client.mermaid.js`、`client.markmap.js`，按需 `require.async` |
-| 数学 | KaTeX（与 chat 同一套渲染），chunk 只带 JS；CSS 与字体由 shell 全局加载，chunk 自带一份去 `@font-face` 的 CSS 兜底 |
+| 数学 | KaTeX（与 chat 同一套渲染），chunk 只带 JS；CSS 与字体由 shell 全局加载，插件不打包 CSS |
 | Mermaid | 全量图类型，不做白名单；`securityLevel: 'strict'`；错误回退源码 + 复制错误 |
 | Mermaid 交互 | 照搬 friendly-expression 的缩放与主题：复用 `ui-primitives` 的 `ZoomControls`，不复用它的代码；全屏壳改为组件框统一弹框 |
 | 思维导图 | Markmap 式：Markdown 大纲 → 可折叠导图，只取 `markmap-view`，大纲转树用本插件自己的块模型 |
@@ -151,11 +151,18 @@
 
 ## 9. 数学
 
-- 语法：行内 `$…$`（避开 `$ ` 与转义）、行间 `$$…$$`、```` ```math ````。
-- 渲染：`katex.renderToString` 后置入容器，行内 `displayMode: false`，行间 `true`。
-- 失败：`throwOnError: false` 的错误色文本 + 复制原文；严格模式先试一次再降级，与 chat 的三段式一致。
-- 字体：依赖 shell 已加载的 KaTeX `@font-face`；chunk 内注入去字体声明的 CSS 兜底，字体缺失时退系统衬线。
-- 与翻译：公式节点不翻译、不参与行对齐改写。
+已实现（P4e）。行内 `$…$`、行间 `$$…$$` 与 ```` ```math ```` 都渲染成 KaTeX，宽公式在组件框里横向滚动；没有公式的文档不加载 `client.math.js`。
+
+- 语法：行内要求 `$` 后与闭合 `$` 前都不是空白，`$$` 不当行内，`\$` 是转义，行内代码与围栏内不解析，未闭合的 `$` 留作文本。行间 `$$…$$` 必须独占一段，可跨行；空行结束候选，所以未闭合的 `$$` 不会吞掉后文。围栏语言为 `math` 时直接成为公式块。
+- 模型：`Inline` 增加 `{ kind: 'math', tex }`；`Block` 增加 `{ type: 'math', tex, display: true }`，`COMPONENT_REGISTRY.math` 只开复制与批注，因此公式块共用组件外壳但没有全屏。
+- 渲染：主包只带加载器与回退，KaTeX 在 `client.math.js` 里，第一次出现公式时 `loadChunk` 取回。chunk 用 `throwOnError: true`、`strict: 'ignore'`、`trust: false` 调 `katex.renderToString`，写坏的公式抛错而不是输出错误色文本。
+- 失败：行间公式回退成 `RichError`（源码 + 错误首行 + 复制错误）；行内公式回退成 `$…$` 源码 span，段落其余部分照常显示，不白屏。
+- 字体：不打包 KaTeX 的 CSS 与字体，依赖 shell 全局加载的 `katex/dist/katex.min.css` 与 woff2 字体；插件只补 1em 字号与容器布局。shell 若换渲染方案，公式会退到系统衬线。
+- 与翻译：提示词第 2 版要求行内与行间公式逐字保留，缓存键随 `PROMPT_VERSION` 升级，旧自动缓存不再命中；译文重新解析后按同样规则渲染。
+
+实测范围：`test/math.test.ts` 覆盖行内（多公式、空白边界、转义、行内代码、未闭合）、行间（同行、跨行、紧随正文、尾随文字、未闭合）、`math` 围栏、列表与 callout 内的公式、组件能力与中英文案，以及 `inlineMathAt` / `displayMathAt` 的边界；`pnpm build` 产出 `client.math.js` 261,969 字节，低于 chunk 的 4 MiB 门；入口 `client.js` 874,378 字节，`Katex` 与 `renderToString` 的 grep 计数都是 0，剩下的 `katex` 字样只有插件自己针对 shell KaTeX 类名的布局规则。Web 端本轮未实测公式观感与暗色。
+
+已知限制：行内公式在文本批注的投影里按 TeX 源码计长，而 KaTeX 渲染后的 DOM 文本不是源码，所以含行内公式的一行里做文本批注时偏移可能漂移；行间公式是组件，选区跨过它时只能整块批注。
 
 ## 10. 排版
 

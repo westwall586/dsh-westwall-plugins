@@ -1,7 +1,7 @@
 /** The block model P0 renders and later phases annotate. */
 import { calloutLabel, resolveCallout, type CalloutFamily, type CalloutType } from './callout.ts'
 
-export type ComponentKind = 'table' | 'code' | 'callout' | 'mermaid' | 'markmap'
+export type ComponentKind = 'table' | 'code' | 'callout' | 'mermaid' | 'markmap' | 'math'
 
 /**
  * What the shared shell offers one component. The header buttons come from
@@ -52,6 +52,10 @@ export const COMPONENT_REGISTRY: Record<ComponentKind, ComponentDefinition> = {
     kind: 'markmap',
     capabilities: { fullscreen: true, clickToExpand: true, zoom: true, pan: true, wrap: false, copy: true, annotate: true },
   },
+  math: {
+    kind: 'math',
+    capabilities: { fullscreen: false, clickToExpand: false, zoom: false, pan: false, wrap: false, copy: true, annotate: true },
+  },
 }
 
 /** One header button slot, in the order the shell renders them. */
@@ -80,6 +84,7 @@ export type ComponentLabel =
   | { kind: 'callout', type: CalloutType }
   | { kind: 'mermaid' }
   | { kind: 'markmap' }
+  | { kind: 'math' }
 
 export interface ComponentView {
   kind: ComponentKind
@@ -102,6 +107,7 @@ export type Inline =
   | { kind: 'del', children: Inline[] }
   | { kind: 'link', href: string, title?: string, children: Inline[] }
   | { kind: 'image', src: string, title?: string, alt: string }
+  | { kind: 'math', tex: string }
 
 export interface BlockBase {
   /** Stable within one document revision: type, text hash, and occurrence. */
@@ -149,6 +155,13 @@ export interface MarkmapBlock extends BlockBase {
   /** `markmap` or `mindmap`; the fence info string picks which alias the author wrote. */
   lang: string
   content: string
+}
+
+/** A paragraph-level `$$…$$` or a ```` ```math ```` fence; both render in display mode. */
+export interface MathBlock extends BlockBase {
+  type: 'math'
+  tex: string
+  display: true
 }
 
 export interface TableCell {
@@ -199,8 +212,8 @@ export interface DividerBlock extends BlockBase {
 }
 
 export type Block =
-  | HeadingBlock | ParagraphBlock | CodeBlock | MermaidBlock | MarkmapBlock | TableBlock | ListBlock | QuoteBlock
-  | CalloutBlock | DividerBlock
+  | HeadingBlock | ParagraphBlock | CodeBlock | MermaidBlock | MarkmapBlock | MathBlock | TableBlock | ListBlock
+  | QuoteBlock | CalloutBlock | DividerBlock
 
 /** Concatenate the readable text of one inline tree. */
 export function inlineText(inlines: readonly Inline[]): string {
@@ -216,6 +229,7 @@ export function inlineText(inlines: readonly Inline[]): string {
       case 'del':
       case 'link': text += inlineText(inline.children); break
       case 'image': text += inline.alt; break
+      case 'math': text += inline.tex; break
     }
   }
   return text
@@ -229,6 +243,7 @@ export function blockText(block: Block): string {
     case 'code': return block.content
     case 'mermaid':
     case 'markmap': return block.content
+    case 'math': return block.tex
     case 'table': return [...block.header, ...block.rows.flat()].map(cell => inlineText(cell.inline)).join(' | ')
     case 'list': return block.items.map(item => item.text).join('\n')
     case 'quote': return block.blocks.map(blockText).join('\n')
@@ -315,6 +330,16 @@ export function componentOf(block: Block): ComponentView | null {
         capabilities: COMPONENT_REGISTRY.markmap.capabilities,
         copyText: block.content,
       }
+    case 'math':
+      return {
+        kind: 'math',
+        label: { kind: 'math' },
+        signature: `math:${hashText(block.tex)}:${block.tex.length}`,
+        lineStart: block.sourceStartLine,
+        lineEnd: block.sourceEndLine,
+        capabilities: COMPONENT_REGISTRY.math.capabilities,
+        copyText: block.tex,
+      }
     default:
       return null
   }
@@ -333,5 +358,7 @@ export function componentLabel(view: ComponentView, format: (key: string, params
       return format('component.mermaid')
     case 'markmap':
       return format('component.markmap')
+    case 'math':
+      return format('component.math')
   }
 }

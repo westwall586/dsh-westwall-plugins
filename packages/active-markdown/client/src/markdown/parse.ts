@@ -1,6 +1,8 @@
 /** Markdown source into tokens: front matter split, parser setup, inline trees. */
 import MarkdownIt from 'markdown-it'
+import type { StateBlock, StateInline } from 'markdown-it'
 import type { Inline } from './model.ts'
+import { displayMathAt, inlineMathAt } from './math.ts'
 
 /** One token of the parser's flat stream. */
 export type Token = ReturnType<MarkdownIt['parse']>[number]
@@ -16,6 +18,60 @@ const parser = new MarkdownIt({
   linkify: true,
   typographer: false,
 })
+
+/**
+ * A paragraph that is only a `$$…$$` formula, on one line or several.
+ * @param state - the block parser state.
+ * @param startLine - the line the candidate opens on.
+ * @param endLine - the block's exclusive last line.
+ * @param silent - validate without writing tokens.
+ * @returns whether this line opens a display formula.
+ */
+function mathBlock(state: StateBlock, startLine: number, endLine: number, silent: boolean): boolean {
+  const lineText = (line: number): string =>
+    // `tShift` is where the list item or quote marker ends, so a formula may
+    // start a list item and still read as the item's first line.
+    state.src.slice(state.bMarks[line] + state.tShift[line], state.eMarks[line])
+  if (!lineText(startLine).trimStart().startsWith('$$')) return false
+  const lines: string[] = []
+  for (let line = startLine; line < endLine; line += 1) {
+    const text = lineText(line)
+    lines.push(text)
+    // A blank line ends the paragraph, and with it the candidate.
+    if (line > startLine && text.trim() === '') break
+  }
+  const found = displayMathAt(lines, 0)
+  if (found === null) return false
+  if (silent) return true
+  const token = state.push('math_block', 'math', 0)
+  token.block = true
+  token.content = found.tex
+  token.markup = '$$'
+  token.map = [startLine, startLine + found.lines]
+  state.line = startLine + found.lines
+  return true
+}
+
+/**
+ * Inline `$…$` inside one paragraph line.
+ * @param state - the inline parser state.
+ * @param silent - validate without writing the token.
+ * @returns whether a formula starts at `state.pos`.
+ */
+function mathInline(state: StateInline, silent: boolean): boolean {
+  const found = inlineMathAt(state.src, state.pos, state.posMax)
+  if (found === null) return false
+  if (!silent) {
+    const token = state.push('math_inline', 'math', 0)
+    token.content = found.tex
+    token.markup = '$'
+  }
+  state.pos = found.end
+  return true
+}
+
+parser.block.ruler.before('paragraph', 'math_block', mathBlock, { alt: ['paragraph', 'reference', 'blockquote', 'list'] })
+parser.inline.ruler.before('text', 'math_inline', mathInline)
 
 /**
  * Split a leading `---` block from the body.
@@ -92,6 +148,9 @@ export function inlineOf(tokens: readonly Token[] | null | undefined): Inline[] 
       case 'code_inline':
         push({ kind: 'code', text: token.content })
         break
+      case 'math_inline':
+        push({ kind: 'math', tex: token.content })
+        break
       case 'softbreak': push({ kind: 'softbreak' }); break
       case 'hardbreak': push({ kind: 'hardbreak' }); break
       case 'strong_open': frames.push({ children: [], close: children => ({ kind: 'strong', children }) }); break
@@ -133,7 +192,7 @@ export function inlineOf(tokens: readonly Token[] | null | undefined): Inline[] 
 function plainOf(tokens: readonly Token[]): string {
   let text = ''
   for (const token of tokens) {
-    if (token.type === 'text' || token.type === 'code_inline') text += token.content
+    if (token.type === 'text' || token.type === 'code_inline' || token.type === 'math_inline') text += token.content
     else if (token.children !== null && token.children !== undefined) text += plainOf(token.children)
   }
   return text

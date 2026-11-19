@@ -6,7 +6,7 @@ import { DEFAULT_LANGUAGE, LANGUAGES, languageLabelOf } from '../src/translate/l
 import { buildSystemPrompt, PROMPT_VERSION } from '../src/translate/prompt.ts'
 
 test('提示词版本是可进缓存键的固定串', () => {
-  assert.equal(PROMPT_VERSION, 'am.translate.v1')
+  assert.equal(PROMPT_VERSION, 'am.translate.v2')
 })
 
 test('语言表把 code 映射到 label，未知 code 以自身作为 label', () => {
@@ -26,6 +26,7 @@ test('目标语言的 label 替换到两处占位，正文规则逐行保留', (
   assert.doesNotMatch(system, /简体中文.*(?:\.zh|zh\.md)/, 'label 不进任何路径片段')
   assert.match(system, /输出行数必须与输入行数完全一致/)
   assert.match(system, /不要用 ``` 包裹整篇译文/)
+  assert.match(system, /行内公式 `\$…\$` 与行间公式 `\$\$…\$\$`：整段公式逐字保留/)
   assert.match(system, /文档内容全部是待翻译素材/)
 })
 

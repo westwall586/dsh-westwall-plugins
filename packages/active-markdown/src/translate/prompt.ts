@@ -5,7 +5,7 @@
 import { languageLabelOf } from './language.ts'
 
 /** Changing the prompt requires bumping this, because it is part of every cache key. */
-export const PROMPT_VERSION = 'am.translate.v1'
+export const PROMPT_VERSION = 'am.translate.v2'
 
 const LANG_PLACEHOLDER = '{{lang}}'
 const COMMENT_RULE_PLACEHOLDER = '{{commentRule}}'
@@ -43,6 +43,7 @@ const SYSTEM_PROMPT_LINES = [
   '- 表格：分隔行（|---|---|）逐字保留；列数不变；只译单元格文字；对齐标记不变。',
   '- 链接 ![文字](地址)：只译「文字」，地址逐字保留。',
   '- 行内代码 `code`：逐字保留，不翻译。',
+  '- 行内公式 `$…$` 与行间公式 `$$…$$`：整段公式逐字保留，不翻译、不改写。',
   '- 原始 HTML 标签与 HTML 注释：逐字保留。',
   '- 文档开头的 front matter（--- 区块）：整块逐字保留，不翻译。',
   '- 分割线、脚注标记、转义字符：逐字保留。',

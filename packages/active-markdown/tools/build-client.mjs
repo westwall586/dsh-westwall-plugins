@@ -11,7 +11,18 @@ const ENTRY = { entryPoint: 'client/src/main.tsx', globalName: 'DshActiveMarkdow
  * Each file name must match the loader's `client.<name>.js` form, and its module must
  * default-export the API that `client/src/chunks.ts` hands back.
  */
-const CHUNKS = []
+const CHUNKS = [
+  {
+    entryPoint: 'client/src/rich/mermaid/chunk.tsx',
+    globalName: 'DshActiveMarkdownMermaid',
+    fileName: 'client.mermaid.js',
+  },
+  {
+    entryPoint: 'client/src/rich/markmap/chunk.tsx',
+    globalName: 'DshActiveMarkdownMarkmap',
+    fileName: 'client.markmap.js',
+  },
+]
 
 /**
  * Bundle one program, guard its size, and write it beside this plugin.

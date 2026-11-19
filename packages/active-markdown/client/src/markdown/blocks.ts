@@ -170,6 +170,20 @@ function buildBlocks(tokens: readonly Token[], start: number, end: number, conte
       case 'code_block': {
         const content = token.content.replace(/\n$/, '')
         const lang = token.info.trim().split(/\s+/)[0] ?? ''
+        if (lang === 'mermaid' || lang === 'markmap' || lang === 'mindmap') {
+          const base = {
+            id: makeId(context, lang === 'mermaid' ? 'mermaid' : 'markmap', content),
+            ...linesOf(token, context),
+            headingPath: [...context.headingPath],
+            text: content,
+            content,
+          }
+          blocks.push(lang === 'mermaid'
+            ? { ...base, type: 'mermaid', lang: 'mermaid' }
+            : { ...base, type: 'markmap', lang })
+          index += 1
+          break
+        }
         const block: CodeBlock = {
           id: makeId(context, 'code', content),
           type: 'code',

@@ -77,6 +77,45 @@ test('代码块保留语言与内容', () => {
   assert.equal(code.content, 'const x = 1')
 })
 
+test('mermaid 与 markmap 围栏各自成块，其它语言仍是代码块', () => {
+  const { blocks } = parseDocument([
+    '```mermaid',
+    'flowchart TD',
+    '  A --> B',
+    '```',
+    '',
+    '```markmap',
+    '# 根',
+    '- 子',
+    '```',
+    '',
+    '```mindmap',
+    '# 根',
+    '```',
+    '',
+    '```ts',
+    'const x = 1',
+    '```',
+  ].join('\n'))
+  assert.deepEqual(blocks.map(block => block.type), ['mermaid', 'markmap', 'markmap', 'code'])
+  const mermaid = blocks[0]
+  assert.ok(mermaid.type === 'mermaid')
+  assert.equal(mermaid.lang, 'mermaid')
+  assert.equal(mermaid.content, 'flowchart TD\n  A --> B')
+  const markmap = blocks[1]
+  assert.ok(markmap.type === 'markmap')
+  assert.equal(markmap.lang, 'markmap')
+  assert.equal(markmap.content, '# 根\n- 子')
+  const mindmap = blocks[2]
+  assert.ok(mindmap.type === 'markmap')
+  assert.equal(mindmap.lang, 'mindmap')
+  assert.equal(mindmap.content, '# 根')
+  const code = blocks[3]
+  assert.ok(code.type === 'code')
+  assert.equal(code.lang, 'ts')
+  assert.equal(code.content, 'const x = 1')
+})
+
 test('引用里的块保持嵌套', () => {
   const quote = parseDocument(DOC).blocks.find(block => block.type === 'quote')
   assert.ok(quote !== undefined && quote.type === 'quote')

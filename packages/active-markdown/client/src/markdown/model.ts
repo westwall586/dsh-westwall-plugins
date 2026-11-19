@@ -15,8 +15,8 @@ export const COMPONENT_REGISTRY: Record<ComponentKind, ComponentDefinition> = {
   table: { kind: 'table', actions: ['annotate'] },
   code: { kind: 'code', actions: ['annotate', 'copy'] },
   callout: { kind: 'callout', actions: ['annotate'] },
-  mermaid: { kind: 'mermaid', actions: ['annotate', 'fullscreen'] },
-  markmap: { kind: 'markmap', actions: ['annotate', 'fullscreen'] },
+  mermaid: { kind: 'mermaid', actions: ['annotate', 'copy', 'fullscreen'] },
+  markmap: { kind: 'markmap', actions: ['annotate', 'copy', 'fullscreen'] },
 }
 
 /** The dimensions or language a frame shows in its header. */
@@ -24,6 +24,8 @@ export type ComponentLabel =
   | { kind: 'table', columns: number, rows: number }
   | { kind: 'code', lang: string }
   | { kind: 'callout', type: CalloutType }
+  | { kind: 'mermaid' }
+  | { kind: 'markmap' }
 
 export interface ComponentView {
   kind: ComponentKind
@@ -82,6 +84,19 @@ export interface CodeBlock extends BlockBase {
   fence: boolean
 }
 
+export interface MermaidBlock extends BlockBase {
+  type: 'mermaid'
+  lang: 'mermaid'
+  content: string
+}
+
+export interface MarkmapBlock extends BlockBase {
+  type: 'markmap'
+  /** `markmap` or `mindmap`; the fence info string picks which alias the author wrote. */
+  lang: string
+  content: string
+}
+
 export interface TableCell {
   inline: Inline[]
   align?: 'left' | 'center' | 'right'
@@ -130,7 +145,8 @@ export interface DividerBlock extends BlockBase {
 }
 
 export type Block =
-  | HeadingBlock | ParagraphBlock | CodeBlock | TableBlock | ListBlock | QuoteBlock | CalloutBlock | DividerBlock
+  | HeadingBlock | ParagraphBlock | CodeBlock | MermaidBlock | MarkmapBlock | TableBlock | ListBlock | QuoteBlock
+  | CalloutBlock | DividerBlock
 
 /** Concatenate the readable text of one inline tree. */
 export function inlineText(inlines: readonly Inline[]): string {
@@ -157,6 +173,8 @@ export function blockText(block: Block): string {
     case 'heading':
     case 'paragraph': return inlineText(block.inline)
     case 'code': return block.content
+    case 'mermaid':
+    case 'markmap': return block.content
     case 'table': return [...block.header, ...block.rows.flat()].map(cell => inlineText(cell.inline)).join(' | ')
     case 'list': return block.items.map(item => item.text).join('\n')
     case 'quote': return block.blocks.map(blockText).join('\n')
@@ -189,8 +207,6 @@ export function hashText(text: string): string {
 
 /**
  * Project one block onto its component shell; text blocks have no frame.
- * Mermaid and Markmap blocks do not exist in the parser yet, so their registry
- * entries are the only thing those future kinds need to fill in.
  */
 export function componentOf(block: Block): ComponentView | null {
   switch (block.type) {
@@ -225,6 +241,26 @@ export function componentOf(block: Block): ComponentView | null {
         actions: COMPONENT_REGISTRY.callout.actions,
       }
     }
+    case 'mermaid':
+      return {
+        kind: 'mermaid',
+        label: { kind: 'mermaid' },
+        signature: `mermaid:${hashText(block.content)}:${block.content.length}`,
+        lineStart: block.sourceStartLine,
+        lineEnd: block.sourceEndLine,
+        actions: COMPONENT_REGISTRY.mermaid.actions,
+        copyText: block.content,
+      }
+    case 'markmap':
+      return {
+        kind: 'markmap',
+        label: { kind: 'markmap' },
+        signature: `markmap:${block.lang}:${hashText(block.content)}:${block.content.length}`,
+        lineStart: block.sourceStartLine,
+        lineEnd: block.sourceEndLine,
+        actions: COMPONENT_REGISTRY.markmap.actions,
+        copyText: block.content,
+      }
     default:
       return null
   }
@@ -239,5 +275,9 @@ export function componentLabel(view: ComponentView, format: (key: string, params
       return format('component.code', { lang: view.label.lang === '' ? 'text' : view.label.lang })
     case 'callout':
       return format('component.callout', { type: calloutLabel(view.label.type, format) })
+    case 'mermaid':
+      return format('component.mermaid')
+    case 'markmap':
+      return format('component.markmap')
   }
 }

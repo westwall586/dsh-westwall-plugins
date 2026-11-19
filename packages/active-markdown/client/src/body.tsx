@@ -742,6 +742,20 @@ export function Body({
     edit: t('component.edit'),
     wrap: t('code.wrap'),
     nowrap: t('code.nowrap'),
+    rich: {
+      rendering: t('rich.rendering'),
+      copyError: t('rich.copyError'),
+      copied: t('code.copied'),
+      expand: t('rich.expand'),
+      close: t('rich.close'),
+      zoom: {
+        controls: t('rich.zoom.controls'),
+        menu: t('rich.zoom.menu'),
+        out: t('rich.zoom.out'),
+        into: t('rich.zoom.into'),
+        value: (percent: number): string => t('rich.zoom.value', { percent }),
+      },
+    },
     calloutType: (id: string): string => {
       const type = resolveCallout(id)
       return type === undefined ? id : calloutLabel(type, t)

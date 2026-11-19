@@ -106,18 +106,26 @@
 
 ## 7. Mermaid
 
+已实现（P4c）。文档里出现 Mermaid 围栏时，主包才通过 `loadChunk('client.mermaid.js')` 取回 `client/src/rich/mermaid/chunk.tsx`；入口产物里没有 mermaid 库代码。
+
 - 兜底：`securityLevel: 'strict'`，不执行图内 HTML。
-- 渲染：懒加载 chunk 内单例 `mermaid.initialize` 一次，主题由 `--dsw-alias-*` token 解析成 palette，明暗切换重建。
-- 错误：捕获解析/渲染异常，回退显示源码 + 错误首行 + 「复制错误」。
-- 全屏：`ZoomControls` 缩放、可复位、Esc 关闭，遮罩点击关闭。
+- 渲染：chunk 内首次渲染时 `mermaid.initialize` 一次；主题由 `--dsw-alias-*` token 解析成 palette，palette 指纹变化时重新初始化并重渲染。同一源码 + 同一主题指纹走内存缓存（24 条上限），多个图在一条 Promise 队列里串行渲染。
+- 错误：捕获解析/渲染异常，回退显示源码 + 错误首行 + 「复制错误」；源码仍走组件框的「复制」，渲染失败不白屏。
+- 全屏：遮罩 + 居中容器 + `ZoomControls`（放大 / 缩小 / 复位 / 预设），Esc、关闭按钮与遮罩点击都能关，关闭后焦点回到「全屏」按钮。
 - 缓存：同一源码 + 同一主题指纹只渲染一次，SVG 留在内存。
+
+实测范围：`test/blocks.test.ts` 覆盖 mermaid 围栏成块；`pnpm build` 产出 `client.mermaid.js` 3,317,876 字节（gzip 908,519），低于 chunk 的 4 MiB 门；入口 `client.js` 859,352 字节里 `flowchart`、`sequenceDiagram`、`mermaidAPI` 的 grep 计数都是 0。Web 版的首次真实 chunk 加载、明暗重渲染与全屏交互留待 P4c 验收实测。
 
 ## 8. 思维导图
 
+已实现（P4d）。语言为 `markmap` / `mindmap` 的围栏走 `client.markmap.js`。chunk 只带 `markmap-view` 与它必需的 peer `markmap-common`，没有引入 `markmap-lib`，因此不会把 katex / prism / highlight.js / yaml 拖进来。
+
 - 入口：代码块语言为 `markmap` / `mindmap` 时走导图，不吃 Mermaid 的图类型。
-- 转换：H1–H6 与嵌套列表转成 Markmap 的节点树，行内 Markdown 保留文本；转树用本插件块模型，不引入 `markmap-lib`（它会把 katex / prism / highlight.js / yaml 全拖进 chunk）。
-- 视图：`markmap-view` 只读模式，初始展开层级 2，支持缩放与拖拽；全屏复用 Mermaid 那套壳。
-- 批注：整个导图是一个组件，可复制源码。
+- 转换：H1–H6 与嵌套列表转成 Markmap 的节点树；段落并入最近节点的描述行，用第一个换行分隔。转树是 `client/src/rich/tree.ts` 的纯函数，只读本插件块模型。
+- 视图：`markmap-view` 只读模式，初始展开层级 2，支持缩放与拖拽；节点文本先转义再加换行，不执行图内 HTML；分支色从 palette 的语义色取。
+- 全屏复用 Mermaid 那套壳；批注：整个导图是一个组件，可复制源码。
+
+实测范围：`test/rich-trees.test.ts` 覆盖标题层级、列表嵌套、段落并入与多个 H1；`pnpm build` 产出 `client.markmap.js` 119,083 字节（gzip 39,475），低于 4 MiB 门；入口 `client.js` 里 `markmap-view`、`markmap-common`、`initialExpandLevel` 的 grep 计数都是 0。浏览器端的拖拽、折叠与明暗重渲染留待 P4d 验收实测。
 
 ## 9. 数学
 
@@ -138,7 +146,7 @@
 
 ## 11. 风险与不做
 
-- **产物变大**：`client.mermaid.js` 约 3MB（gzip 约 620KB）入库；构建时间与仓库体积上涨，换来首屏零成本。
+- **产物变大**：`client.mermaid.js` 3.2MB（gzip 约 887KB）与 `client.markmap.js` 116KB（gzip 约 39KB）入库；构建时间与仓库体积上涨，换来首屏零成本。
 - **隐式依赖**：数学的字来自 shell 全局 CSS。shell 若换渲染方案，公式会退到系统衬线；兜底方案是 chunk 内联字体（+296KB 原始字体）。
 - **chunk 首次加载**：文档里有图/公式时多一次本地请求，宿主按 revision 缓存，不做预取。
 - **不做**：Markmap 之外的大纲视图、语法高亮、主题系统、导出 PDF、Gherkin、行级富组件批注。

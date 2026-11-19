@@ -342,6 +342,205 @@
   margin: 0;
 }
 
+/* Mermaid and mind maps share one loading, error, and fullscreen shell. */
+.am-rich-view {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+}
+
+.am-rich-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 96px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+}
+
+.am-rich-diagram {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.am-rich-figure {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.am-rich-mermaid .am-rich-figure > svg {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+}
+
+.am-rich-expand {
+  position: absolute;
+  top: 4px;
+  inset-inline-end: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 4px;
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-tertiary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.6;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+.am-rich-diagram:hover .am-rich-expand,
+.am-rich-diagram:focus-within .am-rich-expand {
+  opacity: 1;
+}
+
+.am-rich-expand:hover {
+  border-color: var(--dsw-alias-link);
+  color: var(--dsw-alias-label-primary);
+}
+
+@media (hover: none), (pointer: coarse) {
+  .am-rich-expand {
+    opacity: 1;
+  }
+}
+
+.am-rich-error {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.am-rich-source {
+  margin: 0;
+  padding: 10px 12px;
+  overflow-x: auto;
+  border-radius: 6px;
+  background: var(--dsw-alias-markdown-code-block);
+  color: var(--dsw-alias-label-primary);
+  font-family: var(--dsh-font-family-code);
+  font-size: var(--dsh-code-font-size);
+  line-height: 1.55;
+  white-space: pre;
+}
+
+.am-rich-error-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.am-rich-error-line {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The mind-map renderer ships light-theme defaults; every color below comes from the host theme. */
+.am-markmap-canvas {
+  display: block;
+  width: 100%;
+  height: 420px;
+  --markmap-text-color: var(--dsw-alias-label-primary);
+  --markmap-code-bg: var(--dsw-alias-markdown-inline-code);
+  --markmap-code-color: var(--dsw-alias-label-primary);
+  --markmap-a-color: var(--dsw-alias-link);
+  --markmap-a-hover-color: var(--dsw-alias-link);
+  --markmap-circle-open-bg: var(--dsw-alias-bg-layer-1);
+  --markmap-highlight-bg: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 30%, transparent);
+}
+
+.am-markmap-canvas.markmap {
+  font-family: inherit;
+  font-weight: 400;
+  font-size: var(--dsh-content-font-size, 14px);
+}
+
+.am-rich-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1) 72%, var(--dsw-alias-label-tertiary));
+}
+
+.am-rich-overlay-frame {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(96vw, 1680px);
+  height: min(92vh, 1100px);
+  padding: 24px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 12px;
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: var(--dsw-elevation-panel, 0 16px 48px color-mix(in srgb, var(--dsw-alias-label-primary) 24%, transparent));
+}
+
+.am-rich-overlay-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  transform-origin: center;
+}
+
+.am-rich-overlay-body .am-rich-figure {
+  width: 100%;
+  height: 100%;
+}
+
+.am-rich-overlay-body .am-rich-figure > svg {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+}
+
+.am-rich-overlay-body .am-markmap-canvas {
+  height: 100%;
+}
+
+.am-rich-overlay-close {
+  position: absolute;
+  top: 16px;
+  inset-inline-end: 16px;
+  padding: 4px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.am-rich-overlay-close:hover {
+  border-color: var(--dsw-alias-link);
+  color: var(--dsw-alias-label-primary);
+}
+
+.am-rich-overlay .am-rich-overlay-zoom {
+  inset-inline-start: auto;
+  inset-inline-end: 16px;
+  bottom: 16px;
+  transform: none;
+}
+
 .am-code-body {
   margin: 0;
   padding: 12px;

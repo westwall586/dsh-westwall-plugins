@@ -72,12 +72,24 @@ importers:
       '@types/react':
         specifier: ^19.0.0
         version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19.3.0
+        version: 19.3.0(@types/react@19.3.0)
       esbuild:
         specifier: ^0.25.0
         version: 0.25.12
       markdown-it:
         specifier: 14.1.0
         version: 14.1.0
+      markmap-common:
+        specifier: 0.18.9
+        version: 0.18.9
+      markmap-view:
+        specifier: 0.18.13
+        version: 0.18.13(markmap-common@0.18.9)
+      mermaid:
+        specifier: 11.15.0
+        version: 11.15.0
       typescript:
         specifier: ~5.9.3
         version: 5.9.3
@@ -242,6 +254,10 @@ packages:
 
   '@antfu/install-pkg@2.1.0':
     resolution: {integrity: sha512-sdg9NxU3zR4Mnawfbc/x6GB5Wf17WYud5qOuEuxXjaKpYpMkISSJEjItGebXJ2bQ4DIcly4NYH23mtkGJjvKUw==}
+
+  '@babel/runtime@7.29.14':
+    resolution: {integrity: sha512-Y5tqevQaUAZhhj82BpYMNC1ssvLQTVAfwKdm8iy8qwmhvC2/CpcAu8OC+QEtjM7pMk7knx83u1Qj8gzkicyelw==}
+    engines: {node: '>=6.9.0'}
 
   '@braintree/sanitize-url@7.1.2':
     resolution: {integrity: sha512-jigsZK+sMF/cuiB7sERuo9V7N9jx+dhmHHnQyDSVdpZwVutaBu7WvNYqMDLSgFgfB30n452TP3vjDAvFC973mA==}
@@ -580,6 +596,9 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@gera2ld/jsx-dom@2.2.2':
+    resolution: {integrity: sha512-EOqf31IATRE6zS1W1EoWmXZhGfLAoO9FIlwTtHduSrBdud4npYBxYAkv8dZ5hudDPwJeeSjn40kbCL4wAzr8dA==}
+
   '@iconify/types@2.0.0':
     resolution: {integrity: sha512-+wluvCrRhXrhyOmRDJ3q8mux9JkKy5SJ/v8ol2tu4FVjyYvtEzkc/3pK15ET6RKg4b4w4BmTk1+gsCUhf21Ykg==}
 
@@ -732,6 +751,11 @@ packages:
 
   '@types/node@26.6.6':
     resolution: {integrity: sha512-MzQj+8Kx3XI40OmUAE6Qoh58ZMNstNNMwn2nfd3qWsfe7nDNSqJNzes4njhz6AHwrSHOffSLwXU6yb474Q4aog==}
+
+  '@types/react-dom@19.3.0':
+    resolution: {integrity: sha512-ZI7bU42mZXXKHn/qNLEw2IrbiINU7X5+vfgdixBHkCNpYWXjKgfQ/P+uyGb5CjOLB9UcnTeg3rylQtV2hym44Q==}
+    peerDependencies:
+      '@types/react': ^19.3.0
 
   '@types/react@19.3.0':
     resolution: {integrity: sha512-N0rFCuH9YoxG9/m61l9MfpJKfmLOVU0em7ipIz6TRgSSkvReLB9vL85GB+yr8Bs5leqpvg96JSwF4ZS1s4viQg==}
@@ -1222,6 +1246,16 @@ packages:
     engines: {node: '>= 20'}
     hasBin: true
 
+  markmap-common@0.18.9:
+    resolution: {integrity: sha512-MV2HQO7IGIm3jWEJXSG8vmdpqf4WIDXcEyAEN52lrWR1qD53Zg5l81JwjXoZ2l0rY5mofKYqUFlmdM2fqTGMVg==}
+    deprecated: Replaced by @markmap/* in 1.0.0. See https://markmap.js.org/docs/migration
+
+  markmap-view@0.18.13:
+    resolution: {integrity: sha512-FNzBzDZ81hR9TJ8MmpDxH1qhFWVqAHeCE2BkOW4GseDrymNTlXg5uLaiVl6PFAlB+O6mG6Gkbd+UsHuaOpgyKA==}
+    deprecated: Replaced by @markmap/* in 1.0.0. See https://markmap.js.org/docs/migration
+    peerDependencies:
+      markmap-common: '*'
+
   mathml-to-latex@1.8.0:
     resolution: {integrity: sha512-gQ0uK3zqB8HwlfaXJkEL5rgaZNbKUiBMmBP/B/W+b+t6KcseLSuYb1b0BjLgS9ZiQa24ePkqTX8/6FaQuDL7wQ==}
 
@@ -1233,6 +1267,9 @@ packages:
 
   node-html-parser@7.1.0:
     resolution: {integrity: sha512-iJo8b2uYGT40Y8BTyy5ufL6IVbN8rbm/1QK2xffXU/1a/v3AAa0d1YAoqBNYqaS4R/HajkWIpIfdE6KcyFh1AQ==}
+
+  npm2url@0.2.4:
+    resolution: {integrity: sha512-arzGp/hQz0Ey+ZGhF64XVH7Xqwd+1Q/po5uGiBbzph8ebX6T0uvt3N7c1nBHQNsQVykQgHhqoRTX7JFcHecGuw==}
 
   nth-check@2.1.1:
     resolution: {integrity: sha512-lqjrjmaOoAnWfMmBPL+XNnynZh2+swxiX3WUE0s4yEHI6m+AwrK2UZOimIRl3X/4QctVqS8AiZjFqyOGrMXb/w==}
@@ -1353,6 +1390,8 @@ snapshots:
     dependencies:
       package-manager-detector: 1.9.0
       tinyexec: 1.3.1
+
+  '@babel/runtime@7.29.14': {}
 
   '@braintree/sanitize-url@7.1.2': {}
 
@@ -1649,6 +1688,10 @@ snapshots:
   '@esbuild/win32-x64@0.25.12':
     optional: true
 
+  '@gera2ld/jsx-dom@2.2.2':
+    dependencies:
+      '@babel/runtime': 7.29.14
+
   '@iconify/types@2.0.0': {}
 
   '@iconify/utils@3.1.7':
@@ -1838,6 +1881,10 @@ snapshots:
   '@types/node@26.6.6':
     dependencies:
       undici-types: 8.9.0
+
+  '@types/react-dom@19.3.0(@types/react@19.3.0)':
+    dependencies:
+      '@types/react': 19.3.0
 
   '@types/react@19.3.0':
     dependencies:
@@ -2323,6 +2370,18 @@ snapshots:
 
   marked@16.4.2: {}
 
+  markmap-common@0.18.9:
+    dependencies:
+      '@babel/runtime': 7.29.14
+      '@gera2ld/jsx-dom': 2.2.2
+      npm2url: 0.2.4
+
+  markmap-view@0.18.13(markmap-common@0.18.9):
+    dependencies:
+      '@babel/runtime': 7.29.14
+      d3: 7.9.2
+      markmap-common: 0.18.9
+
   mathml-to-latex@1.8.0:
     dependencies:
       '@xmldom/xmldom': 0.9.12
@@ -2357,6 +2416,8 @@ snapshots:
     dependencies:
       css-select: 5.2.2
       he: 1.2.0
+
+  npm2url@0.2.4: {}
 
   nth-check@2.1.1:
     dependencies:

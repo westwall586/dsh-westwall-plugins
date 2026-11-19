@@ -90,6 +90,10 @@ function blockKey(block: Block): string {
       return JSON.stringify(['paragraph', inlineKeys(block.inline)])
     case 'code':
       return JSON.stringify(['code', block.lang, normalizeCode(block.content)])
+    case 'mermaid':
+      return JSON.stringify(['mermaid', normalizeCode(block.content)])
+    case 'markmap':
+      return JSON.stringify(['markmap', block.lang, normalizeCode(block.content)])
     case 'table':
       return JSON.stringify(['table', block.header.map(cellKey), block.rows.map(row => row.map(cellKey))])
     case 'list':

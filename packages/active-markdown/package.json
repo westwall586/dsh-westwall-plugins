@@ -57,13 +57,17 @@
     "@types/markdown-it": "^14.1.2",
     "@types/node": "^24.0.0",
     "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.3.0",
     "esbuild": "^0.25.0",
     "markdown-it": "14.1.0",
+    "markmap-common": "0.18.9",
+    "markmap-view": "0.18.13",
+    "mermaid": "11.15.0",
     "typescript": "~5.9.3"
   },
   "files": [
     "lib",
-    "client.js",
+    "client*.js",
     "cordis.patch.yml",
     "locale",
     "icon.svg",

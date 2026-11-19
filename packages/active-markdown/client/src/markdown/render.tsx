@@ -9,6 +9,9 @@ import { ComponentFrame } from './component-frame.tsx'
 import { resolveCallout } from './callout.ts'
 import { splitSourceLines, type SourceLine } from './lines.ts'
 import { isRemoteSource } from '../images.ts'
+import { MarkmapView } from '../rich/markmap.tsx'
+import { MermaidView } from '../rich/mermaid.tsx'
+import type { RichLabels } from '../rich/labels.ts'
 
 /** Copy the labels this view needs. */
 export interface RenderLabels {
@@ -21,6 +24,8 @@ export interface RenderLabels {
   edit: string
   wrap: string
   nowrap: string
+  /** Localized copy for the lazily rendered diagrams. */
+  rich: RichLabels
   /** One callout type's localized label. */
   calloutType: (id: string) => string
 }
@@ -97,7 +102,9 @@ function renderBlock(
       )
     }
     case 'code':
-    case 'table': {
+    case 'table':
+    case 'mermaid':
+    case 'markmap': {
       const component = componentOf(block)
       if (component === null) return null
       return (
@@ -118,7 +125,13 @@ function renderBlock(
             nowrap: labels.nowrap,
           }}
         >
-          {block.type === 'table' ? renderTable(block, key, labels, actions) : wrap => renderCode(block, wrap)}
+          {block.type === 'table'
+            ? renderTable(block, key, labels, actions)
+            : block.type === 'code'
+              ? (wrap => renderCode(block, wrap))
+              : block.type === 'mermaid'
+                ? <MermaidView code={block.content} labels={labels.rich} />
+                : <MarkmapView code={block.content} labels={labels.rich} />}
         </ComponentFrame>
       )
     }

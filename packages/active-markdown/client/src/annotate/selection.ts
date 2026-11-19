@@ -96,7 +96,8 @@ export function collectLineAtoms(blocks: readonly Block[]): TextLineAtom[] {
 export function collectComponentRanges(blocks: readonly Block[]): ComponentRange[] {
   const ranges: ComponentRange[] = []
   walkBlocks(blocks, (block) => {
-    if (block.type !== 'code' && block.type !== 'table' && block.type !== 'callout') return
+    if (block.type !== 'code' && block.type !== 'table' && block.type !== 'callout'
+      && block.type !== 'mermaid' && block.type !== 'markmap') return
     ranges.push({ blockId: block.id, lineStart: block.sourceStartLine, lineEnd: block.sourceEndLine })
   })
   return ranges

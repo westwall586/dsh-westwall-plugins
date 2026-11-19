@@ -25,7 +25,7 @@ const OPTIONS = {
   target: ['es2022'],
   jsx: 'transform',
   minify: true,
-  external: ['react', '@deepseek-ai/dsh-client-ui-primitives'],
+  external: ['react', 'react-dom', '@deepseek-ai/dsh-client-ui-primitives'],
   loader: { '.css': 'text' },
   legalComments: 'inline',
   define: { 'process.env.NODE_ENV': '"production"' },

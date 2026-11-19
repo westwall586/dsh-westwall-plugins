@@ -95,7 +95,7 @@
 | markmap | ✓ | ✓ | ✓ | ✓ | | ✓ | ✓ |
 | callout | | | | | | | ✓ |
 
-- 头部：左侧类型图标与标签（callout 用规范图标、类型名与标题），右侧 28×28、圆角 6 的图标按钮，悬停 `--dsw-alias-bg-layer-3`。顺序固定为全屏、换行（仅 code）、批注、复制；能力关掉、没有可复制文本或视图只读时对应按钮不出现。面板里的全屏按钮换成关闭图标。
+- 头部：左侧类型图标与标签（callout 用规范图标、类型名与标题），右侧 28×28、圆角 6 的图标按钮（16 网格、1.3 描边，与顶栏工具栏同一套画法），悬停 `--dsw-alias-bg-layer-3`。顺序固定为换行（仅 code）、复制、批注、全屏；能力关掉、没有可复制文本或视图只读时对应按钮不出现。面板里的全屏按钮换成关闭图标。
 - 图标：`client/src/rich/icons.tsx` 里的内联 SVG（`ExpandIcon`、`CloseIcon`、`CopyIcon`、`WrapIcon`、`AnnotateIcon`、`FitIcon`、`ActualIcon`），15–16px、`currentColor`、`stroke-width 1.7`，每个按钮都带 `aria-label` 与 `title`。
 - 面板：遮罩 `rgba(0, 0, 0, 0.62)`；面板 `width: min(100%, clamp(940px, 72vw, 1600px))`、`height: min(100%, clamp(656px, 78vh, 1000px))`、14px 圆角、`--dsw-alias-bg-layer-1`。Esc、点遮罩与关闭按钮三条路径都关，打开时聚焦关闭按钮，关闭后焦点回到全屏按钮并恢复 `body` 滚动。
 - 底栏：只在 `zoom` 能力下出现，居中为 `−`、百分比、`+`、分隔线、「适配」与「实际大小」；百分比以适配为 100%。表格与代码的正文不挂底栏，也不铺点状底。
@@ -186,7 +186,7 @@
 
 ### 11.3 组件全屏
 
-- 统一外壳与能力表见第 6 节。`ComponentFrame` 出两种形态（`inline` 与 `panel`）：同一个头部、同一条按钮顺序（全屏、换行、批注、复制），面板里的全屏按钮换成关闭图标；按钮集合由 `COMPONENT_REGISTRY` 的能力表生成。
+- 统一外壳与能力表见第 6 节。`ComponentFrame` 出两种形态（`inline` 与 `panel`）：同一个头部、同一条按钮顺序（换行、复制、批注、全屏），面板里的全屏按钮换成关闭图标；按钮集合由 `COMPONENT_REGISTRY` 的能力表生成。
 - `children` 是渲染函数 `({ wrap, expanded }) => ReactNode`；弹框内以 `expanded: true` 再渲染一次同一份内容。Mermaid 与导图在 `expanded` 时挂各自的舞台与同一条底栏，code 与 table 不挂底栏。
 - 弹框结构：遮罩 `position: fixed; inset: 0; z-index: 30; background: rgba(0, 0, 0, 0.62)`，`createPortal` 到 `document.body`；面板 `width: min(100%, clamp(940px, 72vw, 1600px))`、`height: min(100%, clamp(656px, 78vh, 1000px))`、14px 圆角、`--dsw-alias-bg-layer-1` 与阴影；头部是外壳同款，正文是可滚动的 flex 区，`zoom` 能力的正文铺点状底并在底部留底栏。
 - 关闭：Esc（捕获阶段）、点遮罩、关闭按钮三条路径都关；打开时聚焦关闭按钮，关闭后焦点回到全屏按钮并恢复 `body` 滚动。

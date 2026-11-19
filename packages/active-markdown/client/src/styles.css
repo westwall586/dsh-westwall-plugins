@@ -461,6 +461,18 @@
   --markmap-highlight-bg: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 30%, transparent);
 }
 
+/* markmap injects its own palette inside the SVG; repaint from theme tokens.
+   The element selector outranks the injected `.markmap` rule. */
+svg.am-markmap-canvas {
+  --markmap-text-color: var(--dsw-alias-label-primary);
+  --markmap-a-color: var(--dsw-alias-link);
+  --markmap-a-hover-color: var(--dsw-alias-link);
+  --markmap-code-bg: var(--dsw-alias-markdown-inline-code);
+  --markmap-code-color: var(--dsw-alias-label-secondary);
+  --markmap-circle-open-bg: var(--dsw-alias-bg-layer-1);
+  --markmap-font: 14px/20px var(--dsh-font-family-code, sans-serif);
+}
+
 .am-markmap-canvas.markmap {
   font-family: inherit;
   font-weight: 400;

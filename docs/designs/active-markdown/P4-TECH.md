@@ -114,7 +114,7 @@
 - 全屏：遮罩 + 居中容器 + `ZoomControls`（放大 / 缩小 / 复位 / 预设），Esc、关闭按钮与遮罩点击都能关，关闭后焦点回到「全屏」按钮。
 - 缓存：同一源码 + 同一主题指纹只渲染一次，SVG 留在内存。
 
-实测范围：`test/blocks.test.ts` 覆盖 mermaid 围栏成块；`pnpm build` 产出 `client.mermaid.js` 3,317,876 字节（gzip 908,519），低于 chunk 的 4 MiB 门；入口 `client.js` 859,352 字节里 `flowchart`、`sequenceDiagram`、`mermaidAPI` 的 grep 计数都是 0。Web 版的首次真实 chunk 加载、明暗重渲染与全屏交互留待 P4c 验收实测。
+实测范围：`test/blocks.test.ts` 覆盖 mermaid 围栏成块；`pnpm build` 产出 `client.mermaid.js` 3,317,876 字节（gzip 908,519），低于 chunk 的 4 MiB 门；入口 `client.js` 859,352 字节里 `flowchart`、`sequenceDiagram`、`mermaidAPI` 的 grep 计数都是 0。Web 版实测：没有图的文档零请求，含图的文档只请求 `client.mermaid.js` 与 `client.markmap.js` 两个 chunk；正常图渲染出 422×168 的 SVG，写坏的图回退成源码 + 「Parse error on line 2」+「复制错误」；全屏遮罩有关闭 / 缩小 / 缩放比例 / 放大四个控件，Esc 关闭后焦点回到「全屏」。暗色主题下实测，亮色未切换。
 
 ## 8. 思维导图
 
@@ -122,7 +122,7 @@
 
 - 入口：代码块语言为 `markmap` / `mindmap` 时走导图，不吃 Mermaid 的图类型。
 - 转换：H1–H6 与嵌套列表转成 Markmap 的节点树；段落并入最近节点的描述行，用第一个换行分隔。转树是 `client/src/rich/tree.ts` 的纯函数，只读本插件块模型。
-- 视图：`markmap-view` 只读模式，初始展开层级 2，支持缩放与拖拽；节点文本先转义再加换行，不执行图内 HTML；分支色从 palette 的语义色取。
+- 视图：`markmap-view` 只读模式，初始展开层级 2，支持缩放与拖拽；节点文本先转义再加换行，不执行图内 HTML；分支色从 palette 的语义色取；单个顶层标题直接作为根节点，不再套一个空根；节点文字与连线颜色由 `svg.am-markmap-canvas` 上的 `--markmap-*` 变量从主题 token 重设（markmap 自带的深色文字会压到 0.1 的层级）。
 - 全屏复用 Mermaid 那套壳；批注：整个导图是一个组件，可复制源码。
 
 实测范围：`test/rich-trees.test.ts` 覆盖标题层级、列表嵌套、段落并入与多个 H1；`pnpm build` 产出 `client.markmap.js` 119,083 字节（gzip 39,475），低于 4 MiB 门；入口 `client.js` 里 `markmap-view`、`markmap-common`、`initialExpandLevel` 的 grep 计数都是 0。浏览器端的拖拽、折叠与明暗重渲染留待 P4d 验收实测。

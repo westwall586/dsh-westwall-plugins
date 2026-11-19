@@ -77,7 +77,12 @@ export interface MarkmapViewProps {
  */
 export function MarkmapView({ code, labels }: MarkmapViewProps): ReactNode {
   const palette = usePalette()
-  const tree = useMemo(() => outlineToTree(parseDocument(code).blocks), [code])
+  // A lone top heading becomes the root itself; otherwise the map would open on
+  // an empty node just above it.
+  const tree = useMemo(() => {
+    const full = outlineToTree(parseDocument(code).blocks)
+    return full.children.length === 1 ? full.children[0]! : full
+  }, [code])
   const [state, setState] = useState<MountState>({ kind: 'loading' })
   const [expanded, setExpanded] = useState(false)
   const [overlayState, setOverlayState] = useState<MountState>({ kind: 'loading' })

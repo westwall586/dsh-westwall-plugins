@@ -131,6 +131,11 @@ export function ComponentFrame({
     if (button === 'annotate') return annotate !== undefined
     return true
   })
+  // The panel has room the pane does not, so its head offers a wrap toggle even
+  // where the inline copy has none; the inline copy keeps its own layout.
+  const panelButtons = capabilities.panelWrap && !buttons.includes('wrap')
+    ? ['wrap' as const, ...buttons]
+    : buttons
   const annotateLabel = annotation === undefined ? labels.annotate : labels.edit
 
   /** One header row; the panel copy swaps the expand button for a close button. */
@@ -142,7 +147,7 @@ export function ComponentFrame({
       {annotation === undefined ? null : <span className="am-component-seq">#{annotation.seq}</span>}
       {copied ? <span className="am-component-feedback" role="status">{labels.copied}</span> : null}
       <div className="am-component-actions">
-        {buttons.map((button) => renderButton(button, variant))}
+        {(variant === 'panel' ? panelButtons : buttons).map((button) => renderButton(button, variant))}
       </div>
     </div>
   )

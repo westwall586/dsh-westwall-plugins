@@ -36,7 +36,7 @@ test('文本块没有组件外壳，表格与代码块有类型、能力与签�
   assert.equal(table.kind, 'table')
   assert.deepEqual(table.label, { kind: 'table', columns: 2, rows: 1 })
   assert.deepEqual(table.capabilities, {
-    fullscreen: true, clickToExpand: false, zoom: false, pan: false, wrap: false, copy: false, annotate: true,
+    fullscreen: true, clickToExpand: false, zoom: false, pan: false, wrap: false, panelWrap: true, copy: false, annotate: true,
   })
   assert.match(table.signature, /^table:2x1:/)
   assert.equal(table.lineStart, TABLE.sourceStartLine)
@@ -46,7 +46,7 @@ test('文本块没有组件外壳，表格与代码块有类型、能力与签�
   assert.equal(code.kind, 'code')
   assert.deepEqual(code.label, { kind: 'code', lang: 'ts' })
   assert.deepEqual(code.capabilities, {
-    fullscreen: true, clickToExpand: false, zoom: false, pan: false, wrap: true, copy: true, annotate: true,
+    fullscreen: true, clickToExpand: false, zoom: false, pan: false, wrap: true, panelWrap: false, copy: true, annotate: true,
   })
   assert.equal(code.copyText, 'const a = 1')
   assert.match(code.signature, /^code:ts:/)
@@ -67,7 +67,7 @@ test('能力表按组件给按钮，图才有点击放大与缩放平移', () =>
   assert.deepEqual(components.map(component => component?.kind), ['mermaid', 'markmap'])
   for (const component of components) {
     assert.deepEqual(component!.capabilities, {
-      fullscreen: true, clickToExpand: true, zoom: true, pan: true, wrap: false, copy: true, annotate: true,
+      fullscreen: true, clickToExpand: true, zoom: true, pan: true, wrap: false, panelWrap: false, copy: true, annotate: true,
     })
     assert.deepEqual(frameButtons(component!.capabilities), ['copy', 'annotate', 'fullscreen'])
   }
@@ -81,6 +81,17 @@ test('按钮顺序固定为换行、复制、批注、全屏，callout 只有批
   assert.deepEqual(frameButtons(COMPONENT_REGISTRY.callout.capabilities), ['annotate'])
   for (const definition of Object.values(COMPONENT_REGISTRY)) {
     assert.equal(definition.capabilities.zoom, definition.capabilities.pan, `${definition.kind} 的缩放与拖动同开同关`)
+  }
+})
+
+test('表格只在全屏面板里多一个换行开关，内联按钮不变', () => {
+  const table = COMPONENT_REGISTRY.table.capabilities
+  assert.equal(table.wrap, false)
+  assert.equal(table.panelWrap, true)
+  assert.deepEqual(frameButtons(table), ['annotate', 'fullscreen'])
+  for (const definition of Object.values(COMPONENT_REGISTRY)) {
+    if (definition.kind === 'table') continue
+    assert.equal(definition.capabilities.panelWrap, false, `${definition.kind} 没有面板换行`)
   }
 })
 

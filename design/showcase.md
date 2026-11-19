@@ -180,7 +180,7 @@ after a blank line
 | 左 | 中 | 右 |
 | 短 | 中间 | 99998 |
 
-超宽表，列数多到压缩不下时，窄栏与全屏都应该横向滚动：
+超宽表：窄栏横滚；全屏默认也横滚，点弹框头部多出来的「换行」改成折行，列数不再受限：
 
 | 组件 | 输入 | 输出 | 触发 | 回退 | 主题 | 体积 | 备注 | 状态 | 责任 | 版本 | 验收 |
 |---|---|---|---|---|---|---|---|---|---|---|---|
@@ -197,6 +197,7 @@ after a blank line
 |---|---|
 | `packages/active-markdown/client/src/rich/mermaid/chunk.tsx` | 路径比较长，应该换行而不是撑破 |
 | `design/assets/checker.png` | 短路径 |
+| `packages/active-markdown/client/src/body.tsx` | 这一行用来看全屏里的折行：默认横滚，点头部「换行」之后应当按面板宽度折行，不再需要左右拖。 |
 
 ## 图片
 

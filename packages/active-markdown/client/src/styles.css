@@ -411,11 +411,15 @@
   margin: 0;
 }
 
-/* The expanded copy fills the viewport over a scrim; the document stays in place underneath. */
+/* The expanded copy fills the viewport over a scrim; the document stays in place underneath.
+   The dockkit keeps its own scale: the frame's overlays sit at 20, a fullscreen
+   sidebar pane at 40, and independently floating panels at 60. The panel rides
+   between them, so opening it over a fullscreen sidebar works while shell menus
+   still come out on top. */
 .am-component-overlay {
   position: fixed;
   inset: 0;
-  z-index: 30;
+  z-index: 50;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -772,6 +776,18 @@ svg.am-markmap-canvas .markmap-foreign > div {
 .am-table th {
   background: var(--dsw-alias-bg-layer-2);
   font-weight: 600;
+}
+
+/* The panel is wide enough to read across, so its head offers a wrap toggle for
+   tables that would otherwise drag sideways. Off by default: the panel keeps
+   the inline scroll. On, cells wrap at the panel width whatever the column
+   count; the inline copy is out of scope and still scrolls. */
+.am-component-panel-body .am-table-wrap[data-wrap='true'] .am-table {
+  min-width: 100%;
+}
+
+.am-component-panel-body .am-table-wrap[data-wrap='true'] :is(th, td) {
+  overflow-wrap: anywhere;
 }
 
 .am-divider {
@@ -1879,9 +1895,10 @@ svg.am-markmap-canvas .markmap-foreign > div {
   color: var(--dsw-alias-label-primary);
 }
 
+/* Above the expanded panel: deleting an annotation from its drawer offers undo. */
 .am-toast {
   position: fixed;
-  z-index: 40;
+  z-index: 55;
   bottom: 24px;
   left: 50%;
   display: flex;

@@ -129,7 +129,7 @@ test('行间公式作为组件带复制与批注，没有全屏', () => {
   assert.equal(view.copyText, 'x')
   assert.match(view.signature, /^math:/)
   assert.deepEqual(view.capabilities, {
-    fullscreen: false, clickToExpand: false, zoom: false, pan: false, wrap: false, copy: true, annotate: true,
+    fullscreen: false, clickToExpand: false, zoom: false, pan: false, wrap: false, panelWrap: false, copy: true, annotate: true,
   })
   assert.deepEqual(view.capabilities, COMPONENT_REGISTRY.math.capabilities)
   assert.deepEqual(frameButtons(view.capabilities), ['copy', 'annotate'])

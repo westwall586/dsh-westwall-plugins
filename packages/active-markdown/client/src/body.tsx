@@ -1,6 +1,7 @@
 /** The document body: read, fallbacks, the rendered Markdown, and annotations. */
 import * as React from 'react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import type { AttachmentController, AttachmentFailure } from './annotate/attachment.ts'
 import type { PendingHub } from './annotate/committer.ts'
 import { AnnotationDrawer } from './annotate/drawer.tsx'
@@ -2609,9 +2610,11 @@ export function Body({
           onCancel={() => setEditor(null)}
         />
       )}
+      {/* The toast can report a delete made from the expanded panel, which is
+          portaled to the body; its own copy is portaled for the same reason. */}
       {notice === null
         ? null
-        : (
+        : createPortal(
           <div className="am-toast" role="status">
             <span>{notice.text}</span>
             {notice.copyPath === undefined
@@ -2635,7 +2638,8 @@ export function Body({
             {notice.undo && undo !== null && !editPhase
               ? <button type="button" className="am-toast-action" onClick={undoDelete}>{t('annotate.undo')}</button>
               : null}
-          </div>
+          </div>,
+          document.body,
         )}
     </div>
   )

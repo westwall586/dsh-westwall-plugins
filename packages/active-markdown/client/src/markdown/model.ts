@@ -19,6 +19,11 @@ export interface ComponentCapabilities {
   pan: boolean
   /** The header's wrap toggle. */
   wrap: boolean
+  /**
+   * The panel copy's wrap toggle, for a body that reads better across the panel
+   * than the narrow pane. The inline copy keeps its own layout either way.
+   */
+  panelWrap: boolean
   /** The header's copy button, when the component has text to copy. */
   copy: boolean
   /** The header's annotation button, when the view is not read-only. */
@@ -34,27 +39,27 @@ export interface ComponentDefinition {
 export const COMPONENT_REGISTRY: Record<ComponentKind, ComponentDefinition> = {
   table: {
     kind: 'table',
-    capabilities: { fullscreen: true, clickToExpand: false, zoom: false, pan: false, wrap: false, copy: false, annotate: true },
+    capabilities: { fullscreen: true, clickToExpand: false, zoom: false, pan: false, wrap: false, panelWrap: true, copy: false, annotate: true },
   },
   code: {
     kind: 'code',
-    capabilities: { fullscreen: true, clickToExpand: false, zoom: false, pan: false, wrap: true, copy: true, annotate: true },
+    capabilities: { fullscreen: true, clickToExpand: false, zoom: false, pan: false, wrap: true, panelWrap: false, copy: true, annotate: true },
   },
   callout: {
     kind: 'callout',
-    capabilities: { fullscreen: false, clickToExpand: false, zoom: false, pan: false, wrap: false, copy: false, annotate: true },
+    capabilities: { fullscreen: false, clickToExpand: false, zoom: false, pan: false, wrap: false, panelWrap: false, copy: false, annotate: true },
   },
   mermaid: {
     kind: 'mermaid',
-    capabilities: { fullscreen: true, clickToExpand: true, zoom: true, pan: true, wrap: false, copy: true, annotate: true },
+    capabilities: { fullscreen: true, clickToExpand: true, zoom: true, pan: true, wrap: false, panelWrap: false, copy: true, annotate: true },
   },
   markmap: {
     kind: 'markmap',
-    capabilities: { fullscreen: true, clickToExpand: true, zoom: true, pan: true, wrap: false, copy: true, annotate: true },
+    capabilities: { fullscreen: true, clickToExpand: true, zoom: true, pan: true, wrap: false, panelWrap: false, copy: true, annotate: true },
   },
   math: {
     kind: 'math',
-    capabilities: { fullscreen: false, clickToExpand: false, zoom: false, pan: false, wrap: false, copy: true, annotate: true },
+    capabilities: { fullscreen: false, clickToExpand: false, zoom: false, pan: false, wrap: false, panelWrap: false, copy: true, annotate: true },
   },
 }
 

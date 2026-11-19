@@ -87,15 +87,15 @@
 
 已实现（P4b，P4f 统一外壳）。所有非文本块共用一个 `ComponentFrame`：同一个头部、同一套图标按钮、同一个弹框，`inline` 与 `panel` 两种形态只差容器样式和「全屏 / 关闭」按钮。按钮与底栏由 `client/src/markdown/model.ts` 的 `COMPONENT_REGISTRY` 能力表生成，组件之间不再各写一套头部。
 
-| 组件 | fullscreen | clickToExpand | zoom | pan | wrap | copy | annotate |
-|---|---|---|---|---|---|---|---|
-| table | ✓ | | | | | | ✓ |
-| code | ✓ | | | | ✓ | ✓ | ✓ |
-| mermaid | ✓ | ✓ | ✓ | ✓ | | ✓ | ✓ |
-| markmap | ✓ | ✓ | ✓ | ✓ | | ✓ | ✓ |
-| callout | | | | | | | ✓ |
+| 组件 | fullscreen | clickToExpand | zoom | pan | wrap | panelWrap | copy | annotate |
+|---|---|---|---|---|---|---|---|---|
+| table | ✓ | | | | | ✓ | | ✓ |
+| code | ✓ | | | | ✓ | | ✓ | ✓ |
+| mermaid | ✓ | ✓ | ✓ | ✓ | | | ✓ | ✓ |
+| markmap | ✓ | ✓ | ✓ | ✓ | | | ✓ | ✓ |
+| callout | | | | | | | | ✓ |
 
-- 头部：左侧类型图标与标签。callout 是例外：图标已经表达类型，头部只留语义图标 + 标题（有标题用标题，空标题用类型名兜底，标题 13px / 600），类型名放进 head 的 `title`，不丢信息。右侧 28×28、圆角 6 的图标按钮（16 网格、1.3 描边，与顶栏工具栏同一套画法），悬停 `--dsw-alias-bg-layer-3`。顺序固定为换行（仅 code）、复制、批注、全屏；能力关掉、没有可复制文本或视图只读时对应按钮不出现。面板里的全屏按钮换成关闭图标。
+- 头部：左侧类型图标与标签。callout 是例外：图标已经表达类型，头部只留语义图标 + 标题（有标题用标题，空标题用类型名兜底，标题 13px / 600），类型名放进 head 的 `title`，不丢信息。右侧 28×28、圆角 6 的图标按钮（16 网格、1.3 描边，与顶栏工具栏同一套画法），悬停 `--dsw-alias-bg-layer-3`。顺序固定为换行（code 常驻；table 只在面板里出现）、复制、批注、全屏；能力关掉、没有可复制文本或视图只读时对应按钮不出现。面板里的全屏按钮换成关闭图标。
 - 图标：`client/src/rich/icons.tsx` 里的内联 SVG（`ExpandIcon`、`CollapseIcon`、`CloseIcon`、`CopyIcon`、`CheckIcon`、`WrapIcon`、`AnnotateIcon`、`FitIcon`、`ActualIcon`），14px、`currentColor`、`stroke-width 1.3`，每个按钮都带 `aria-label` 与 `title`。front matter 卡的复制按钮复用同一套。
 - 面板：遮罩 `rgba(0, 0, 0, 0.62)`；面板 `width: min(100%, clamp(940px, 72vw, 1600px))`、`height: min(100%, clamp(656px, 78vh, 1000px))`、14px 圆角、`--dsw-alias-bg-layer-1`。Esc、点遮罩与关闭按钮三条路径都关，打开时聚焦关闭按钮，关闭后焦点回到全屏按钮并恢复 `body` 滚动。
 - 底栏：只在 `zoom` 能力下出现，居中为 `−`、百分比、`+`、分隔线、「适配」与「实际大小」；百分比以适配为 100%。表格与代码的正文不挂底栏，也不铺点状底。
@@ -195,7 +195,7 @@
 
 - 统一外壳与能力表见第 6 节。`ComponentFrame` 出两种形态（`inline` 与 `panel`）：同一个头部、同一条按钮顺序（换行、复制、批注、全屏），面板里的全屏按钮换成关闭图标；按钮集合由 `COMPONENT_REGISTRY` 的能力表生成。
 - `children` 是渲染函数 `({ wrap, expanded }) => ReactNode`；弹框内以 `expanded: true` 再渲染一次同一份内容。Mermaid 与导图在 `expanded` 时挂各自的舞台与同一条底栏，code 与 table 不挂底栏。
-- 弹框结构：遮罩 `position: fixed; inset: 0; z-index: 30; background: rgba(0, 0, 0, 0.62)`，`createPortal` 到 `document.body`；面板 `width: min(100%, clamp(940px, 72vw, 1600px))`、`height: min(100%, clamp(656px, 78vh, 1000px))`、14px 圆角、`--dsw-alias-bg-layer-1` 与阴影；头部是外壳同款，正文是可滚动的 flex 区，`zoom` 能力的正文铺点状底并在底部留底栏。
+- 弹框结构：遮罩 `position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, 0.62)`，`createPortal` 到 `document.body`；面板 `width: min(100%, clamp(940px, 72vw, 1600px))`、`height: min(100%, clamp(656px, 78vh, 1000px))`、14px 圆角、`--dsw-alias-bg-layer-1` 与阴影；头部是外壳同款，正文是可滚动的 flex 区，`zoom` 能力的正文铺点状底并在底部留底栏。
 - 关闭：Esc（捕获阶段）、点遮罩、关闭按钮三条路径都关；打开时聚焦关闭按钮，关闭后焦点回到全屏按钮并恢复 `body` 滚动。
 - 实测范围：`test/component-frame.test.ts` 断言能力表、按钮顺序与图标集；本轮 `pnpm build` 入口 `client.js` 870,031 字节。Web 端本轮未重做实测：亮色与暗色下的面板、底栏与关闭后的焦点待验收。
 
@@ -210,11 +210,20 @@
 - 底栏百分比不跟随缩放：chunk 原来把监听挂在 `map.svg.on('zoom.scale-track')` 上，而 d3-zoom 的 `zoom` 事件走 behavior 自己的 dispatch，元素上收不到，底栏因此一直停在 100%。改挂 `map.zoom.on('zoom.scale-track')` 后实测跟随。
 - 「实际大小」回到自然尺寸：markmap 的 `rescale()` 是相对倍率，原实现乘 `fitScale / k`，落到「回到适配」而不是「回到 1」；`actualFactor` 改成 `1 / k` 并同步改测试与调用点，实测 k 3.125 → 1、百分比 156% → 50%（该图适配在 200%）。
 
-## 13. 风险与不做
+## 13. 表格全屏折行与浮窗层级（2026-11-19）
+
+维护者在桌面端反馈两点：超长表格进了全屏仍要左右拖；侧栏全屏时组件弹框被压在下面、要收回侧栏才看得到。
+
+- 表格默认仍是横滚。`COMPONENT_REGISTRY.table` 增加 `panelWrap` 能力：面板头部多一个换行按钮，内联头部不受影响（内联没有这个按钮，CSS 也只作用于 `.am-component-panel-body`）。打开后 `.am-table-wrap[data-wrap='true']` 下的表格 `min-width: 100%`、单元格 `overflow-wrap: anywhere`，不设列宽下限，所以列再多也折行而不横滚——这是维护者选定的取舍，默认状态才是给宽表横滚用的。实测 12 列长单元格：默认 `scrollWidth` 1433 > 1352，打开后 1352，120 字符无空格 URL 也折行；内联表格的 `min-width` 仍是 `max-content`。
+- 浮窗层级：宿主 dockkit 把侧栏全屏的 grid cell 设成 `--dsh-dockkit-dock-layer: 40`，该 cell 虽是 `position: static`，作为 grid item 的 `z-index: 40` 仍然生效，成了 40 层堆叠上下文；弹框原来是 30，正好被压住。抬到 50（宿主自述的 20 框内覆盖层 / 40 侧栏全屏 / 60 独立浮层之间的空档）。实测：侧栏全屏时 `elementFromPoint` 先命中面板；把那个 cell 的 `z-index` 临时改 `auto`，命中也会翻回面板。
+- 撤销 toast 跟着改：它原来渲染在文档里，弹框抬高后会被遮罩盖住；改成 `createPortal` 到 `document.body` 并放到 55，删除批注后仍能在面板之上点「撤销」。
+- 测试：`test/component-frame.test.ts` 增加「面板换行只给表格」的断言（table 的 `wrap` 仍为 false、`panelWrap` 为 true，内联按钮序列不变）。
+
+## 14. 风险与不做
 
 - **产物变大**：`client.mermaid.js` 3.2MB（gzip 约 887KB）与 `client.markmap.js` 116KB（gzip 约 39KB）入库；构建时间与仓库体积上涨，换来首屏零成本。
 - **隐式依赖**：数学的字来自 shell 全局 CSS。shell 若换渲染方案，公式会退到系统衬线；兜底方案是 chunk 内联字体（+296KB 原始字体）。
 - **chunk 首次加载**：文档里有图/公式时多一次本地请求，宿主按 revision 缓存，不做预取。
-- **全屏层级**：弹框固定 `z-index: 30`，与 friendly-expression 一致；宿主若出现高于 30 的常驻浮层，弹框会压在它下面。
+- **全屏层级**：弹框固定 `z-index: 50`，夹在宿主 dockkit 的 40（侧栏全屏）与 60（独立浮层）之间；宿主若把常驻浮层抬到 50 以上，弹框会压在它下面，届时按宿主的层级表再挪。
 - **侧栏浏览器是宿主能力**：Web profile 没有 `browser` 页签，外部链接退回系统新标签页；侧栏浏览器只在桌面版出现。
 - **不做**：Markmap 之外的大纲视图、自带高亮库、主题系统、导出 PDF、Gherkin、行级富组件批注。

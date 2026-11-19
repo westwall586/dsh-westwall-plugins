@@ -144,7 +144,7 @@ function renderBlock(
         >
           {(context) => {
             switch (block.type) {
-              case 'table': return renderTable(block, key, labels, actions)
+              case 'table': return renderTable(block, key, labels, actions, context.wrap)
               case 'code': return renderCode(block, context.wrap, labels)
               case 'mermaid': return <MermaidView code={block.content} labels={labels.rich} expanded={context.expanded} />
               case 'markmap': return <MarkmapView code={block.content} labels={labels.rich} expanded={context.expanded} />
@@ -229,9 +229,11 @@ function renderTable(
   key: string,
   labels: RenderLabels,
   actions: RenderActions,
+  wrap: boolean,
 ): ReactNode {
+  // Only the panel copy honors `wrap`; the inline copy is styled to scroll.
   return (
-    <div className="am-table-wrap">
+    <div className="am-table-wrap" data-wrap={wrap ? 'true' : undefined}>
       <table className="am-table">
         <thead><tr data-line={block.sourceStartLine}>{block.header.map((cell, index) => <th key={index} style={cell.align === undefined ? undefined : { textAlign: cell.align }}>{renderInline(cell.inline, `${key}-h${index}`, labels, actions)}</th>)}</tr></thead>
         <tbody>{block.rows.map((row, rowIndex) => <tr key={rowIndex} data-line={block.sourceStartLine + 2 + rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex} style={cell.align === undefined ? undefined : { textAlign: cell.align }}>{renderInline(cell.inline, `${key}-${rowIndex}-${cellIndex}`, labels, actions)}</td>)}</tr>)}</tbody>

@@ -1,6 +1,6 @@
 # Active Markdown P4 技术方案：富渲染与阅读打磨
 
-> 状态：进行中（2026-11-19）。定位见 [POSITIONING.md](POSITIONING.md)，阶段见 [ROADMAP.md](ROADMAP.md)，块模型见 [P1-TECH.md](P1-TECH.md)，样式与批注壳见 [P2-ANNOTATION-TECH.md](P2-ANNOTATION-TECH.md)。
+> 状态：已实现（2026-11-19），Web 版逐项实测，桌面端与亮色主题待验收。定位见 [POSITIONING.md](POSITIONING.md)，阶段见 [ROADMAP.md](ROADMAP.md)，块模型见 [P1-TECH.md](P1-TECH.md)，样式与批注壳见 [P2-ANNOTATION-TECH.md](P2-ANNOTATION-TECH.md)。
 >
 > 本文覆盖 P4：把“读得舒服”补齐。不做 WYSIWYG、主题系统、导出 PDF、Gherkin。代码块语法高亮复用平台 shiki，不另带高亮库。
 

@@ -1141,74 +1141,70 @@ function SectionCard({
   const showDot = section.status !== 'notPublished';
   const degraded = showBrief && brief.detailStatus === 'degraded';
 
-  // The rows are the section card's one grid. The header is a single cell spanning
-  // it, and auto-fit puts rows in two columns exactly when both columns fit. The
-  // cards sit in a list wrapper so the two-column width can be capped and centred
-  // without the section card shrinking away from the scroll area's edges.
-  return h('div', { className: 'dl-list' },
-    h('section', { className: 'dl-card', style: { '--dl-i': index } },
-      h('div', { className: 'dl-rows' },
-      h('div', { className: 'dl-rows-all' },
-        h('div', { className: 'dl-card-head' },
-          h('span', { className: 'dl-ch-dot', 'aria-hidden': true }),
-          h('span', { className: 'dl-card-title' }, channelName(section.source, text)),
-          manual ? h('span', { className: 'dl-card-pill' }, text('x.manual')) : null,
-          h('span', { className: 'dl-card-count' }, String(section.count)),
-          h('span', {
-            className: `dl-card-meta${isError ? ' is-error' : ''}`,
-            title: fetchError || section.fetch?.error || '',
-          },
-            showDot
-              ? h('span', { className: `dl-status-dot ${sectionDotClass(section, fetchError)}` })
-              : null,
-            h('span', { className: 'dl-card-meta-text' }, statusText),
-          ),
-          degraded ? h('span', { className: 'dl-card-hint' }, text('brief.detailsIncomplete')) : null,
-          head.statusText ? h('span', { className: 'dl-card-status' }, head.statusText) : null,
-          canRefresh
-            ? pull.show
-              ? h('button', {
-                type: 'button',
-                className: 'dl-btn dl-btn--sm',
-                disabled: pull.disabled,
-                onClick: () => void actions.refreshSection(section),
-              }, pull.label)
-              : h('button', {
-                type: 'button',
-                className: 'dl-icon-btn dl-icon-btn--sm',
-                title: isPooled ? text('section.rss.pull') : text('section.refetch'),
-                'aria-label': isPooled ? text('section.rss.pull') : text('section.refetch'),
-                disabled: head.refetchDisabled,
-                onClick: () => void actions.refreshSection(section),
-              }, h(RefreshIcon, { size: 12, className: busy ? 'dl-spin' : undefined }))
-            : null,
-          head.showTranslate
-            ? h('button', {
-              type: 'button',
-              className: 'dl-btn dl-btn--sm',
-              disabled: head.translateDisabled,
-              onClick: () => void actions.translateSource(section.source.id),
-            }, head.translateLabel)
-            : null,
-        ),
+  // A channel is a heading followed by its cards, not a container: each row is
+  // its own card on the page's ground, so no shared border turns the list into a
+  // table. The heading scrolls with the rows it names.
+  return h('div', { className: 'dl-group', style: { '--dl-i': index } },
+    h('div', { className: 'dl-card-head' },
+      h('span', { className: 'dl-ch-dot', 'aria-hidden': true }),
+      h('span', { className: 'dl-card-title' }, channelName(section.source, text)),
+      manual ? h('span', { className: 'dl-card-pill' }, text('x.manual')) : null,
+      h('span', { className: 'dl-card-count' }, String(section.count)),
+      h('span', {
+        className: `dl-card-meta${isError ? ' is-error' : ''}`,
+        title: fetchError || section.fetch?.error || '',
+      },
+        showDot
+          ? h('span', { className: `dl-status-dot ${sectionDotClass(section, fetchError)}` })
+          : null,
+        h('span', { className: 'dl-card-meta-text' }, statusText),
       ),
-      head.showError
-        ? h('div', { className: 'dl-translate-error', role: 'status' },
-          h('span', { className: 'dl-translate-error-label' }, text('section.translationFailed')),
-          h('span', { className: 'dl-translate-error-text' }, head.errorMessage),
-          h('span', { className: 'dl-translate-error-hint' }, text('section.translationHint')))
-        : null,
-      isPooled && section.status === 'error'
-        ? h('div', { className: 'dl-section-error', role: 'status' },
-          h('span', { className: 'dl-section-error-text' }, section.fetch?.error || rssChannel?.error || text('card.failed')),
-          h('button', {
+      degraded ? h('span', { className: 'dl-card-hint' }, text('brief.detailsIncomplete')) : null,
+      head.statusText ? h('span', { className: 'dl-card-status' }, head.statusText) : null,
+      canRefresh
+        ? pull.show
+          ? h('button', {
             type: 'button',
             className: 'dl-btn dl-btn--sm',
-            disabled: busy,
+            disabled: pull.disabled,
             onClick: () => void actions.refreshSection(section),
-          }, busy ? text('section.rss.pulling') : text('section.rss.pullShort')))
+          }, pull.label)
+          : h('button', {
+            type: 'button',
+            className: 'dl-icon-btn dl-icon-btn--sm',
+            title: isPooled ? text('section.rss.pull') : text('section.refetch'),
+            'aria-label': isPooled ? text('section.rss.pull') : text('section.refetch'),
+            disabled: head.refetchDisabled,
+            onClick: () => void actions.refreshSection(section),
+          }, h(RefreshIcon, { size: 12, className: busy ? 'dl-spin' : undefined }))
         : null,
-      showBrief ? h(BriefHeader, { brief, text, actions }) : null,
+      head.showTranslate
+        ? h('button', {
+          type: 'button',
+          className: 'dl-btn dl-btn--sm',
+          disabled: head.translateDisabled,
+          onClick: () => void actions.translateSource(section.source.id),
+        }, head.translateLabel)
+        : null,
+    ),
+    head.showError
+      ? h('div', { className: 'dl-translate-error', role: 'status' },
+        h('span', { className: 'dl-translate-error-label' }, text('section.translationFailed')),
+        h('span', { className: 'dl-translate-error-text' }, head.errorMessage),
+        h('span', { className: 'dl-translate-error-hint' }, text('section.translationHint')))
+      : null,
+    isPooled && section.status === 'error'
+      ? h('div', { className: 'dl-section-error', role: 'status' },
+        h('span', { className: 'dl-section-error-text' }, section.fetch?.error || rssChannel?.error || text('card.failed')),
+        h('button', {
+          type: 'button',
+          className: 'dl-btn dl-btn--sm',
+          disabled: busy,
+          onClick: () => void actions.refreshSection(section),
+        }, busy ? text('section.rss.pulling') : text('section.rss.pullShort')))
+      : null,
+    showBrief ? h(BriefHeader, { brief, text, actions }) : null,
+    h('div', { className: 'dl-rows' },
       emptyState === 'none'
         ? null
         : h(SectionEmpty, {
@@ -1233,7 +1229,6 @@ function SectionCard({
         selectMode,
         selected: selected.has(item.id),
       })),
-      ),
     ),
   );
 }

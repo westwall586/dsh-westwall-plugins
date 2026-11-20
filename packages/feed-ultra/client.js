@@ -5465,97 +5465,89 @@ var DshFeedUltraClient = (() => {
     const degraded = showBrief && brief.detailStatus === "degraded";
     return h4(
       "div",
-      { className: "dl-list" },
+      { className: "dl-group", style: { "--dl-i": index } },
       h4(
-        "section",
-        { className: "dl-card", style: { "--dl-i": index } },
+        "div",
+        { className: "dl-card-head" },
+        h4("span", { className: "dl-ch-dot", "aria-hidden": true }),
+        h4("span", { className: "dl-card-title" }, channelName(section.source, text)),
+        manual ? h4("span", { className: "dl-card-pill" }, text("x.manual")) : null,
+        h4("span", { className: "dl-card-count" }, String(section.count)),
         h4(
-          "div",
-          { className: "dl-rows" },
-          h4(
-            "div",
-            { className: "dl-rows-all" },
-            h4(
-              "div",
-              { className: "dl-card-head" },
-              h4("span", { className: "dl-ch-dot", "aria-hidden": true }),
-              h4("span", { className: "dl-card-title" }, channelName(section.source, text)),
-              manual ? h4("span", { className: "dl-card-pill" }, text("x.manual")) : null,
-              h4("span", { className: "dl-card-count" }, String(section.count)),
-              h4(
-                "span",
-                {
-                  className: `dl-card-meta${isError ? " is-error" : ""}`,
-                  title: fetchError || section.fetch?.error || ""
-                },
-                showDot ? h4("span", { className: `dl-status-dot ${sectionDotClass(section, fetchError)}` }) : null,
-                h4("span", { className: "dl-card-meta-text" }, statusText)
-              ),
-              degraded ? h4("span", { className: "dl-card-hint" }, text("brief.detailsIncomplete")) : null,
-              head.statusText ? h4("span", { className: "dl-card-status" }, head.statusText) : null,
-              canRefresh ? pull.show ? h4("button", {
-                type: "button",
-                className: "dl-btn dl-btn--sm",
-                disabled: pull.disabled,
-                onClick: () => void actions.refreshSection(section)
-              }, pull.label) : h4("button", {
-                type: "button",
-                className: "dl-icon-btn dl-icon-btn--sm",
-                title: isPooled ? text("section.rss.pull") : text("section.refetch"),
-                "aria-label": isPooled ? text("section.rss.pull") : text("section.refetch"),
-                disabled: head.refetchDisabled,
-                onClick: () => void actions.refreshSection(section)
-              }, h4(RefreshIcon, { size: 12, className: busy ? "dl-spin" : void 0 })) : null,
-              head.showTranslate ? h4("button", {
-                type: "button",
-                className: "dl-btn dl-btn--sm",
-                disabled: head.translateDisabled,
-                onClick: () => void actions.translateSource(section.source.id)
-              }, head.translateLabel) : null
-            )
-          ),
-          head.showError ? h4(
-            "div",
-            { className: "dl-translate-error", role: "status" },
-            h4("span", { className: "dl-translate-error-label" }, text("section.translationFailed")),
-            h4("span", { className: "dl-translate-error-text" }, head.errorMessage),
-            h4("span", { className: "dl-translate-error-hint" }, text("section.translationHint"))
-          ) : null,
-          isPooled && section.status === "error" ? h4(
-            "div",
-            { className: "dl-section-error", role: "status" },
-            h4("span", { className: "dl-section-error-text" }, section.fetch?.error || rssChannel?.error || text("card.failed")),
-            h4("button", {
-              type: "button",
-              className: "dl-btn dl-btn--sm",
-              disabled: busy,
-              onClick: () => void actions.refreshSection(section)
-            }, busy ? text("section.rss.pulling") : text("section.rss.pullShort"))
-          ) : null,
-          showBrief ? h4(BriefHeader, { brief, text, actions }) : null,
-          emptyState === "none" ? null : h4(SectionEmpty, {
-            kind: emptyState,
-            section,
-            busy,
-            isToday: day === today,
-            canBackfill,
-            text,
-            actions
-          }),
-          ...section.items.map((item) => h4(ItemRow, {
-            key: item.id,
-            item,
-            section,
-            deleting: deleting.includes(item.id),
-            deleteError: deleteErrors[item.id] ?? "",
-            expanded: expanded.has(item.id),
-            uiLocale,
-            text,
-            actions,
-            selectMode,
-            selected: selected.has(item.id)
-          }))
-        )
+          "span",
+          {
+            className: `dl-card-meta${isError ? " is-error" : ""}`,
+            title: fetchError || section.fetch?.error || ""
+          },
+          showDot ? h4("span", { className: `dl-status-dot ${sectionDotClass(section, fetchError)}` }) : null,
+          h4("span", { className: "dl-card-meta-text" }, statusText)
+        ),
+        degraded ? h4("span", { className: "dl-card-hint" }, text("brief.detailsIncomplete")) : null,
+        head.statusText ? h4("span", { className: "dl-card-status" }, head.statusText) : null,
+        canRefresh ? pull.show ? h4("button", {
+          type: "button",
+          className: "dl-btn dl-btn--sm",
+          disabled: pull.disabled,
+          onClick: () => void actions.refreshSection(section)
+        }, pull.label) : h4("button", {
+          type: "button",
+          className: "dl-icon-btn dl-icon-btn--sm",
+          title: isPooled ? text("section.rss.pull") : text("section.refetch"),
+          "aria-label": isPooled ? text("section.rss.pull") : text("section.refetch"),
+          disabled: head.refetchDisabled,
+          onClick: () => void actions.refreshSection(section)
+        }, h4(RefreshIcon, { size: 12, className: busy ? "dl-spin" : void 0 })) : null,
+        head.showTranslate ? h4("button", {
+          type: "button",
+          className: "dl-btn dl-btn--sm",
+          disabled: head.translateDisabled,
+          onClick: () => void actions.translateSource(section.source.id)
+        }, head.translateLabel) : null
+      ),
+      head.showError ? h4(
+        "div",
+        { className: "dl-translate-error", role: "status" },
+        h4("span", { className: "dl-translate-error-label" }, text("section.translationFailed")),
+        h4("span", { className: "dl-translate-error-text" }, head.errorMessage),
+        h4("span", { className: "dl-translate-error-hint" }, text("section.translationHint"))
+      ) : null,
+      isPooled && section.status === "error" ? h4(
+        "div",
+        { className: "dl-section-error", role: "status" },
+        h4("span", { className: "dl-section-error-text" }, section.fetch?.error || rssChannel?.error || text("card.failed")),
+        h4("button", {
+          type: "button",
+          className: "dl-btn dl-btn--sm",
+          disabled: busy,
+          onClick: () => void actions.refreshSection(section)
+        }, busy ? text("section.rss.pulling") : text("section.rss.pullShort"))
+      ) : null,
+      showBrief ? h4(BriefHeader, { brief, text, actions }) : null,
+      h4(
+        "div",
+        { className: "dl-rows" },
+        emptyState === "none" ? null : h4(SectionEmpty, {
+          kind: emptyState,
+          section,
+          busy,
+          isToday: day === today,
+          canBackfill,
+          text,
+          actions
+        }),
+        ...section.items.map((item) => h4(ItemRow, {
+          key: item.id,
+          item,
+          section,
+          deleting: deleting.includes(item.id),
+          deleteError: deleteErrors[item.id] ?? "",
+          expanded: expanded.has(item.id),
+          uiLocale,
+          text,
+          actions,
+          selectMode,
+          selected: selected.has(item.id)
+        }))
       )
     );
   }
@@ -6403,63 +6395,45 @@ var DshFeedUltraClient = (() => {
   padding: 12px 14px 40px;
 }
 
-/* ---------- section cards ---------- */
+/* ---------- channel groups ---------- */
 
-.dl-card {
-  background: var(--dl-bg-base);
-  border: var(--dl-hairline);
-  border-radius: var(--dl-radius-md);
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--dl-label-primary) 4%, transparent);
-  overflow: hidden;
-  margin-bottom: 12px;
+/* A channel is a heading, not a container. Wrapping its rows in one bordered
+   surface made the list read as a table: every row shared the box's edges and
+   the two columns met along a vertical seam. The group is now just the heading
+   plus a stack of cards on the page ground, and the cards carry their own
+   outline and hover lift. */
+.dl-group {
+  margin-bottom: 22px;
   animation: dl-rise 0.5s var(--dl-ease) both;
   animation-delay: calc(var(--dl-i, 0) * 45ms);
-  transition: box-shadow 0.2s var(--dl-ease);
 }
 
-.dl-card:hover {
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--dl-label-primary) 8%, transparent);
+.dl-group:last-child {
+  margin-bottom: 0;
 }
 
-/* The one grid a section card holds: its header spans every column and the rows
-   sit in two of them. Two fixed tracks rather than auto-fit, because auto-fit
-   keeps opening columns as long as tracks fit, which turns a wide panel into
-   three and then four narrow ones instead of the two wide cards the list is
-   designed for. The panel query below drops to a single track when a second
-   380px card no longer fits, and .dl-list bounds the pair so neither track
-   outgrows 760. */
+/* One column, bounded so a very wide panel does not stretch a line past a
+   comfortable reading width. */
 .dl-rows {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: start;
-  gap: 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 920px;
   min-width: 0;
 }
 
-/* Two 760 tracks and their gutter is as wide as the list ever gets; the centring
-   has to sit here rather than on the grid, whose width is set by this cap. */
-.dl-list {
-  max-width: 1532px;
-  margin-inline: auto;
-}
-
-/* One card at a time until a second one fits: the panel minus its two 12px of
-   padding is at least two 380px cards and the gutter between them. */
-@container dl-panel (max-width: 875px) {
-  .dl-rows {
-    grid-template-columns: minmax(0, 1fr);
+@container dl-panel (min-width: 960px) {
+  .dl-group {
+    max-width: 920px;
+    margin-inline: auto;
   }
-}
-
-.dl-rows-all {
-  grid-column: 1 / -1;
 }
 
 .dl-card-head {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 11px 14px 9px;
+  padding: 0 2px 8px;
 }
 
 .dl-ch-dot {
@@ -6546,27 +6520,24 @@ var DshFeedUltraClient = (() => {
 
 /* ---------- item rows ---------- */
 
-/* One card shape for every source. Rows are grid items, so \`min-width: 0\` stops
-   a long unbroken title from widening its column past the grid's track. A row
-   keeps its natural height; it never stretches to match a taller neighbour. */
+/* One card shape for every source, and one card per item: the row owns its
+   background, radius and shadow, so nothing outside it decides where it ends.
+   \`min-width: 0\` keeps a long unbroken title from widening the column, and the
+   row keeps its natural height rather than matching a neighbour. */
 .dl-row {
   display: flex;
   align-items: flex-start;
-  align-self: start;
   min-width: 0;
-  gap: 10px;
-  padding: 11px 14px;
-  border-top: var(--dl-hairline);
+  gap: 16px;
+  padding: 15px 17px;
+  border-radius: var(--dl-radius-md);
+  background: var(--dl-bg-base);
+  box-shadow:
+    0 0 0 0.5px var(--dl-border-hairline),
+    0 1px 2px color-mix(in srgb, var(--dl-label-primary) 5%, transparent);
   cursor: default;
   user-select: text;
-  transition: background-color 0.15s;
-}
-
-/* A row in the right column opens the first line of its section's grid, where
-   there is no row above it to carry the separator. */
-.dl-rows > .dl-row:first-child,
-.dl-rows > .dl-rows-all + .dl-row {
-  border-top: 0;
+  transition: box-shadow 0.18s var(--dl-ease), background-color 0.15s;
 }
 
 .dl-row.is-select {
@@ -6574,8 +6545,13 @@ var DshFeedUltraClient = (() => {
   user-select: none;
 }
 
+/* The lift on hover is what separates the cards from the ground; it replaces
+   the row separator the shared container used to draw. */
 .dl-row:hover {
-  background: var(--dl-hover);
+  background: color-mix(in srgb, var(--dl-label-primary) 2%, var(--dl-bg-base));
+  box-shadow:
+    0 0 0 0.5px var(--dl-border-strong),
+    0 6px 18px color-mix(in srgb, var(--dl-label-primary) 10%, transparent);
 }
 
 .dl-row:focus-visible {
@@ -6807,12 +6783,15 @@ var DshFeedUltraClient = (() => {
   color: var(--dl-label-secondary);
 }
 
+/* A single column leaves room for a cover worth looking at: 200x112 holds a
+   16:9 crop without crowding the text beside it. The narrow-panel query below
+   shrinks it back so a sidebar-width panel keeps its text column. */
 .dl-row-cover {
   position: relative;
-  flex: 0 0 132px;
-  width: 132px;
-  height: 74px;
-  margin-top: 2px;
+  flex: 0 0 176px;
+  width: 176px;
+  height: 99px;
+  margin-top: 1px;
   border-radius: var(--dl-radius-sm);
   overflow: hidden;
   background: var(--dl-active);
@@ -7462,8 +7441,11 @@ var DshFeedUltraClient = (() => {
   background: var(--dl-business);
 }
 
+/* A selected card keeps its own surface, so the tint sits over the card fill
+   rather than letting the page ground show through. */
 .dl-row.is-selected {
-  background: color-mix(in srgb, var(--dl-business) 8%, transparent);
+  background: color-mix(in srgb, var(--dl-business) 8%, var(--dl-bg-base));
+  box-shadow: 0 0 0 1px var(--dl-business);
 }
 
 /* ---------- settings ---------- */
@@ -8315,9 +8297,9 @@ var DshFeedUltraClient = (() => {
   }
 
   .dl-row-cover {
-    flex: 0 0 84px;
-    width: 84px;
-    height: 47px;
+    flex: 0 0 112px;
+    width: 112px;
+    height: 63px;
   }
 
   .dl-brief-keywords {

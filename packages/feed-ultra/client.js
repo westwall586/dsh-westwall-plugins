@@ -6523,12 +6523,26 @@ var DshFeedUltraClient = (() => {
    \`min-width: 0\` keeps a long unbroken title from widening the column, and the
    row keeps its natural height rather than matching a neighbour. */
 /* A channel's leading card may carry a short keyword list; it uses the same
-   pill material as an attachment, so one tag style covers the list. */
+   pill material as an attachment, so one tag style covers the list.
+   One line, never more: tags that do not fit fade out at the edge rather than
+   wrap to a second line, so the meta line and the actions below keep their place.
+   The mask reads as a deliberate cut; a hard clip reads as a bug. */
 .dl-row-keywords {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 6px;
   margin-top: 8px;
+  min-width: 0;
+  overflow: hidden;
+  mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+}
+
+.dl-row-keywords > .dl-chip {
+  flex: 0 0 auto;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Two classes so it wins over .dl-chip, which is declared later and is a filter
@@ -6682,10 +6696,13 @@ var DshFeedUltraClient = (() => {
 }
 
 /* The meta line and the row's actions share this line: the meta text takes what
-   it needs and ellipses, the actions keep their width at the right. */
+   is left and ellipses, the actions keep their width at the right edge. Nothing
+   above can push the buttons down, because every slot above is single-line. */
 .dl-row-foot {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
   gap: 8px;
   min-width: 0;
   min-height: calc(var(--dl-font-ratio) * 26px);
@@ -9106,11 +9123,23 @@ var DshFeedUltraClient = (() => {
 }
 
 
+/* Same rule as the tags: one line, the overflow fades out, the actions stay put. */
 .dl-row-attachments {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 6px;
   margin-top: 6px;
+  min-width: 0;
+  overflow: hidden;
+  mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+}
+
+.dl-row-attachments > .dl-attachment {
+  flex: 0 0 auto;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dl-attachment {

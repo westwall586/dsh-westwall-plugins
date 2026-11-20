@@ -1,0 +1,161 @@
+{
+  "version": 1,
+  "threads": [
+    {
+      "id": "c_f25eb5385f",
+      "anchor": "#dc-root > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(1) > dct:nth-of-type(81) > dce5f4c5e9bdf3a17465751:nth-of-type(1)",
+      "label": "01-card-anatomy › text \"简介统一 2 行，X 书签也降到 2 行（现在 6 行）\"",
+      "detail": "01-card-anatomy.dc.html: #80:1/2/1/1/1/0 text \"简介统一 2 行，X 书签也降到 2 行（现在 6 行）\"",
+      "location": {
+        "file": "project/01-card-anatomy.dc.html",
+        "board": "01-card-anatomy.dc.html"
+      },
+      "status": "open",
+      "createdAt": "2026-11-20T02:17:57.242Z",
+      "updatedAt": "2026-11-20T02:24:55.825Z",
+      "messages": [
+        {
+          "id": "m_552bced1ed",
+          "author": {
+            "kind": "user",
+            "name": "johnxi"
+          },
+          "text": "2行看起来有点少，3 行吧，溢出时显示“详情”",
+          "at": "2026-11-20T02:17:57.242Z"
+        },
+        {
+          "id": "m_c9afc4a857",
+          "author": {
+            "kind": "agent",
+            "name": "agent"
+          },
+          "text": "改成 3 行，01 的规格和样例同步更新了。触发词统一叫「详情」，按渲染后的实际高度判断是否真的溢出，不是按字数猜；展开后变「收起」。至于展开后的具体形态，我在 03 底部做了两种，D1 就地长高、D2 侧栏详情，等你选。",
+          "at": "2026-11-20T02:24:55.825Z"
+        }
+      ]
+    },
+    {
+      "id": "c_ef700c6b36",
+      "anchor": "#dc-root > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > span:nth-of-type(2) > dct:nth-of-type(20) > dce5303338a008b45097773:nth-of-type(1)",
+      "label": "02-four-forms › text \"AI 快讯\"",
+      "detail": "02-four-forms.dc.html: #19:1/3/0/1/0/1 text \"AI 快讯\"",
+      "location": {
+        "file": "project/02-four-forms.dc.html",
+        "board": "02-four-forms.dc.html"
+      },
+      "status": "open",
+      "createdAt": "2026-11-20T02:19:50.253Z",
+      "updatedAt": "2026-11-20T02:24:55.875Z",
+      "messages": [
+        {
+          "id": "m_3a9ccf9a3d",
+          "author": {
+            "kind": "user",
+            "name": "johnxi"
+          },
+          "text": "卡片上的这个频道名称，这是你给我作为示例看的，不会存在对吧？",
+          "at": "2026-11-20T02:19:50.253Z"
+        },
+        {
+          "id": "m_4e3caa3ca3",
+          "author": {
+            "kind": "agent",
+            "name": "agent"
+          },
+          "text": "对，那是我画的示例，实际不存在。我查了代码：行里只有未读圆点、配图、标题、简介、说明行，没有频道名。频道名只出现在左侧导航和右侧「源状态」。你截图里每张卡左上那样的小标签，现在也没有，是我加的，已经去掉了。",
+          "at": "2026-11-20T02:24:55.875Z"
+        }
+      ]
+    },
+    {
+      "id": "c_301eaef212",
+      "anchor": "#dc-root > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(2) > dcfx1kltoyq:nth-of-type(1) > dct:nth-of-type(34) > dce5303338a008b18608974:nth-of-type(1)",
+      "label": "02-four-forms › text \"anthropics/claude-code: Terminal-first…\"",
+      "detail": "02-four-forms.dc.html: #33:1/3/1/1/1 text \"anthropics/claude-code: Terminal-first…\"",
+      "location": {
+        "file": "project/02-four-forms.dc.html",
+        "board": "02-four-forms.dc.html"
+      },
+      "status": "open",
+      "createdAt": "2026-11-20T02:20:17.043Z",
+      "updatedAt": "2026-11-20T02:25:00.577Z",
+      "messages": [
+        {
+          "id": "m_a9678c6efc",
+          "author": {
+            "kind": "user",
+            "name": "johnxi"
+          },
+          "text": "github，title 就是仓库名，应该没拿别的",
+          "at": "2026-11-20T02:20:17.043Z"
+        },
+        {
+          "id": "m_04e68ef960",
+          "author": {
+            "kind": "agent",
+            "name": "agent"
+          },
+          "text": "对，GitHub 的 title 就是仓库全名，我把示例改成 anthropics/claude-code 了（原来我拼了描述进去，是错的）。说明行我按代码里的实际字段写：语言 + star，没有「第 1 名」这一项，也去掉了。",
+          "at": "2026-11-20T02:25:00.577Z"
+        }
+      ]
+    },
+    {
+      "id": "c_7ce4db7e34",
+      "anchor": "#dc-root > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(4) > div:nth-of-type(1) > span:nth-of-type(1) > dcfx0p1bcng:nth-of-type(1) > dct:nth-of-type(59) > dce7d2ef197ae3354487806:nth-of-type(1)",
+      "label": "03-width-options › text \"C · 宽屏双列\"",
+      "detail": "03-width-options.dc.html: #58:1/4/0/0 text \"C · 宽屏双列\"",
+      "location": {
+        "file": "project/03-width-options.dc.html",
+        "board": "03-width-options.dc.html"
+      },
+      "status": "open",
+      "createdAt": "2026-11-20T02:23:04.840Z",
+      "updatedAt": "2026-11-20T02:25:00.628Z",
+      "messages": [
+        {
+          "id": "m_e95b0cc6b5",
+          "author": {
+            "kind": "user",
+            "name": "johnxi"
+          },
+          "text": "我觉得应该定义一下卡片的最小和最大宽度，响应式布局。 现在电脑屏幕都挺大的。 单列占满 -> 单列显宽 -> 双列，根据空间来排布，这样好吗？  另外就是简介溢出时，点击“详情”，展开所有简介的样式，我们也要考虑一下",
+          "at": "2026-11-20T02:23:04.840Z"
+        },
+        {
+          "id": "m_85f0db9564",
+          "author": {
+            "kind": "agent",
+            "name": "agent"
+          },
+          "text": "好，按你说的重画了 03：卡片最小 380、最大 760，<780 单列占满，780–1540 单列限宽居中，≥1540 双列。你截图那块内容区约 1290px，落在单列限宽档。展开态我在底部给了两种（就地 / 侧栏详情），等你选一个。",
+          "at": "2026-11-20T02:25:00.628Z"
+        }
+      ]
+    },
+    {
+      "id": "c_cfb30747de",
+      "anchor": "#dc-root > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(2) > div:nth-of-type(1) > dcfx08kjb2y:nth-of-type(1) > dct:nth-of-type(28) > dce5303338a008b48507146:nth-of-type(1)",
+      "label": "02-four-forms › text \"#1\"",
+      "detail": "02-four-forms.dc.html: #27:1/3/1/0 text \"#1\"",
+      "location": {
+        "file": "project/02-four-forms.dc.html",
+        "board": "02-four-forms.dc.html"
+      },
+      "status": "open",
+      "createdAt": "2026-11-20T02:26:09.387Z",
+      "updatedAt": "2026-11-20T02:26:09.387Z",
+      "messages": [
+        {
+          "id": "m_4bca40c212",
+          "author": {
+            "kind": "user",
+            "name": "johnxi"
+          },
+          "text": "github 没有图就算了，不硬凑",
+          "at": "2026-11-20T02:26:09.387Z"
+        }
+      ]
+    }
+  ]
+}

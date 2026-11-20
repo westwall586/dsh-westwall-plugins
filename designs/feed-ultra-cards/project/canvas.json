@@ -1,0 +1,78 @@
+{
+  "v": 3,
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-11-20T02:15:00Z"
+  },
+  "title": "Feed Ultra · 卡片线稿",
+  "launch": {
+    "view": "canvas"
+  },
+  "pages": [],
+  "boards": {
+    "A1-single.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1010,
+      "h": 760,
+      "title": "A1 单列独立卡片"
+    },
+    "A2-two-col.dc.html": {
+      "x": 1110,
+      "y": 0,
+      "w": 1010,
+      "h": 760,
+      "title": "A2 双列独立卡片"
+    },
+    "A3-masonry.dc.html": {
+      "x": 0,
+      "y": 900,
+      "w": 1010,
+      "h": 760,
+      "title": "A3 双列瀑布流"
+    },
+    "01-card-anatomy.dc.html": {
+      "x": 0,
+      "y": 2200,
+      "w": 880,
+      "h": 1080
+    },
+    "02-four-forms.dc.html": {
+      "x": 960,
+      "y": 2200,
+      "w": 880,
+      "h": 1080
+    },
+    "03-width-options.dc.html": {
+      "x": 0,
+      "y": 3000,
+      "w": 880,
+      "h": 1080
+    }
+  },
+  "order": [
+    "A1-single.dc.html",
+    "A2-two-col.dc.html",
+    "A3-masonry.dc.html",
+    "01-card-anatomy.dc.html",
+    "02-four-forms.dc.html",
+    "03-width-options.dc.html"
+  ],
+  "notes": {
+    "n-layout": {
+      "x": 0,
+      "y": -260,
+      "text": "布局方向对比（内容区按 1010px 画）",
+      "kind": "title1",
+      "maxW": 2120
+    },
+    "n-card": {
+      "x": 0,
+      "y": 1940,
+      "text": "卡片归一化（已完成实现）",
+      "kind": "title1",
+      "maxW": 1840
+    }
+  },
+  "designSystems": []
+}

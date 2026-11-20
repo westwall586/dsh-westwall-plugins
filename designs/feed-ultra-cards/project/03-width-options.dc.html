@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>响应式列与展开态</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#2d5bd1}a:hover{color:#4176e6}
+</style>
+</helmet>
+
+<div style="width:880px;box-sizing:border-box;padding:32px 36px;background:#f5f5f5;color:#0f1115;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',Helvetica,Arial,sans-serif;font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased">
+
+  <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px">
+    <h1 style="margin:0;font-size:21px;font-weight:600;letter-spacing:-0.01em">按空间排布</h1>
+  </div>
+  <p style="margin:0 0 18px;font-size:12.5px;color:#4b5563;max-width:700px;line-height:1.7">卡片有最小宽度 <b style="font-weight:600">380px</b>、最大宽度 <b style="font-weight:600">760px</b>。内容区按这一对区间自动选择列数，你的窗口越宽，卡片越多，而不是卡片越拉越长。</p>
+
+  <!-- the rule -->
+  <div style="background:#ffffff;border:0.5px solid rgba(0,0,0,.10);border-radius:12px;padding:16px 18px;margin-bottom:18px">
+    <div style="display:grid;grid-template-columns:120px repeat(3,minmax(0,1fr));gap:10px;font-size:11.5px;align-items:start">
+      <div style="color:#6b7280;font-weight:600">内容区宽度</div>
+      <div><div style="font-weight:600">＜ 780px</div><div style="color:#6b7280;margin-top:2px">单列，占满</div></div>
+      <div><div style="font-weight:600">780 – 1540px</div><div style="color:#6b7280;margin-top:2px">单列，限宽 760 居中</div></div>
+      <div><div style="font-weight:600">≥ 1540px</div><div style="color:#6b7280;margin-top:2px">双列，每列 380–760</div></div>
+
+      <div style="color:#6b7280;font-weight:600;border-top:0.5px solid rgba(0,0,0,.06);padding-top:8px">每张卡实际宽</div>
+      <div style="color:#4b5563;border-top:0.5px solid rgba(0,0,0,.06);padding-top:8px">320 – 780px</div>
+      <div style="color:#4b5563;border-top:0.5px solid rgba(0,0,0,.06);padding-top:8px">760px</div>
+      <div style="color:#4b5563;border-top:0.5px solid rgba(0,0,0,.06);padding-top:8px">≈ 750px × 2</div>
+
+      <div style="color:#6b7280;font-weight:600;border-top:0.5px solid rgba(0,0,0,.06);padding-top:8px">典型场景</div>
+      <div style="color:#4b5563;border-top:0.5px solid rgba(0,0,0,.06);padding-top:8px">窄侧栏</div>
+      <div style="color:#4b5563;border-top:0.5px solid rgba(0,0,0,.06);padding-top:8px">你现在这块</div>
+      <div style="color:#4b5563;border-top:0.5px solid rgba(0,0,0,.06);padding-top:8px">超宽屏 / 全屏</div>
+    </div>
+  </div>
+
+  <!-- B single column, wide -->
+  <div style="margin-bottom:16px">
+    <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px">
+      <span style="font-size:12px;font-weight:600">B · 单列限宽</span>
+      <span style="font-size:11px;color:#6b7280">内容 760px 居中，两侧留给留白</span>
+    </div>
+    <div style="background:#eef2f7;border:0.5px dashed #b7bec7;border-radius:8px;padding:10px">
+      <div style="max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:8px">
+        <div style="background:#ffffff;border-radius:8px;padding:14px 16px;display:flex;gap:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)">
+          <span style="width:5px;height:5px;border-radius:999px;background:#4176e6;flex:0 0 5px;margin-top:7px"></span>
+          <div style="flex:0 0 132px;height:74px;border-radius:8px;background:#eef2f7;display:grid;place-items:center;color:#b7bec7;font-size:11px">配图</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;line-height:1.55;font-weight:500">Meta 如何利用 AI 智能体扩展广告排序模型中的机器学习创新</div>
+            <div style="margin-top:3px;font-size:12px;line-height:1.6;color:#6b7280;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">Meta 利用 AI 智能体自动化并规模化地将机器学习技术推广到旗下多种广告排序模型中，实现了 3× 的工程生产力提升、训练计算量减少 4×，以及超过 $45M 的计算成本节省，这些改进来自一个统一的智能体编排层。</div>
+            <div style="margin-top:2px"><button style="border:0;background:none;padding:0;color:#2d5bd1;font-size:11.5px;cursor:pointer;font-family:inherit">详情</button></div>
+            <div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between">
+              <span style="font-size:11px;color:#6b7280">Engineering at Meta · 昨天 02:24</span>
+              <span style="display:flex;gap:2px"><span style="width:26px;height:26px;border-radius:8px;background:#eef2f7;display:grid;place-items:center;color:#4b5563">○</span><span style="width:26px;height:26px;border-radius:8px;background:#eef2f7;display:grid;place-items:center;color:#4b5563">↗</span></span>
+            </div>
+          </div>
+        </div>
+        <div style="background:#ffffff;border-radius:8px;padding:14px 16px;display:flex;gap:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)">
+          <span style="width:5px;height:5px;border-radius:999px;background:#4176e6;flex:0 0 5px;margin-top:7px"></span>
+          <div style="flex:0 0 132px;height:74px;border-radius:8px;background:#eef2f7;display:grid;place-items:center;color:#b7bec7;font-size:15px;font-weight:600">#1</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;line-height:1.55;font-weight:500">anthropics/claude-code</div>
+            <div style="margin-top:3px;font-size:12px;line-height:1.6;color:#6b7280">Claude Code is an agentic coding tool that lives in your terminal, understands your codebase, and helps you code faster.</div>
+            <div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between">
+              <span style="font-size:11px;color:#6b7280">TypeScript · ★ 12.4k</span>
+              <span style="display:flex;gap:2px"><span style="width:26px;height:26px;border-radius:8px;background:#eef2f7;display:grid;place-items:center;color:#4b5563">○</span><span style="width:26px;height:26px;border-radius:8px;background:#eef2f7;display:grid;place-items:center;color:#4b5563">↗</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:#6b7280;line-height:1.6">一行约 40 个汉字。简介 3 行，溢出时下方出现蓝色「详情」。</div>
+    </div>
+  </div>
+
+  <!-- C two columns -->
+  <div style="margin-bottom:16px">
+    <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px">
+      <span style="font-size:12px;font-weight:600">C · 双列</span>
+      <span style="font-size:11px;color:#6b7280">≥ 1540px 时启用，每列仍 ≥ 380</span>
+    </div>
+    <div style="background:#eef2f7;border:0.5px dashed #b7bec7;border-radius:8px;padding:10px">
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+        <div style="background:#ffffff;border-radius:8px;padding:12px 14px;display:flex;gap:10px;box-shadow:0 1px 2px rgba(0,0,0,.04)">
+          <span style="width:5px;height:5px;border-radius:999px;background:#4176e6;flex:0 0 5px;margin-top:6px"></span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;line-height:1.5;font-weight:500;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">Meta 如何利用 AI 智能体扩展广告排序模型中的机器学习创新</div>
+            <div style="margin-top:3px;font-size:11.5px;line-height:1.55;color:#6b7280;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">Meta 利用 AI 智能体规模化地将机器学习技术推广到多种广告排序模型中。</div>
+            <div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between">
+              <span style="font-size:10.5px;color:#6b7280">Meta · 昨天 02:24</span>
+              <span style="display:flex;gap:2px"><span style="width:22px;height:22px;border-radius:6px;background:#eef2f7;display:grid;place-items:center;color:#4b5563;font-size:10px">○</span><span style="width:22px;height:22px;border-radius:6px;background:#eef2f7;display:grid;place-items:center;color:#4b5563;font-size:10px">↗</span></span>
+            </div>
+          </div>
+        </div>
+        <div style="background:#ffffff;border-radius:8px;padding:12px 14px;display:flex;gap:10px;box-shadow:0 1px 2px rgba(0,0,0,.04)">
+          <span style="width:5px;height:5px;border-radius:999px;background:#4176e6;flex:0 0 5px;margin-top:6px"></span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;line-height:1.5;font-weight:500;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">anthropics/claude-code</div>
+            <div style="margin-top:3px;font-size:11.5px;line-height:1.55;color:#6b7280;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">Claude Code is an agentic coding tool that lives in your terminal, understands your codebase, and helps you code faster.</div>
+            <div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between">
+              <span style="font-size:10.5px;color:#6b7280">TypeScript · ★ 12.4k</span>
+              <span style="display:flex;gap:2px"><span style="width:22px;height:22px;border-radius:6px;background:#eef2f7;display:grid;place-items:center;color:#4b5563;font-size:10px">○</span><span style="width:22px;height:22px;border-radius:6px;background:#eef2f7;display:grid;place-items:center;color:#4b5563;font-size:10px">↗</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:#6b7280;line-height:1.6">双列时配图缩到 84×47，与现在窄屏的逻辑一致，不藏图。</div>
+    </div>
+  </div>
+
+  <!-- expand states -->
+  <div style="margin-top:22px;padding-top:16px;border-top:0.5px solid rgba(0,0,0,.10)">
+    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px">
+      <span style="font-size:14px;font-weight:600">简介展开的两种做法</span>
+    </div>
+    <p style="margin:0 0 14px;font-size:11.5px;color:#6b7280;line-height:1.7">默认 3 行，溢出时出现「详情」。展开后有两种处理，区别在你希望列表保持多长的节奏。</p>
+
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px">
+
+      <div>
+        <div style="font-size:11.5px;font-weight:600;margin-bottom:6px">D1 · 就地展开 <span style="font-weight:400;color:#6b7280">推荐</span></div>
+        <div style="background:#ffffff;border:0.5px solid rgba(0,0,0,.10);border-radius:8px;padding:14px 16px">
+          <div style="font-size:13.5px;line-height:1.55;font-weight:500">Meta 如何利用 AI 智能体扩展广告排序模型中的机器学习创新</div>
+          <div style="margin-top:4px;font-size:12px;line-height:1.65;color:#4b5563">Meta 利用 AI 智能体自动化并规模化地将机器学习技术推广到旗下多种广告排序模型中，实现了 3× 的工程生产力提升、训练计算量减少 4×，以及超过 $45M 的计算成本节省。这些改进来自一个统一的智能体编排层，它把原先分散在各团队的手工调参工作收敛成可复用的流程，并让模型迭代周期从数周缩短到数天。</div>
+          <div style="margin-top:4px"><button style="border:0;background:none;padding:0;color:#2d5bd1;font-size:11.5px;cursor:pointer;font-family:inherit">收起</button></div>
+          <div style="margin-top:8px;font-size:11px;color:#6b7280">Engineering at Meta · 昨天 02:24</div>
+        </div>
+        <p style="margin:6px 0 0;font-size:11px;color:#6b7280;line-height:1.6">卡片原地长高，下面的内容顺延。滚动位置不变，符合你在哪读到哪的直觉。</p>
+      </div>
+
+      <div>
+        <div style="font-size:11.5px;font-weight:600;margin-bottom:6px">D2 · 侧栏详情</div>
+        <div style="background:#ffffff;border:0.5px solid rgba(0,0,0,.10);border-radius:8px;padding:14px 16px;position:relative;overflow:hidden">
+          <div style="font-size:13.5px;line-height:1.55;font-weight:500">Meta 如何利用 AI 智能体扩展广告排序模型中的机器学习创新</div>
+          <div style="margin-top:4px;font-size:12px;line-height:1.65;color:#6b7280;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">Meta 利用 AI 智能体自动化并规模化地将机器学习技术推广到旗下多种广告排序模型中，实现了 3× 的工程生产力提升、训练计算量减少 4×，以及超过 $45M 的计算成本节省。</div>
+          <div style="margin-top:4px"><button style="border:0;background:none;padding:0;color:#2d5bd1;font-size:11.5px;cursor:pointer;font-family:inherit">详情</button></div>
+          <div style="margin-top:8px;font-size:11px;color:#6b7280">Engineering at Meta · 昨天 02:24</div>
+          <div style="position:absolute;right:0;top:0;bottom:0;width:46%;background:rgba(238,242,247,.92);border-left:0.5px solid rgba(0,0,0,.10);padding:12px;font-size:11px;color:#4b5563;line-height:1.6">
+            <div style="font-weight:600;color:#0f1115;margin-bottom:4px">详情面板</div>
+            标题、完整简介、说明行、附件与操作。列表保持紧凑不跳动。
+          </div>
+        </div>
+        <p style="margin:6px 0 0;font-size:11px;color:#6b7280;line-height:1.6">列表完全不跳动，适合快速扫读。代价是要多开一层视图，和「点击标题打开文章」容易混淆。</p>
+      </div>
+
+    </div>
+
+    <div style="margin-top:14px;background:#ffffff;border:0.5px solid rgba(0,0,0,.10);border-radius:12px;padding:14px 16px;font-size:11.5px;color:#4b5563;line-height:1.75">
+      <b style="color:#0f1115;font-weight:600">「详情」的触发规则</b><br>
+      只在 3 行真的放不下时出现，用渲染后的实际高度判断，不是按字数猜。展开后按钮变「收起」。<br>
+      已经读到过的时间点会记住展开状态，切走再回来不收起。
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":880,"height":1080}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

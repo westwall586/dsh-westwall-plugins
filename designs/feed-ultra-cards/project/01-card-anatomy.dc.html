@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>卡片结构规格</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#2d5bd1}a:hover{color:#4176e6}
+</style>
+</helmet>
+
+<div style="width:880px;box-sizing:border-box;padding:32px 36px;background:#ffffff;color:#0f1115;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',Helvetica,Arial,sans-serif;font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased">
+
+  <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px">
+    <h1 style="margin:0;font-size:21px;font-weight:600;letter-spacing:-0.01em">一张卡片的结构</h1>
+    <span style="font-size:12px;color:#6b7280">所有频道与 RSS 共用</span>
+  </div>
+  <p style="margin:0 0 22px;font-size:12.5px;color:#4b5563;max-width:640px;line-height:1.7">五个槽位。标题、简介、操作必填；配图、说明行可选。槽位顺序固定，所有来源都按这一套摆放，差异只体现在填入的内容不同。</p>
+
+  <!-- annotated card -->
+  <div style="display:flex;gap:28px">
+
+    <!-- card -->
+    <div style="flex:0 0 552px">
+      <div style="border:0.5px solid rgba(0,0,0,.10);border-radius:12px;background:#ffffff;overflow:hidden">
+
+        <!-- 1 配图 -->
+        <div style="position:relative;display:flex;align-items:center;gap:14px;padding:14px 16px">
+          <span style="position:absolute;left:-6px;top:0;bottom:0;width:0;border-left:0.5px dashed #b7bec7"></span>
+          <div style="flex:0 0 132px;width:132px;height:74px;border-radius:8px;background:#eef2f7;display:grid;place-items:center;color:#b7bec7;font-size:15px;font-weight:600">配图</div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+              <span style="width:5px;height:5px;border-radius:999px;background:#4176e6;flex:0 0 5px"></span>
+              <span style="font-size:10.5px;font-weight:600;letter-spacing:.04em;color:#6b7280">GITHUB TRENDING</span>
+            </div>
+            <div style="font-size:14px;line-height:1.55;font-weight:500;color:#0f1115">当智能开始量产，从 Anthropic 上市看大模型的六个趋势</div>
+            <div style="margin-top:3px;font-size:12px;line-height:1.6;color:#6b7280">Anthropic 的上市揭示了 AI 产业的六大趋势：规模定律仍有效但研发由 AI 主导，产品从对话框转向虚拟协作者，按智能付费的商业模式逐步成型。</div>
+            <div style="margin-top:8px;display:flex;align-items:center;gap:6px;justify-content:space-between">
+              <span style="font-size:11px;color:#6b7280;font-variant-numeric:tabular-nums">腾讯研究院 · 昨天 16:30 · ★ 92</span>
+              <span style="display:flex;gap:2px">
+                <span style="width:26px;height:26px;border-radius:8px;background:#eef2f7;display:grid;place-items:center;color:#4b5563">○</span>
+                <span style="width:26px;height:26px;border-radius:8px;background:#eef2f7;display:grid;place-items:center;color:#4b5563">↗</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 已读态 -->
+      <div style="margin-top:14px">
+        <div style="font-size:11px;font-weight:600;letter-spacing:.04em;color:#6b7280;margin-bottom:6px">已经是读过的样子</div>
+        <div style="border:0.5px solid rgba(0,0,0,.10);border-radius:12px;background:#ffffff;overflow:hidden">
+          <div style="display:flex;align-items:center;gap:14px;padding:14px 16px">
+            <div style="flex:0 0 132px;width:132px;height:74px;border-radius:8px;background:#eef2f7;display:grid;place-items:center;color:#b7bec7;font-size:15px;font-weight:600;opacity:.6">配图</div>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+                <span style="width:5px;height:5px;border-radius:999px;background:transparent;flex:0 0 5px"></span>
+                <span style="font-size:10.5px;font-weight:600;letter-spacing:.04em;color:#adb2b8">BESTBLOGS 每日早报</span>
+              </div>
+              <div style="font-size:14px;line-height:1.55;font-weight:400;color:#adb2b8">EP242 · Anthropic 上市、Gemini 路线、OpenAI 研发实测</div>
+              <div style="margin-top:3px;font-size:12px;line-height:1.6;color:#adb2b8">Anthropic 上市披露，DeepMind 谈 Gemini 路线，OpenAI 实测智能体研发，看智能如何交付。</div>
+              <div style="margin-top:8px;display:flex;align-items:center;gap:6px;justify-content:space-between">
+                <span style="font-size:11px;color:#adb2b8;font-variant-numeric:tabular-nums">BestBlogs 早报 · 1 小时前</span>
+                <span style="display:flex;gap:2px">
+                  <span style="width:26px;height:26px;border-radius:8px;display:grid;place-items:center;color:#adb2b8">○</span>
+                  <span style="width:26px;height:26px;border-radius:8px;display:grid;place-items:center;color:#adb2b8">↗</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p style="margin:8px 0 0;font-size:11.5px;color:#6b7280;line-height:1.6">已读只降标题与配图，简介保留可读性。未读圆点消失，不是变灰。</p>
+      </div>
+    </div>
+
+    <!-- spec column -->
+    <div style="flex:1;min-width:0">
+
+      <div style="display:flex;flex-direction:column;gap:14px">
+
+        <div style="display:flex;gap:10px">
+          <span style="flex:0 0 22px;height:22px;border-radius:999px;background:#0f1115;color:#fff;display:grid;place-items:center;font-size:11px;font-weight:600">1</span>
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:13px">配图 <span style="font-weight:400;color:#6b7280;font-size:11.5px">可选</span></div>
+            <div style="font-size:11.5px;color:#4b5563;line-height:1.65;margin-top:2px">132×74，16:9 裁切。无图时不占位，正文占满整行。</div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px">
+          <span style="flex:0 0 22px;height:22px;border-radius:999px;background:#0f1115;color:#fff;display:grid;place-items:center;font-size:11px;font-weight:600">2</span>
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:13px">标题 <span style="font-weight:400;color:#6b7280;font-size:11.5px">必填</span></div>
+            <div style="font-size:11.5px;color:#4b5563;line-height:1.65;margin-top:2px">14px / 1.55，最多 2 行。未读 500，已读 400 灰。<br>点击在右侧栏浏览器打开。</div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px">
+          <span style="flex:0 0 22px;height:22px;border-radius:999px;background:#0f1115;color:#fff;display:grid;place-items:center;font-size:11px;font-weight:600">3</span>
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:13px">简介 <span style="font-weight:400;color:#6b7280;font-size:11.5px">必填</span></div>
+            <div style="font-size:11.5px;color:#4b5563;line-height:1.65;margin-top:2px">12px / 1.6，默认 3 行裁切，溢出时出现「详情」。<br>按行而不是按字数裁，字号缩放时自动适配。</div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px">
+          <span style="flex:0 0 22px;height:22px;border-radius:999px;background:#eef2f7;color:#4b5563;display:grid;place-items:center;font-size:11px;font-weight:600">4</span>
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:13px">说明行 <span style="font-weight:400;color:#6b7280;font-size:11.5px">可选</span></div>
+            <div style="font-size:11.5px;color:#4b5563;line-height:1.65;margin-top:2px">11px 淡化。统一为一段文本，用 · 连接：来源 · 时间 · 附加。<br>GitHub 填 star，早报填评分，X 之后填订阅关系。</div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px">
+          <span style="flex:0 0 22px;height:22px;border-radius:999px;background:#0f1115;color:#fff;display:grid;place-items:center;font-size:11px;font-weight:600">5</span>
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:13px">操作 <span style="font-weight:400;color:#6b7280;font-size:11.5px">必填</span></div>
+            <div style="font-size:11.5px;color:#4b5563;line-height:1.65;margin-top:2px">26×26 图标按钮，8px 圆角，2px 间距。<br>已读 + 外部打开常驻；删除等低频操作在 hover 时追加。位置固定在同一条右下角。</div>
+          </div>
+        </div>
+
+      </div>
+
+      <div style="margin-top:22px;padding-top:16px;border-top:0.5px solid rgba(0,0,0,.10)">
+        <div style="font-size:11px;font-weight:600;letter-spacing:.04em;color:#6b7280;margin-bottom:8px">要定下来的四条</div>
+        <ul style="margin:0;padding-left:16px;font-size:11.5px;color:#4b5563;line-height:1.85">
+          <li>简介统一 3 行，X 书签也降到 3 行（现在 6 行）</li>
+          <li>操作恒常显示，不再只在 hover 时出现</li>
+          <li>卡片最小 380、最大 760，按空间切 1 列 / 1 列限宽 / 2 列</li>
+          <li>说明行合并成一段文本，不再区分来源/评分样式</li>
+          <li>配图尺寸 112→132，给宽屏一点呼吸</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":880,"height":1080}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

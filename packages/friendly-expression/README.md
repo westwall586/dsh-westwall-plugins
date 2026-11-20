@@ -24,15 +24,13 @@ dsh plugin --profile <profile> add link:/绝对路径/packages/friendly-expressi
 
 ## 截图
 
-从 ASCII 草图到可缩放的图：
+回复里的图直接渲染，点开可缩放、可存：
 
-![替换前：ASCII 方框箭头流程图](assets/screenshot-1.png)
+![回复中的 Mermaid 图：带「点击放大」](assets/screenshot-1.png)
 
-![替换后：同一张流程图的 Mermaid 渲染](assets/screenshot-2.png)
+![图表浮窗：缩放、适合窗口、下载 SVG](assets/screenshot-2.png)
 
-![图表浮窗：缩放、适合窗口、下载 SVG](assets/screenshot-3.png)
-
-![设置页：可编辑的表达提示词](assets/screenshot-4.png)
+![设置页：可编辑的表达提示词](assets/screenshot-3.png)
 
 ## 配置
 

@@ -59,6 +59,8 @@ var DshFeedUltraClient = (() => {
     "row.openExternal": "Open in browser",
     "row.openInSidebar": "Open in sidebar",
     "row.read": "Read",
+    "row.detail": "Show more",
+    "row.collapse": "Show less",
     "x.manual": "Manual",
     "x.pull": "Pull {n}",
     "x.pulling": "Pulling…",
@@ -362,6 +364,8 @@ var DshFeedUltraClient = (() => {
     "row.openExternal": "在浏览器打开",
     "row.openInSidebar": "在侧栏打开",
     "row.read": "已读",
+    "row.detail": "详情",
+    "row.collapse": "收起",
     "x.manual": "手动",
     "x.pull": "拉取 {n} 条",
     "x.pulling": "拉取中…",
@@ -859,14 +863,6 @@ var DshFeedUltraClient = (() => {
       (0, import_react.createElement)("path", { key: "arc", d: "M13.5 8a5.5 5.5 0 1 1-1.9-4.2M13.5 2.5V6H10" })
     ]);
   }
-  function StarIcon({ size = 11, className }) {
-    return svg(size, { viewBox: "0 0 24 24", strokeWidth: 1.8, className }, [
-      (0, import_react.createElement)("path", {
-        key: "star",
-        d: "M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.4l-5.8 3.1 1.1-6.5L2.6 9.4l6.5-.9z"
-      })
-    ]);
-  }
   function CheckIcon({ size = 13, className }) {
     return svg(size, { strokeWidth: 1.5, className }, [
       (0, import_react.createElement)("path", { key: "check", d: "M3 8.5 6.5 12 13 4.8" })
@@ -927,6 +923,7 @@ var DshFeedUltraClient = (() => {
   var MINUTE_MS = 6e4;
   var HOUR_MS = 36e5;
   var RELATIVE_HOURS = 6;
+  var STAR = "★";
   function pad2(value) {
     return String(value).padStart(2, "0");
   }
@@ -1009,6 +1006,16 @@ var DshFeedUltraClient = (() => {
   function isManualSection(section) {
     return section?.cadence === "manual";
   }
+  function withToggledExpanded(set, id, limit = 200) {
+    const next = new Set(set);
+    if (next.has(id)) {
+      next.delete(id);
+      return next;
+    }
+    next.add(id);
+    while (next.size > limit) next.delete(next.values().next().value);
+    return next;
+  }
   function isTweetSection(section) {
     return section?.source?.type === "x-bookmarks";
   }
@@ -1032,30 +1039,26 @@ var DshFeedUltraClient = (() => {
     if (typeof text !== "string") return "";
     return text.replace(/\r\n?/g, "\n").replace(/\n[ \t]*\n(?:[ \t]*\n)*[ \t]*/g, "\n").replace(/^\n+|\n+$/g, "");
   }
-  function tweetMeta(item, now, t) {
-    const extra = item?.extra ?? {};
-    const author = trimmed(extra.author);
-    const handle = trimmed(extra.handle).replace(/^@/, "");
-    const published = item?.publishedAt ? new Date(item.publishedAt) : null;
-    const time = published !== null && !Number.isNaN(published.getTime()) ? formatRelativeTime(item.publishedAt, now, t) : "";
-    const favorites = tweetCount(extra.favorites);
-    const views = tweetCount(extra.views);
-    return {
-      author,
-      handle: handle === "" ? "" : `@${handle}`,
-      time,
-      likes: favorites === TWEET_COUNT_MISSING ? "" : t("x.likes", { n: formatCompact(favorites) }),
-      reads: views === TWEET_COUNT_MISSING ? "" : t("x.reads", { n: formatCompact(views) }),
-      deleted: tweetDeleted(item)
-    };
+  function tweetTime(item, now, t) {
+    if (tweetDeleted(item) || !item?.publishedAt) return "";
+    const published = new Date(item.publishedAt);
+    return Number.isNaN(published.getTime()) ? "" : formatRelativeTime(item.publishedAt, now, t);
   }
-  function tweetActions(section, item) {
+  function tweetLikes(extra, t) {
+    const favorites = tweetCount(extra?.favorites);
+    return favorites === TWEET_COUNT_MISSING ? "" : t("x.likes", { n: formatCompact(favorites) });
+  }
+  function tweetReads(extra, t) {
+    const views = tweetCount(extra?.views);
+    return views === TWEET_COUNT_MISSING ? "" : t("x.reads", { n: formatCompact(views) });
+  }
+  function rowActions(section, item) {
     const declared = section?.capabilities?.actions;
     const canDelete = Array.isArray(declared) && declared.includes("deleteBookmark");
     return {
       delete: canDelete && !tweetDeleted(item),
       read: !item?.read,
-      open: true
+      open: typeof item?.url === "string" && item.url !== ""
     };
   }
   function pullLabel(section, busy, t) {
@@ -1170,10 +1173,12 @@ var DshFeedUltraClient = (() => {
   }
   function briefItemMeta(item, now, t) {
     const extra = item?.extra ?? {};
-    const source = trimmed(extra.source);
     const when = item?.publishedAt ? formatRelativeTime(item.publishedAt, now, t) : "";
-    const score = typeof extra.score === "number" && Number.isFinite(extra.score) ? extra.score : null;
-    return { text: [source, when].filter(Boolean).join(" · "), score };
+    return [trimmed(extra.source), when, briefScore(extra)].filter(Boolean).join(" · ");
+  }
+  function briefScore(extra) {
+    const score = extra?.score;
+    return typeof score === "number" && Number.isFinite(score) ? `${STAR} ${formatCompact(score)}` : "";
   }
   function hostOf(url) {
     try {
@@ -1223,14 +1228,65 @@ var DshFeedUltraClient = (() => {
     if (letters === 0) return void 0;
     return han / letters > HAN_RATIO_THRESHOLD ? "zh-CN" : "en";
   }
-  function descriptionOf(item, uiLocale) {
+  function descriptionOf(item, uiLocale, translatable = true) {
     const original = typeof item?.description === "string" ? item.description.trim() : "";
     if (original === "") return { text: "", title: "", lang: void 0, translated: false };
-    const translated = typeof item?.descriptionTranslated === "string" ? item.descriptionTranslated.trim() : "";
+    const translated = translatable && typeof item?.descriptionTranslated === "string" ? item.descriptionTranslated.trim() : "";
     if (translated !== "" && isChineseUi(uiLocale)) {
       return { text: translated, title: original, lang: "zh-CN", translated: true };
     }
     return { text: original, title: "", lang: textLanguage(original), translated: false };
+  }
+  function extraString(item, key) {
+    return typeof item?.extra?.[key] === "string" ? item.extra[key].trim() : "";
+  }
+  function tweetBody(item) {
+    const raw = typeof item?.description === "string" ? item.description : "";
+    return raw.trim() === "" || /^<p>(?:<br\s*\/?>)*<\/p>$/i.test(raw.trim()) ? tweetDisplayText(item?.title) : tweetDisplayText(raw);
+  }
+  function coverOf(item, isTweet) {
+    const candidates = isTweet ? ["cover", "imageUrl"] : [item?.extra?.kind === "brief" ? "cover" : "imageUrl", "cover"];
+    for (const key of candidates) {
+      const value = extraString(item, key);
+      if (value === "") continue;
+      return /^(?:https?|data|blob):/i.test(value) ? value : "";
+    }
+    return "";
+  }
+  function attachmentsOf(item) {
+    return Array.isArray(item?.extra?.attachments) ? item.extra.attachments.filter((entry) => entry && typeof entry.url === "string") : [];
+  }
+  function rowKindOf(section) {
+    if (section?.source?.type === "bestblogs-brief") return "brief";
+    return isTweetSection(section) ? "tweet" : "";
+  }
+  function rowOf(item, section, { now, uiLocale, t }) {
+    const kind = rowKindOf(section);
+    const isTweet = kind === "tweet";
+    const linked = typeof item?.url === "string" ? item.url : "";
+    const title = isTweet ? { text: extraString(item, "author") || "X", url: linked } : { text: typeof item?.title === "string" ? item.title : "", url: linked };
+    const description = descriptionOf(
+      isTweet ? { ...item, description: tweetBody(item) } : item,
+      uiLocale,
+      section?.capabilities?.translation !== false
+    );
+    const meta = isTweet ? [
+      tweetTime(item, now, t),
+      tweetLikes(item.extra, t),
+      tweetReads(item.extra, t),
+      tweetDeleted(item) ? t("x.deletedTag") : ""
+    ].filter(Boolean).join(" · ") : kind === "brief" ? briefItemMeta(item, now, t) : itemMeta(item, now, t);
+    const originalUrl = kind === "brief" ? extraString(item, "originalUrl") : "";
+    return {
+      kind,
+      title,
+      description,
+      cover: coverOf(item, isTweet),
+      meta,
+      actions: { ...rowActions(section, item), externalUrl: originalUrl === "" ? linked : originalUrl },
+      attachments: attachmentsOf(item),
+      read: item?.read === true
+    };
   }
   function sectionEmptyState(section) {
     const status = section?.status;
@@ -2468,7 +2524,7 @@ var DshFeedUltraClient = (() => {
       for (let index = start; index <= end; index += 1) numbers.push(index);
       return numbers;
     };
-    const rowActions = (feed) => {
+    const rowActions2 = (feed) => {
       const confirming = state.confirm?.kind === "feed" && state.confirm.url === feed.url;
       if (confirming) {
         return h2(
@@ -2552,7 +2608,7 @@ var DshFeedUltraClient = (() => {
             onClick: () => startEdit(feed)
           }, feed.note === "" ? text("settings.rss.note.add") : feed.note)
         ),
-        rowActions(feed)
+        rowActions2(feed)
       );
     };
     const channelRow = (entry) => {
@@ -4456,12 +4512,14 @@ var DshFeedUltraClient = (() => {
     filter: "all",
     selectMode: false,
     selected: /* @__PURE__ */ new Set(),
+    expanded: /* @__PURE__ */ new Set(),
     month: "",
     calendar: /* @__PURE__ */ new Map(),
     calendarMonth: "",
     calendarLoading: false,
     settingsPane: "general"
   };
+  var EXPANDED_LIMIT = 200;
   function createInitialState(memory) {
     const selection = memory.readSelection();
     return {
@@ -4538,6 +4596,7 @@ var DshFeedUltraClient = (() => {
           date: action.date,
           month: monthKeyOf(action.date),
           selected: /* @__PURE__ */ new Set(),
+          expanded: /* @__PURE__ */ new Set(),
           day: null,
           dayLoading: true,
           dayError: null,
@@ -4551,6 +4610,7 @@ var DshFeedUltraClient = (() => {
           day: action.day,
           sources: action.sources,
           channel: resolveReadingChannel(state.channel, action.sources),
+          expanded: action.day.date === state.date ? state.expanded : /* @__PURE__ */ new Set(),
           dayLoading: false,
           dayError: null,
           settingsPane: resolvePane(state.settingsPane, sourceIdsOf(action.sources))
@@ -4608,6 +4668,8 @@ var DshFeedUltraClient = (() => {
       }
       case "channel":
         return { ...state, channel: action.channel, selected: /* @__PURE__ */ new Set() };
+      case "toggle-expanded":
+        return { ...state, expanded: withToggledExpanded(state.expanded, action.id, EXPANDED_LIMIT) };
       case "view":
         return { ...state, view: action.view, selectMode: false, selected: /* @__PURE__ */ new Set() };
       case "filter":
@@ -4872,9 +4934,8 @@ var DshFeedUltraClient = (() => {
         dispatch({ type: "deleting", id, on: false });
       }
     }, [api, text]);
-    const openItem = (0, import_react5.useCallback)((item) => {
+    const openItem = (0, import_react5.useCallback)((item, url = item.url) => {
       void markRead([item.id]);
-      const url = item.url;
       if (!url) {
         ctx.layout.selectPanel(null);
         return;
@@ -4963,6 +5024,7 @@ var DshFeedUltraClient = (() => {
       startSelect: () => dispatch({ type: "select-mode", on: true }),
       cancelSelect: () => dispatch({ type: "select-mode", on: false }),
       toggleSelect: (id) => dispatch({ type: "select", id }),
+      toggleExpanded: (id) => dispatch({ type: "toggle-expanded", id }),
       markSelected,
       selectMonth: (delta) => {
         const month = stateRef.current.month;
@@ -5239,25 +5301,22 @@ var DshFeedUltraClient = (() => {
       )
     );
   }
-  function RowCover({ item, cover: explicit }) {
+  function RowCover({ initial, cover, video }) {
     const [coverFailed, setCoverFailed] = (0, import_react5.useState)(false);
-    const cover = typeof explicit === "string" ? explicit : typeof item.extra?.cover === "string" ? item.extra.cover : "";
-    const showCover = cover !== "" && !coverFailed;
-    const initial = typeof item.title === "string" && item.title !== "" ? item.title.trim().charAt(0) : "";
     return h4(
       "div",
       { className: "dl-row-cover" },
-      showCover ? h4("img", {
+      coverFailed ? h4("span", { className: "dl-row-cover-fallback", "aria-hidden": true }, initial) : h4("img", {
         src: cover,
         alt: "",
-        width: 112,
-        height: 63,
+        width: 132,
+        height: 74,
         loading: "lazy",
         decoding: "async",
         referrerPolicy: "no-referrer",
         onError: () => setCoverFailed(true)
-      }) : h4("span", { className: "dl-row-cover-fallback", "aria-hidden": true }, initial),
-      item.extra?.kind === "video" ? h4("span", { className: "dl-play", "aria-hidden": true }, h4(PlayIcon, { size: 8 })) : null
+      }),
+      video ? h4("span", { className: "dl-play", "aria-hidden": true }, h4(PlayIcon, { size: 8 })) : null
     );
   }
   function attachmentSize(bytes) {
@@ -5363,18 +5422,17 @@ var DshFeedUltraClient = (() => {
     selectMode,
     selected,
     deleting = [],
-    deleteErrors = {}
+    deleteErrors = {},
+    expanded = /* @__PURE__ */ new Set()
   }) {
     const now = /* @__PURE__ */ new Date();
-    const isBriefChannel = section.source?.type === "bestblogs-brief";
-    const isTweetChannel = isTweetSection(section);
     const manual = isManualSection(section);
     const isPooled = section.channelId !== void 0;
     const rss = isPooled ? rssSectionMeta(section) : null;
     const rssSources = rssChannel?.feedCount ?? rss?.feeds.length ?? 0;
     const rssFailed = rss?.failed ?? 0;
     const rssOverLimit = rss?.overLimit ?? 0;
-    const brief = isBriefChannel ? briefMeta(section) : null;
+    const brief = section.source?.type === "bestblogs-brief" ? briefMeta(section) : null;
     const emptyState = sectionEmptyState(section);
     const pull = pullControl(section, { day, today, busy }, text);
     const showBrief = Boolean(brief) && section.status !== "pending" && section.status !== "notPublished";
@@ -5406,119 +5464,177 @@ var DshFeedUltraClient = (() => {
     const showDot = section.status !== "notPublished";
     const degraded = showBrief && brief.detailStatus === "degraded";
     return h4(
-      "section",
-      { className: "dl-card", style: { "--dl-i": index } },
+      "div",
+      { className: "dl-list" },
       h4(
-        "div",
-        { className: "dl-card-head" },
-        h4("span", { className: "dl-ch-dot", "aria-hidden": true }),
-        h4("span", { className: "dl-card-title" }, channelName(section.source, text)),
-        manual ? h4("span", { className: "dl-card-pill" }, text("x.manual")) : null,
-        h4("span", { className: "dl-card-count" }, String(section.count)),
+        "section",
+        { className: "dl-card", style: { "--dl-i": index } },
         h4(
-          "span",
-          {
-            className: `dl-card-meta${isError ? " is-error" : ""}`,
-            title: fetchError || section.fetch?.error || ""
-          },
-          showDot ? h4("span", { className: `dl-status-dot ${sectionDotClass(section, fetchError)}` }) : null,
-          h4("span", { className: "dl-card-meta-text" }, statusText)
-        ),
-        degraded ? h4("span", { className: "dl-card-hint" }, text("brief.detailsIncomplete")) : null,
-        head.statusText ? h4("span", { className: "dl-card-status" }, head.statusText) : null,
-        canRefresh ? pull.show ? h4("button", {
-          type: "button",
-          className: "dl-btn dl-btn--sm",
-          disabled: pull.disabled,
-          onClick: () => void actions.refreshSection(section)
-        }, pull.label) : h4("button", {
-          type: "button",
-          className: "dl-icon-btn dl-icon-btn--sm",
-          title: isPooled ? text("section.rss.pull") : text("section.refetch"),
-          "aria-label": isPooled ? text("section.rss.pull") : text("section.refetch"),
-          disabled: head.refetchDisabled,
-          onClick: () => void actions.refreshSection(section)
-        }, h4(RefreshIcon, { size: 12, className: busy ? "dl-spin" : void 0 })) : null,
-        head.showTranslate ? h4("button", {
-          type: "button",
-          className: "dl-btn dl-btn--sm",
-          disabled: head.translateDisabled,
-          onClick: () => void actions.translateSource(section.source.id)
-        }, head.translateLabel) : null
-      ),
-      head.showError ? h4(
-        "div",
-        { className: "dl-translate-error", role: "status" },
-        h4("span", { className: "dl-translate-error-label" }, text("section.translationFailed")),
-        h4("span", { className: "dl-translate-error-text" }, head.errorMessage),
-        h4("span", { className: "dl-translate-error-hint" }, text("section.translationHint"))
-      ) : null,
-      isPooled && section.status === "error" ? h4(
-        "div",
-        { className: "dl-section-error", role: "status" },
-        h4("span", { className: "dl-section-error-text" }, section.fetch?.error || rssChannel?.error || text("card.failed")),
-        h4("button", {
-          type: "button",
-          className: "dl-btn dl-btn--sm",
-          disabled: busy,
-          onClick: () => void actions.refreshSection(section)
-        }, busy ? text("section.rss.pulling") : text("section.rss.pullShort"))
-      ) : null,
-      showBrief ? h4(BriefHeader, { brief, text, actions }) : null,
-      emptyState === "none" ? null : h4(SectionEmpty, {
-        kind: emptyState,
-        section,
-        busy,
-        isToday: day === today,
-        canBackfill,
-        text,
-        actions
-      }),
-      ...section.items.map((item) => h4(ItemRow, {
-        key: item.id,
-        item,
-        brief: isBriefChannel,
-        tweet: isTweetChannel,
-        section,
-        deleting: deleting.includes(item.id),
-        deleteError: deleteErrors[item.id] ?? "",
-        uiLocale,
-        text,
-        actions,
-        selectMode,
-        selected: selected.has(item.id)
-      }))
+          "div",
+          { className: "dl-rows" },
+          h4(
+            "div",
+            { className: "dl-rows-all" },
+            h4(
+              "div",
+              { className: "dl-card-head" },
+              h4("span", { className: "dl-ch-dot", "aria-hidden": true }),
+              h4("span", { className: "dl-card-title" }, channelName(section.source, text)),
+              manual ? h4("span", { className: "dl-card-pill" }, text("x.manual")) : null,
+              h4("span", { className: "dl-card-count" }, String(section.count)),
+              h4(
+                "span",
+                {
+                  className: `dl-card-meta${isError ? " is-error" : ""}`,
+                  title: fetchError || section.fetch?.error || ""
+                },
+                showDot ? h4("span", { className: `dl-status-dot ${sectionDotClass(section, fetchError)}` }) : null,
+                h4("span", { className: "dl-card-meta-text" }, statusText)
+              ),
+              degraded ? h4("span", { className: "dl-card-hint" }, text("brief.detailsIncomplete")) : null,
+              head.statusText ? h4("span", { className: "dl-card-status" }, head.statusText) : null,
+              canRefresh ? pull.show ? h4("button", {
+                type: "button",
+                className: "dl-btn dl-btn--sm",
+                disabled: pull.disabled,
+                onClick: () => void actions.refreshSection(section)
+              }, pull.label) : h4("button", {
+                type: "button",
+                className: "dl-icon-btn dl-icon-btn--sm",
+                title: isPooled ? text("section.rss.pull") : text("section.refetch"),
+                "aria-label": isPooled ? text("section.rss.pull") : text("section.refetch"),
+                disabled: head.refetchDisabled,
+                onClick: () => void actions.refreshSection(section)
+              }, h4(RefreshIcon, { size: 12, className: busy ? "dl-spin" : void 0 })) : null,
+              head.showTranslate ? h4("button", {
+                type: "button",
+                className: "dl-btn dl-btn--sm",
+                disabled: head.translateDisabled,
+                onClick: () => void actions.translateSource(section.source.id)
+              }, head.translateLabel) : null
+            )
+          ),
+          head.showError ? h4(
+            "div",
+            { className: "dl-translate-error", role: "status" },
+            h4("span", { className: "dl-translate-error-label" }, text("section.translationFailed")),
+            h4("span", { className: "dl-translate-error-text" }, head.errorMessage),
+            h4("span", { className: "dl-translate-error-hint" }, text("section.translationHint"))
+          ) : null,
+          isPooled && section.status === "error" ? h4(
+            "div",
+            { className: "dl-section-error", role: "status" },
+            h4("span", { className: "dl-section-error-text" }, section.fetch?.error || rssChannel?.error || text("card.failed")),
+            h4("button", {
+              type: "button",
+              className: "dl-btn dl-btn--sm",
+              disabled: busy,
+              onClick: () => void actions.refreshSection(section)
+            }, busy ? text("section.rss.pulling") : text("section.rss.pullShort"))
+          ) : null,
+          showBrief ? h4(BriefHeader, { brief, text, actions }) : null,
+          emptyState === "none" ? null : h4(SectionEmpty, {
+            kind: emptyState,
+            section,
+            busy,
+            isToday: day === today,
+            canBackfill,
+            text,
+            actions
+          }),
+          ...section.items.map((item) => h4(ItemRow, {
+            key: item.id,
+            item,
+            section,
+            deleting: deleting.includes(item.id),
+            deleteError: deleteErrors[item.id] ?? "",
+            expanded: expanded.has(item.id),
+            uiLocale,
+            text,
+            actions,
+            selectMode,
+            selected: selected.has(item.id)
+          }))
+        )
+      )
     );
   }
-  function TweetText({ item, text }) {
-    const raw = typeof item.description === "string" ? item.description : "";
-    const placeholder = raw.trim() === "";
-    const body = placeholder ? typeof item.title === "string" ? item.title : "" : tweetDisplayText(raw);
-    const [expanded, setExpanded] = (0, import_react5.useState)(false);
+  function RowDescription({ row, expanded, toggle, text }) {
     const [overflowing, setOverflowing] = (0, import_react5.useState)(false);
-    const bodyRef = (0, import_react5.useRef)(null);
+    const ref = (0, import_react5.useRef)(null);
+    const showControl = overflowing || expanded;
     (0, import_react5.useLayoutEffect)(() => {
-      const node = bodyRef.current;
-      if (!node || expanded) return;
-      setOverflowing(node.scrollHeight > node.clientHeight + 1);
-    }, [expanded, body]);
-    if (body === "") return null;
-    const classes = ["dl-tweet-text"];
-    if (placeholder) classes.push("is-placeholder");
-    if (!expanded) classes.push("is-clamped");
+      const node = ref.current;
+      if (!node) return void 0;
+      const measure = () => setOverflowing(node.scrollHeight > node.clientHeight + 1);
+      measure();
+      const observer = new ResizeObserver(measure);
+      observer.observe(node);
+      return () => observer.disconnect();
+    }, [expanded, row.description.text, showControl]);
     return [
-      h4("div", { key: "body", ref: bodyRef, className: classes.join(" ") }, body),
-      overflowing || expanded ? h4("button", {
+      h4("div", {
+        key: "text",
+        ref,
+        className: `dl-row-desc${expanded ? " is-expanded" : " is-clamped"}`,
+        title: row.description.title || void 0,
+        lang: row.description.lang
+      }, row.description.text),
+      showControl ? h4("button", {
         key: "toggle",
         type: "button",
-        className: "dl-tweet-expand",
+        className: "dl-row-more",
         "aria-expanded": expanded,
         onClick: (event) => {
           event.stopPropagation();
-          setExpanded((value) => !value);
+          toggle();
         }
-      }, text(expanded ? "x.collapse" : "x.expand")) : null
+      }, text(expanded ? "row.collapse" : "row.detail")) : null
     ];
+  }
+  function RowActions({ row, item, text, actions, deleting }) {
+    const buttons = [];
+    if (row.actions.delete) {
+      buttons.push(h4("button", {
+        key: "delete",
+        type: "button",
+        className: "dl-icon-btn dl-icon-btn--danger",
+        title: text("x.delete"),
+        "aria-label": text("x.delete"),
+        disabled: deleting,
+        onClick: (event) => {
+          event.stopPropagation();
+          void actions.deleteBookmark(item);
+        }
+      }, h4(TrashIcon, { size: 13 })));
+    }
+    if (row.actions.read) {
+      buttons.push(h4("button", {
+        key: "read",
+        type: "button",
+        className: "dl-icon-btn",
+        title: text("row.markRead"),
+        "aria-label": text("row.markRead"),
+        onClick: (event) => {
+          event.stopPropagation();
+          void actions.markRead([item.id]);
+        }
+      }, h4(CheckIcon, { size: 13 })));
+    }
+    if (row.actions.open || row.actions.externalUrl !== "") {
+      buttons.push(h4("button", {
+        key: "open",
+        type: "button",
+        className: "dl-icon-btn",
+        title: text("row.openExternal"),
+        "aria-label": text("row.openExternal"),
+        onClick: (event) => {
+          event.stopPropagation();
+          void actions.openExternal(item, row.actions.externalUrl);
+        }
+      }, h4(OpenIcon, { size: 13 })));
+    }
+    return h4("div", { className: "dl-acts" }, ...buttons);
   }
   function selectionIntersects(node) {
     const selection = typeof window === "undefined" ? null : window.getSelection?.();
@@ -5530,46 +5646,10 @@ var DshFeedUltraClient = (() => {
     event.preventDefault();
     event.stopPropagation();
     if (selectionIntersects(event.currentTarget)) return;
-    void actions.openItem(item);
-  }
-  function TweetRowBody({ item, now, text, selectMode, onOpen }) {
-    const meta = tweetMeta(item, now, text);
-    const parts = [];
-    const push = (key, node, separator = true) => {
-      if (separator && parts.length > 0) {
-        parts.push(h4("span", { key: `sep:${key}`, className: "dl-tweet-sep", "aria-hidden": true }, "·"));
-      }
-      parts.push(node);
-    };
-    if (meta.author) {
-      push("author", h4("span", { key: "author", className: "dl-tweet-author" }, meta.author), false);
-    }
-    if (meta.handle) push("handle", h4("span", { key: "handle", className: "dl-tweet-handle" }, meta.handle));
-    if (meta.time) push("time", h4("span", { key: "time" }, meta.time));
-    if (meta.likes) push("likes", h4("span", { key: "likes" }, meta.likes));
-    if (meta.reads) push("reads", h4("span", { key: "reads" }, meta.reads));
-    if (meta.deleted) {
-      push("deleted", h4("span", { key: "deleted", className: "dl-tweet-deleted" }, text("x.deletedTag")));
-    }
-    const head = !selectMode && item.url ? h4("a", {
-      className: "dl-tweet-head dl-title-link",
-      href: item.url,
-      title: text("row.openInSidebar"),
-      draggable: false,
-      onClick: onOpen,
-      onAuxClick: (event) => event.preventDefault()
-    }, ...parts) : h4("div", { className: "dl-tweet-head" }, ...parts);
-    return h4(
-      "div",
-      { className: "dl-tweet" },
-      head,
-      h4(TweetText, { item, text })
-    );
+    void actions.openItem(item, event.currentTarget.href);
   }
   function ItemRow({
     item,
-    brief = false,
-    tweet = false,
     section = null,
     deleting = false,
     deleteError = "",
@@ -5577,23 +5657,25 @@ var DshFeedUltraClient = (() => {
     text,
     actions,
     selectMode = false,
-    selected = false
+    selected = false,
+    expanded = false
   }) {
-    const now = /* @__PURE__ */ new Date();
-    const stats = brief || tweet ? null : githubStats(item.extra);
-    const meta = brief || tweet ? "" : itemMeta(item, now, text);
-    const briefInfo = brief ? briefItemMeta(item, now, text) : null;
-    const description = descriptionOf(item, uiLocale);
-    const imageUrl = typeof item.extra?.imageUrl === "string" ? item.extra.imageUrl : "";
-    const attachments = Array.isArray(item.extra?.attachments) ? item.extra.attachments.filter((entry) => entry && typeof entry.url === "string") : [];
-    const externalUrl = brief ? typeof item.extra?.originalUrl === "string" ? item.extra.originalUrl : "" : item.url;
-    const visible = tweet ? tweetActions(section, item) : null;
+    const row = (0, import_react5.useMemo)(
+      () => rowOf(item, section, { now: /* @__PURE__ */ new Date(), uiLocale, t: text }),
+      [item, section, uiLocale, text]
+    );
     const classes = ["dl-row"];
-    if (item.read) classes.push("is-read");
+    if (row.read) classes.push("is-read");
     if (selectMode) classes.push("is-select");
     if (selected) classes.push("is-selected");
-    if (brief) classes.push("is-brief");
-    if (tweet) classes.push("is-tweet");
+    const titleNode = selectMode || !row.title.url ? h4("span", { className: "dl-row-title", title: row.title.text }, row.title.text) : h4("a", {
+      className: "dl-row-title dl-title-link",
+      href: row.title.url,
+      title: row.title.text,
+      draggable: false,
+      onClick: (event) => openTitle(event, item, actions),
+      onAuxClick: (event) => event.preventDefault()
+    }, row.title.text);
     return h4(
       "div",
       {
@@ -5615,34 +5697,25 @@ var DshFeedUltraClient = (() => {
         { className: `dl-check${selected ? " is-on" : ""}`, "aria-hidden": true },
         selected ? h4(CheckIcon, { size: 10 }) : null
       ) : h4("span", { className: "dl-unread-dot", "aria-hidden": true }),
-      brief || imageUrl !== "" ? h4(RowCover, { item, cover: brief ? void 0 : imageUrl }) : null,
+      row.cover === "" ? null : h4(RowCover, {
+        initial: row.title.text.trim().charAt(0),
+        cover: row.cover,
+        video: item.extra?.kind === "video"
+      }),
       h4(
         "div",
         { className: "dl-row-body" },
-        tweet ? h4(TweetRowBody, {
-          item,
-          now,
-          text,
-          selectMode,
-          onOpen: (event) => openTitle(event, item, actions)
-        }) : null,
-        tweet ? null : selectMode || !item.url ? h4("span", { className: "dl-row-title", title: item.title }, item.title) : h4("a", {
-          className: "dl-row-title dl-title-link",
-          href: item.url,
-          title: item.title,
-          draggable: false,
-          onClick: (event) => openTitle(event, item, actions),
-          onAuxClick: (event) => event.preventDefault()
-        }, item.title),
-        tweet ? null : description.text ? h4("div", {
-          className: "dl-row-desc",
-          title: description.title || void 0,
-          lang: description.lang
-        }, description.text) : null,
-        tweet || attachments.length === 0 ? null : h4(
+        titleNode,
+        row.description.text === "" ? null : h4(RowDescription, {
+          row,
+          expanded,
+          toggle: () => actions.toggleExpanded(item.id),
+          text
+        }),
+        row.attachments.length === 0 ? null : h4(
           "div",
           { className: "dl-row-attachments" },
-          ...attachments.map((attachment, index) => h4("a", {
+          ...row.attachments.map((attachment, index) => h4("a", {
             key: `${index}:${attachment.url}`,
             className: "dl-attachment",
             href: attachment.url,
@@ -5655,29 +5728,15 @@ var DshFeedUltraClient = (() => {
             }
           }, h4(OpenIcon, { size: 10 }), h4("span", null, attachmentLabel(attachment, text))))
         ),
-        tweet ? null : brief ? h4(
+        // The actions share the meta line when there is one, and stand on the
+        // next line beside a meta line that is absent.
+        h4(
           "div",
-          { className: "dl-row-meta" },
-          briefInfo.text ? h4("span", { className: "dl-row-meta-text" }, briefInfo.text) : null,
-          briefInfo.score !== null ? h4(
-            "span",
-            { className: "dl-row-score" },
-            briefInfo.text ? h4("span", { className: "dl-row-sep" }, "·") : null,
-            h4(StarIcon, { size: 10 }),
-            String(briefInfo.score)
-          ) : null
-        ) : meta ? h4(
-          "div",
-          { className: "dl-row-meta" },
-          stats ? h4("span", {
-            className: "dl-row-star",
-            role: "img",
-            "aria-label": text("gh.starsLabel"),
-            title: text("gh.starsLabel")
-          }, h4(StarIcon, { size: 11 })) : null,
-          h4("span", { className: "dl-row-meta-text" }, meta)
-        ) : null,
-        tweet && deleteError ? h4(
+          { className: "dl-row-foot" },
+          row.meta ? h4("span", { className: "dl-row-meta-text", title: row.meta }, row.meta) : null,
+          selectMode ? null : h4(RowActions, { row, item, text, actions, deleting })
+        ),
+        deleteError ? h4(
           "div",
           { className: "dl-row-delete-error", role: "status" },
           h4("span", { className: "dl-row-delete-error-text" }, deleteError),
@@ -5691,43 +5750,6 @@ var DshFeedUltraClient = (() => {
             }
           }, text("section.retry"))
         ) : null
-      ),
-      selectMode ? null : h4(
-        "div",
-        { className: "dl-acts" },
-        visible?.delete ? h4("button", {
-          type: "button",
-          className: "dl-icon-btn dl-icon-btn--danger",
-          title: text("x.delete"),
-          "aria-label": text("x.delete"),
-          disabled: deleting,
-          onClick: (event) => {
-            event.stopPropagation();
-            void actions.deleteBookmark(item);
-          }
-        }, h4(TrashIcon, { size: 13 })) : null,
-        (visible ? visible.read : !item.read) ? h4("button", {
-          type: "button",
-          className: "dl-icon-btn",
-          title: text("row.markRead"),
-          "aria-label": text("row.markRead"),
-          disabled: tweet ? deleting : void 0,
-          onClick: (event) => {
-            event.stopPropagation();
-            void actions.markRead([item.id]);
-          }
-        }, h4(CheckIcon, { size: 13 })) : null,
-        externalUrl ? h4("button", {
-          type: "button",
-          className: "dl-icon-btn",
-          title: text("row.openExternal"),
-          "aria-label": text("row.openExternal"),
-          disabled: tweet ? deleting : void 0,
-          onClick: (event) => {
-            event.stopPropagation();
-            void actions.openExternal(item, externalUrl);
-          }
-        }, h4(OpenIcon, { size: 13 })) : null
       )
     );
   }
@@ -6066,7 +6088,8 @@ var DshFeedUltraClient = (() => {
           selectMode: state.selectMode,
           selected: state.selected,
           deleting: state.deleting,
-          deleteErrors: state.deleteErrors
+          deleteErrors: state.deleteErrors,
+          expanded: state.expanded
         }))
       );
     }
@@ -6142,7 +6165,11 @@ var DshFeedUltraClient = (() => {
   font-size: calc(var(--dl-font-ratio) * 13px);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  /* The panel's breakpoints are measured here. Both panel @container blocks name
+     this container, and the rows grid carries its own name, so a panel width
+     query never resolves against a row or against that grid. */
   container-type: inline-size;
+  container-name: dl-panel;
 }
 
 .dl-root[data-dl-scheme="dark"],
@@ -6394,6 +6421,40 @@ var DshFeedUltraClient = (() => {
   box-shadow: 0 6px 18px color-mix(in srgb, var(--dl-label-primary) 8%, transparent);
 }
 
+/* The one grid a section card holds: its header spans every column and the rows
+   sit in two of them. Two fixed tracks rather than auto-fit, because auto-fit
+   keeps opening columns as long as tracks fit, which turns a wide panel into
+   three and then four narrow ones instead of the two wide cards the list is
+   designed for. The panel query below drops to a single track when a second
+   380px card no longer fits, and .dl-list bounds the pair so neither track
+   outgrows 760. */
+.dl-rows {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 0 12px;
+  min-width: 0;
+}
+
+/* Two 760 tracks and their gutter is as wide as the list ever gets; the centring
+   has to sit here rather than on the grid, whose width is set by this cap. */
+.dl-list {
+  max-width: 1532px;
+  margin-inline: auto;
+}
+
+/* One card at a time until a second one fits: the panel minus its two 12px of
+   padding is at least two 380px cards and the gutter between them. */
+@container dl-panel (max-width: 875px) {
+  .dl-rows {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.dl-rows-all {
+  grid-column: 1 / -1;
+}
+
 .dl-card-head {
   display: flex;
   align-items: center;
@@ -6485,15 +6546,27 @@ var DshFeedUltraClient = (() => {
 
 /* ---------- item rows ---------- */
 
+/* One card shape for every source. Rows are grid items, so \`min-width: 0\` stops
+   a long unbroken title from widening its column past the grid's track. A row
+   keeps its natural height; it never stretches to match a taller neighbour. */
 .dl-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  align-self: start;
+  min-width: 0;
   gap: 10px;
-  padding: 9px 14px;
+  padding: 11px 14px;
   border-top: var(--dl-hairline);
   cursor: default;
   user-select: text;
   transition: background-color 0.15s;
+}
+
+/* A row in the right column opens the first line of its section's grid, where
+   there is no row above it to carry the separator. */
+.dl-rows > .dl-row:first-child,
+.dl-rows > .dl-rows-all + .dl-row {
+  border-top: 0;
 }
 
 .dl-row.is-select {
@@ -6519,6 +6592,7 @@ var DshFeedUltraClient = (() => {
   width: 5px;
   height: 5px;
   flex: 0 0 5px;
+  margin-top: 6px;
   border-radius: 999px;
   background: var(--dl-business);
   animation: dl-dot-in 0.45s var(--dl-ease) both;
@@ -6530,13 +6604,14 @@ var DshFeedUltraClient = (() => {
 }
 
 .dl-row-title {
-  display: block;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
   font-size: 1.0769em;
   line-height: 1.5385em;
   font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   transition: color 0.2s var(--dl-ease);
 }
 
@@ -6567,49 +6642,72 @@ var DshFeedUltraClient = (() => {
   border-radius: 2px;
 }
 
+/* The description is the one clamped slot: three lines until the reader asks for
+   the rest, and the text may break anywhere so an unbroken URL never widens it. */
 .dl-row-desc {
   margin-top: 1px;
   font-size: 0.9231em;
   line-height: 1.3077em;
   color: var(--dl-label-tertiary);
-  overflow: visible;
-  text-overflow: clip;
-  white-space: normal;
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.dl-row-desc.is-clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .dl-row.is-read .dl-row-desc {
   color: var(--dl-label-caption);
 }
 
-.dl-row-meta {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+.dl-row-more {
   margin-top: 3px;
-  font-size: 0.8462em;
-  color: var(--dl-label-tertiary);
-  overflow: hidden;
-  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--dl-link);
+  font: inherit;
+  font-size: 0.8846em;
+  cursor: pointer;
 }
 
-.dl-row-star {
-  display: inline-flex;
+.dl-row-more:hover {
+  text-decoration: underline;
+}
+
+.dl-row-more:focus-visible {
+  outline: 2px solid var(--dl-business);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* The meta line and the row's actions share this line: the meta text takes what
+   it needs and ellipses, the actions keep their width at the right. */
+.dl-row-foot {
+  display: flex;
   align-items: center;
-  flex: 0 0 auto;
-  color: var(--dl-label-tertiary);
+  gap: 8px;
+  min-width: 0;
+  min-height: calc(var(--dl-font-ratio) * 26px);
+  margin-top: 3px;
 }
 
 .dl-row-meta-text {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 0.8462em;
+  color: var(--dl-label-tertiary);
   font-variant-numeric: tabular-nums;
 }
 
-.dl-row.is-read .dl-row-meta,
-.dl-row.is-read .dl-row-star {
+.dl-row.is-read .dl-row-meta-text {
   color: var(--dl-label-caption);
 }
 
@@ -6711,9 +6809,10 @@ var DshFeedUltraClient = (() => {
 
 .dl-row-cover {
   position: relative;
-  flex: 0 0 112px;
-  width: 112px;
-  height: 63px;
+  flex: 0 0 132px;
+  width: 132px;
+  height: 74px;
+  margin-top: 2px;
   border-radius: var(--dl-radius-sm);
   overflow: hidden;
   background: var(--dl-active);
@@ -6749,39 +6848,11 @@ var DshFeedUltraClient = (() => {
   color: #ffffff;
 }
 
-.dl-row.is-brief .dl-row-title {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-
-.dl-row.is-brief .dl-row-desc {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
 .dl-row.is-read .dl-row-cover {
   opacity: 0.6;
 }
 
-.dl-row-sep {
-  color: var(--dl-label-caption);
-}
-
-.dl-row-score {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  flex: 0 0 auto;
-  font-variant-numeric: tabular-nums;
-}
-
-/* ---------- tweet cards ---------- */
+/* ---------- section header extras ---------- */
 
 .dl-card-pill {
   height: calc(var(--dl-font-ratio) * 17px);
@@ -6793,111 +6864,6 @@ var DshFeedUltraClient = (() => {
   background: var(--dl-active);
   color: var(--dl-label-secondary);
   font-size: 0.7692em;
-}
-
-.dl-row.is-tweet {
-  align-items: flex-start;
-  padding: 11px 14px;
-}
-
-.dl-row.is-tweet .dl-unread-dot {
-  margin-top: 6px;
-}
-
-.dl-row.is-tweet .dl-acts {
-  align-self: center;
-}
-
-.dl-tweet {
-  min-width: 0;
-}
-
-.dl-tweet-head {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 4px;
-  font-size: 0.8462em;
-  line-height: 1.2308em;
-  color: var(--dl-label-tertiary);
-}
-
-.dl-tweet-head.dl-title-link:hover .dl-tweet-author {
-  color: var(--dl-link);
-}
-
-.dl-tweet-author {
-  font-size: 0.9231em;
-  font-weight: 600;
-  color: var(--dl-label-primary);
-}
-
-.dl-row.is-read .dl-tweet-author {
-  color: var(--dl-label-tertiary);
-}
-
-.dl-tweet-handle,
-.dl-tweet-head > span {
-  overflow-wrap: anywhere;
-}
-
-.dl-tweet-sep {
-  color: var(--dl-label-caption);
-}
-
-.dl-tweet-deleted {
-  height: calc(var(--dl-font-ratio) * 18px);
-  padding: 0 6px;
-  display: inline-flex;
-  align-items: center;
-  align-self: center;
-  border-radius: 4px;
-  background: var(--dl-active);
-  color: var(--dl-label-secondary);
-  font-size: 0.7692em;
-}
-
-.dl-tweet-text {
-  margin-top: 4px;
-  font-size: 0.9615em;
-  line-height: 1.5000em;
-  color: var(--dl-label-secondary);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.dl-row.is-read .dl-tweet-text {
-  color: var(--dl-label-caption);
-}
-
-.dl-tweet-text.is-clamped {
-  display: -webkit-box;
-  -webkit-line-clamp: 6;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.dl-tweet-text.is-placeholder {
-  color: var(--dl-label-tertiary);
-}
-
-.dl-tweet-expand {
-  margin-top: 3px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--dl-link);
-  font: inherit;
-  font-size: 0.8846em;
-  cursor: pointer;
-}
-
-.dl-tweet-expand:hover {
-  text-decoration: underline;
-}
-
-.dl-icon-btn--danger {
-  color: var(--dl-error);
 }
 
 .dl-row-delete-error {
@@ -6945,25 +6911,16 @@ var DshFeedUltraClient = (() => {
   color: var(--dl-label-tertiary);
 }
 
+/* The row actions are always on screen, at the right of the foot line; they are
+   never hover-only, so a touch panel and a keyboard reach them the same way. */
+.dl-icon-btn--danger {
+  color: var(--dl-error);
+}
+
 .dl-acts {
   display: flex;
+  flex: 0 0 auto;
   gap: 2px;
-  opacity: 0;
-  transform: translateX(4px);
-  transition: opacity 0.16s, transform 0.16s var(--dl-ease);
-}
-
-.dl-row:hover .dl-acts,
-.dl-row:focus-within .dl-acts {
-  opacity: 1;
-  transform: none;
-}
-
-@media (hover: none) {
-  .dl-acts {
-    opacity: 1;
-    transform: none;
-  }
 }
 
 /* ---------- right rail ---------- */
@@ -8334,9 +8291,10 @@ var DshFeedUltraClient = (() => {
 
 /* ---------- narrow panel ----------
    Breakpoints follow the panel's own width, not the window: the DSH app
-   sidebar changes how much room the main column has. */
+   sidebar changes how much room the main column has. Both queries name
+   \`dl-panel\`, so only \`.dl-root\` can answer them. */
 
-@container (max-width: 900px) {
+@container dl-panel (max-width: 900px) {
   .dl-side {
     display: none;
   }
@@ -8347,7 +8305,7 @@ var DshFeedUltraClient = (() => {
   }
 }
 
-@container (max-width: 620px) {
+@container dl-panel (max-width: 620px) {
   .dl-rail {
     display: none;
   }
@@ -8360,10 +8318,6 @@ var DshFeedUltraClient = (() => {
     flex: 0 0 84px;
     width: 84px;
     height: 47px;
-  }
-
-  .dl-row.is-brief .dl-row-desc {
-    -webkit-line-clamp: 1;
   }
 
   .dl-brief-keywords {

@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import {
   batchSizeOf,
   briefItemMeta,
+  briefRowOf,
   briefMeta,
   calendarDot,
   calendarWithDay,
@@ -868,6 +869,44 @@ test('an item outside the brief channel keeps the plain meta line, whatever extr
   );
   assert.equal(row.kind, '');
   assert.equal(row.meta, 'github.com · 1 小时前');
+});
+
+test('a channel issue card is shaped exactly like an item row', () => {
+  const section = { source: { id: 'bestblogs_brief', type: 'bestblogs-brief' }, capabilities: {} };
+  const brief = {
+    episodeTitle: 'EP242',
+    intro: '一句话概括',
+    cover: 'https://x/c.webp',
+    webUrl: 'https://bestblogs.dev/ep242',
+    keywords: ['Gemini', 'Anthropic 上市'],
+    detailStatus: 'ok',
+  };
+  const row = briefRowOf(brief, section);
+  // Same slot names and types as rowOf produces, so the renderer needs no branch.
+  const itemRow = rowOf(
+    { title: 'T', description: 'D', url: 'https://x/1', extra: {} },
+    { source: { id: 'github_trending', type: 'github-trending' }, capabilities: {} },
+    { now: new Date('2026-11-10T12:00:00'), uiLocale: 'zh-CN', t },
+  );
+  // An item row carries no id of its own (the caller keys by item.id); the built
+  // row carries one because there is no item behind it.
+  assert.deepEqual(
+    Object.keys(row).filter(key => key !== 'id').sort(),
+    Object.keys(itemRow).sort(),
+  );
+  assert.equal(row.title.text, 'EP242');
+  assert.equal(row.title.url, 'https://bestblogs.dev/ep242');
+  assert.equal(row.description.text, '一句话概括');
+  assert.equal(row.cover, 'https://x/c.webp');
+  assert.deepEqual(row.keywords, ['Gemini', 'Anthropic 上市']);
+  assert.equal(row.actions.open, true);
+  assert.equal(row.actions.externalUrl, 'https://bestblogs.dev/ep242');
+  assert.equal(row.actions.read, false);
+
+  // An issue with nothing to open offers no open action.
+  const bare = briefRowOf({ ...brief, webUrl: '' }, section);
+  assert.equal(bare.actions.open, false);
+  assert.equal(bare.id, row.id);
 });
 
 test('a cover field holding an empty string renders no cover at all', () => {

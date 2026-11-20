@@ -417,6 +417,28 @@
    background, radius and shadow, so nothing outside it decides where it ends.
    `min-width: 0` keeps a long unbroken title from widening the column, and the
    row keeps its natural height rather than matching a neighbour. */
+/* A channel's leading card may carry a short keyword list; it uses the same
+   pill material as an attachment, so one tag style covers the list. */
+.dl-row-keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/* Two classes so it wins over .dl-chip, which is declared later and is a filter
+   button: the tag only shares the cased look of an attachment pill. */
+.dl-chip.dl-chip--tag {
+  height: auto;
+  padding: 2px 8px;
+  border: 0.5px solid var(--dl-border-hairline);
+  border-radius: 999px;
+  background: var(--dl-bg-rail);
+  color: var(--dl-label-secondary);
+  font-size: 0.8077em;
+  cursor: default;
+}
+
 .dl-row {
   display: flex;
   align-items: flex-start;
@@ -587,93 +609,6 @@
   font-size: 0.8462em;
   color: var(--dl-warn);
   white-space: nowrap;
-}
-
-.dl-brief-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 2px 14px 10px;
-  padding: 12px;
-  border: var(--dl-hairline);
-  border-radius: var(--dl-radius-sm);
-  background: var(--dl-bg-base);
-}
-
-.dl-brief-cover {
-  flex: 0 0 120px;
-  width: 120px;
-  height: 68px;
-  display: block;
-  border-radius: var(--dl-radius-sm);
-  object-fit: cover;
-  background: var(--dl-active);
-}
-
-.dl-brief-cover.is-fallback {
-  background: linear-gradient(135deg, var(--dl-active), var(--dl-bg-page));
-}
-
-.dl-brief-main {
-  flex: 1;
-  min-width: 0;
-}
-
-.dl-brief-top {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-}
-
-.dl-brief-title {
-  margin: 0;
-  flex: 1;
-  min-width: 0;
-  font-size: 1.1538em;
-  line-height: 1.6923em;
-  font-weight: 600;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.dl-brief-intro {
-  margin: 4px 0 0;
-  font-size: 1.0000em;
-  line-height: 1.4615em;
-  color: var(--dl-label-secondary);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.dl-brief-keywords {
-  margin-top: 6px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-
-.dl-brief-chip {
-  height: calc(var(--dl-font-ratio) * 18px);
-  display: inline-flex;
-  align-items: center;
-  padding: 0 7px;
-  background: var(--dl-bg-rail);
-  border: var(--dl-hairline);
-  border-radius: 999px;
-  font-size: 0.8077em;
-  color: var(--dl-label-secondary);
-}
-
-.dl-brief-open {
-  flex: 0 0 auto;
-  border: var(--dl-hairline);
-  background: var(--dl-bg-base);
-  color: var(--dl-label-secondary);
 }
 
 /* A single column leaves room for a cover worth looking at: 200x112 holds a
@@ -2195,9 +2130,6 @@
     height: 63px;
   }
 
-  .dl-brief-keywords {
-    display: none;
-  }
 }
 
 /* RSS settings page */

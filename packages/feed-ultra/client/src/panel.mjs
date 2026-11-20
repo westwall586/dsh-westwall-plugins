@@ -24,6 +24,7 @@ import {
 import {
   briefItemMeta,
   briefMeta,
+  briefRowOf,
   calendarWithDay,
   channelName,
   channelStatusLine,
@@ -906,48 +907,6 @@ function Filters({ state, unread, text, actions }) {
   );
 }
 
-/** The brief header card: cover, episode title, intro, keyword chips, open. */
-function BriefHeader({ brief, text, actions }) {
-  const [coverFailed, setCoverFailed] = useState(false);
-  const showCover = brief.cover !== '' && !coverFailed;
-  return h('div', { className: 'dl-brief-head' },
-    showCover
-      ? h('img', {
-        className: 'dl-brief-cover',
-        src: brief.cover,
-        alt: '',
-        width: 120,
-        height: 68,
-        loading: 'lazy',
-        decoding: 'async',
-        onError: () => setCoverFailed(true),
-      })
-      : h('span', { className: 'dl-brief-cover is-fallback', 'aria-hidden': true }),
-    h('div', { className: 'dl-brief-main' },
-      h('div', { className: 'dl-brief-top' },
-        h('h2', { className: 'dl-brief-title' }, brief.episodeTitle),
-        brief.webUrl
-          ? h('button', {
-            type: 'button',
-            className: 'dl-icon-btn dl-brief-open',
-            title: text('brief.openOriginal'),
-            'aria-label': text('brief.openOriginal'),
-            onClick: () => actions.openUrl(brief.webUrl),
-          }, h(OpenIcon, { size: 13 }))
-          : null,
-      ),
-      brief.intro ? h('p', { className: 'dl-brief-intro' }, brief.intro) : null,
-      brief.keywords.length > 0
-        ? h('div', { className: 'dl-brief-keywords' },
-          ...brief.keywords.map((keyword, index) => h('span', {
-            key: `${index}:${keyword}`,
-            className: 'dl-brief-chip',
-          }, keyword)))
-        : null,
-    ),
-  );
-}
-
 /** The cover of one row: lazy image, letter placeholder when the image fails, video badge. */
 function RowCover({ initial, cover, video }) {
   const [coverFailed, setCoverFailed] = useState(false);
@@ -1203,8 +1162,16 @@ function SectionCard({
           onClick: () => void actions.refreshSection(section),
         }, busy ? text('section.rss.pulling') : text('section.rss.pullShort')))
       : null,
-    showBrief ? h(BriefHeader, { brief, text, actions }) : null,
     h('div', { className: 'dl-rows' },
+      showBrief
+        ? h(ItemRow, {
+          key: `brief:${section.source?.id ?? 'channel'}`,
+          fixedRow: briefRowOf(brief, section),
+          uiLocale,
+          text,
+          actions,
+        })
+        : null,
       emptyState === 'none'
         ? null
         : h(SectionEmpty, {
@@ -1349,7 +1316,7 @@ function openTitle(event, item, actions) {
  * content, never which source filled it.
  */
 function ItemRow({
-  item,
+  item = null,
   section = null,
   deleting = false,
   deleteError = '',
@@ -1359,11 +1326,17 @@ function ItemRow({
   selectMode = false,
   selected = false,
   expanded = false,
+  // A channel's leading card arrives already shaped, because it is built from
+  // the section rather than from an item; it renders through this same row.
+  fixedRow = null,
 }) {
-  const row = useMemo(
-    () => rowOf(item, section, { now: new Date(), uiLocale, t: text }),
-    [item, section, uiLocale, text],
+  const computed = useMemo(
+    () => (fixedRow ? null : rowOf(item, section, { now: new Date(), uiLocale, t: text })),
+    [fixedRow, item, section, uiLocale, text],
   );
+  const row = fixedRow ?? computed;
+  // A built row has no item behind it, so its identity comes from the row.
+  const id = item?.id ?? row.id ?? null;
   const classes = ['dl-row'];
   if (row.read) classes.push('is-read');
   if (selectMode) classes.push('is-select');
@@ -1383,14 +1356,14 @@ function ItemRow({
     role: selectMode ? 'checkbox' : undefined,
     'aria-checked': selectMode ? selected : undefined,
     tabIndex: selectMode ? 0 : undefined,
-    onClick: selectMode ? () => actions.toggleSelect(item.id) : undefined,
+    onClick: selectMode ? () => actions.toggleSelect(id) : undefined,
     onKeyDown: selectMode
       ? (event) => {
         // Keys on an inner action belong to that action, not to the row.
         if (event.target !== event.currentTarget) return;
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
-          actions.toggleSelect(item.id);
+          actions.toggleSelect(id);
         }
       }
       : undefined,
@@ -1404,7 +1377,7 @@ function ItemRow({
       : h(RowCover, {
         initial: row.title.text.trim().charAt(0),
         cover: row.cover,
-        video: item.extra?.kind === 'video',
+        video: item?.extra?.kind === 'video',
       }),
     h('div', { className: 'dl-row-body' },
       titleNode,
@@ -1413,9 +1386,16 @@ function ItemRow({
         : h(RowDescription, {
           row,
           expanded,
-          toggle: () => actions.toggleExpanded(item.id),
+          toggle: () => actions.toggleExpanded(id),
           text,
         }),
+      row.keywords.length === 0
+        ? null
+        : h('div', { className: 'dl-row-keywords' },
+          ...row.keywords.map((keyword, index) => h('span', {
+            key: `${index}:${keyword}`,
+            className: 'dl-chip dl-chip--tag',
+          }, keyword))),
       row.attachments.length === 0
         ? null
         : h('div', { className: 'dl-row-attachments' },

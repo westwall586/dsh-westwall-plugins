@@ -1285,7 +1285,29 @@ var DshFeedUltraClient = (() => {
       meta,
       actions: { ...rowActions(section, item), externalUrl: originalUrl === "" ? linked : originalUrl },
       attachments: attachmentsOf(item),
+      keywords: [],
       read: item?.read === true
+    };
+  }
+  function briefRowOf(brief, section) {
+    return {
+      id: `brief:${section?.source?.id ?? "channel"}`,
+      kind: "brief",
+      title: { text: brief.episodeTitle, url: brief.webUrl },
+      description: { text: brief.intro, title: "", lang: void 0, translated: false },
+      cover: brief.cover,
+      meta: "",
+      actions: {
+        delete: false,
+        // The issue card is a summary, not an item: it opens the original page and
+        // has no read state of its own to toggle.
+        read: false,
+        open: brief.webUrl !== "",
+        externalUrl: brief.webUrl
+      },
+      attachments: [],
+      keywords: brief.keywords,
+      read: false
     };
   }
   function sectionEmptyState(section) {
@@ -5258,49 +5280,6 @@ var DshFeedUltraClient = (() => {
       }, h4(SelectIcon, { size: 12 }), text("filters.select"))
     );
   }
-  function BriefHeader({ brief, text, actions }) {
-    const [coverFailed, setCoverFailed] = (0, import_react5.useState)(false);
-    const showCover = brief.cover !== "" && !coverFailed;
-    return h4(
-      "div",
-      { className: "dl-brief-head" },
-      showCover ? h4("img", {
-        className: "dl-brief-cover",
-        src: brief.cover,
-        alt: "",
-        width: 120,
-        height: 68,
-        loading: "lazy",
-        decoding: "async",
-        onError: () => setCoverFailed(true)
-      }) : h4("span", { className: "dl-brief-cover is-fallback", "aria-hidden": true }),
-      h4(
-        "div",
-        { className: "dl-brief-main" },
-        h4(
-          "div",
-          { className: "dl-brief-top" },
-          h4("h2", { className: "dl-brief-title" }, brief.episodeTitle),
-          brief.webUrl ? h4("button", {
-            type: "button",
-            className: "dl-icon-btn dl-brief-open",
-            title: text("brief.openOriginal"),
-            "aria-label": text("brief.openOriginal"),
-            onClick: () => actions.openUrl(brief.webUrl)
-          }, h4(OpenIcon, { size: 13 })) : null
-        ),
-        brief.intro ? h4("p", { className: "dl-brief-intro" }, brief.intro) : null,
-        brief.keywords.length > 0 ? h4(
-          "div",
-          { className: "dl-brief-keywords" },
-          ...brief.keywords.map((keyword, index) => h4("span", {
-            key: `${index}:${keyword}`,
-            className: "dl-brief-chip"
-          }, keyword))
-        ) : null
-      )
-    );
-  }
   function RowCover({ initial, cover, video }) {
     const [coverFailed, setCoverFailed] = (0, import_react5.useState)(false);
     return h4(
@@ -5522,10 +5501,16 @@ var DshFeedUltraClient = (() => {
           onClick: () => void actions.refreshSection(section)
         }, busy ? text("section.rss.pulling") : text("section.rss.pullShort"))
       ) : null,
-      showBrief ? h4(BriefHeader, { brief, text, actions }) : null,
       h4(
         "div",
         { className: "dl-rows" },
+        showBrief ? h4(ItemRow, {
+          key: `brief:${section.source?.id ?? "channel"}`,
+          fixedRow: briefRowOf(brief, section),
+          uiLocale,
+          text,
+          actions
+        }) : null,
         emptyState === "none" ? null : h4(SectionEmpty, {
           kind: emptyState,
           section,
@@ -5641,7 +5626,7 @@ var DshFeedUltraClient = (() => {
     void actions.openItem(item, event.currentTarget.href);
   }
   function ItemRow({
-    item,
+    item = null,
     section = null,
     deleting = false,
     deleteError = "",
@@ -5650,12 +5635,17 @@ var DshFeedUltraClient = (() => {
     actions,
     selectMode = false,
     selected = false,
-    expanded = false
+    expanded = false,
+    // A channel's leading card arrives already shaped, because it is built from
+    // the section rather than from an item; it renders through this same row.
+    fixedRow = null
   }) {
-    const row = (0, import_react5.useMemo)(
-      () => rowOf(item, section, { now: /* @__PURE__ */ new Date(), uiLocale, t: text }),
-      [item, section, uiLocale, text]
+    const computed = (0, import_react5.useMemo)(
+      () => fixedRow ? null : rowOf(item, section, { now: /* @__PURE__ */ new Date(), uiLocale, t: text }),
+      [fixedRow, item, section, uiLocale, text]
     );
+    const row = fixedRow ?? computed;
+    const id = item?.id ?? row.id ?? null;
     const classes = ["dl-row"];
     if (row.read) classes.push("is-read");
     if (selectMode) classes.push("is-select");
@@ -5675,12 +5665,12 @@ var DshFeedUltraClient = (() => {
         role: selectMode ? "checkbox" : void 0,
         "aria-checked": selectMode ? selected : void 0,
         tabIndex: selectMode ? 0 : void 0,
-        onClick: selectMode ? () => actions.toggleSelect(item.id) : void 0,
+        onClick: selectMode ? () => actions.toggleSelect(id) : void 0,
         onKeyDown: selectMode ? (event) => {
           if (event.target !== event.currentTarget) return;
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
-            actions.toggleSelect(item.id);
+            actions.toggleSelect(id);
           }
         } : void 0
       },
@@ -5692,7 +5682,7 @@ var DshFeedUltraClient = (() => {
       row.cover === "" ? null : h4(RowCover, {
         initial: row.title.text.trim().charAt(0),
         cover: row.cover,
-        video: item.extra?.kind === "video"
+        video: item?.extra?.kind === "video"
       }),
       h4(
         "div",
@@ -5701,9 +5691,17 @@ var DshFeedUltraClient = (() => {
         row.description.text === "" ? null : h4(RowDescription, {
           row,
           expanded,
-          toggle: () => actions.toggleExpanded(item.id),
+          toggle: () => actions.toggleExpanded(id),
           text
         }),
+        row.keywords.length === 0 ? null : h4(
+          "div",
+          { className: "dl-row-keywords" },
+          ...row.keywords.map((keyword, index) => h4("span", {
+            key: `${index}:${keyword}`,
+            className: "dl-chip dl-chip--tag"
+          }, keyword))
+        ),
         row.attachments.length === 0 ? null : h4(
           "div",
           { className: "dl-row-attachments" },
@@ -6524,6 +6522,28 @@ var DshFeedUltraClient = (() => {
    background, radius and shadow, so nothing outside it decides where it ends.
    \`min-width: 0\` keeps a long unbroken title from widening the column, and the
    row keeps its natural height rather than matching a neighbour. */
+/* A channel's leading card may carry a short keyword list; it uses the same
+   pill material as an attachment, so one tag style covers the list. */
+.dl-row-keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/* Two classes so it wins over .dl-chip, which is declared later and is a filter
+   button: the tag only shares the cased look of an attachment pill. */
+.dl-chip.dl-chip--tag {
+  height: auto;
+  padding: 2px 8px;
+  border: 0.5px solid var(--dl-border-hairline);
+  border-radius: 999px;
+  background: var(--dl-bg-rail);
+  color: var(--dl-label-secondary);
+  font-size: 0.8077em;
+  cursor: default;
+}
+
 .dl-row {
   display: flex;
   align-items: flex-start;
@@ -6694,93 +6714,6 @@ var DshFeedUltraClient = (() => {
   font-size: 0.8462em;
   color: var(--dl-warn);
   white-space: nowrap;
-}
-
-.dl-brief-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 2px 14px 10px;
-  padding: 12px;
-  border: var(--dl-hairline);
-  border-radius: var(--dl-radius-sm);
-  background: var(--dl-bg-base);
-}
-
-.dl-brief-cover {
-  flex: 0 0 120px;
-  width: 120px;
-  height: 68px;
-  display: block;
-  border-radius: var(--dl-radius-sm);
-  object-fit: cover;
-  background: var(--dl-active);
-}
-
-.dl-brief-cover.is-fallback {
-  background: linear-gradient(135deg, var(--dl-active), var(--dl-bg-page));
-}
-
-.dl-brief-main {
-  flex: 1;
-  min-width: 0;
-}
-
-.dl-brief-top {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-}
-
-.dl-brief-title {
-  margin: 0;
-  flex: 1;
-  min-width: 0;
-  font-size: 1.1538em;
-  line-height: 1.6923em;
-  font-weight: 600;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.dl-brief-intro {
-  margin: 4px 0 0;
-  font-size: 1.0000em;
-  line-height: 1.4615em;
-  color: var(--dl-label-secondary);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.dl-brief-keywords {
-  margin-top: 6px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-
-.dl-brief-chip {
-  height: calc(var(--dl-font-ratio) * 18px);
-  display: inline-flex;
-  align-items: center;
-  padding: 0 7px;
-  background: var(--dl-bg-rail);
-  border: var(--dl-hairline);
-  border-radius: 999px;
-  font-size: 0.8077em;
-  color: var(--dl-label-secondary);
-}
-
-.dl-brief-open {
-  flex: 0 0 auto;
-  border: var(--dl-hairline);
-  background: var(--dl-bg-base);
-  color: var(--dl-label-secondary);
 }
 
 /* A single column leaves room for a cover worth looking at: 200x112 holds a
@@ -8302,9 +8235,6 @@ var DshFeedUltraClient = (() => {
     height: 63px;
   }
 
-  .dl-brief-keywords {
-    display: none;
-  }
 }
 
 /* RSS settings page */

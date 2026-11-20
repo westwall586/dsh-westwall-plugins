@@ -598,7 +598,36 @@ export function rowOf(item, section, { now, uiLocale, t }) {
     meta,
     actions: { ...rowActions(section, item), externalUrl: originalUrl === '' ? linked : originalUrl },
     attachments: attachmentsOf(item),
+    keywords: [],
     read: item?.read === true,
+  };
+}
+
+/**
+ * A channel's own leading card, shaped exactly like every item row so the list
+ * renders it through the same component. A BestBlogs section carries one episode
+ * covering the whole issue; it is pinned to the top of its channel and otherwise
+ * gets no treatment a row does not get.
+ */
+export function briefRowOf(brief, section) {
+  return {
+    id: `brief:${section?.source?.id ?? 'channel'}`,
+    kind: 'brief',
+    title: { text: brief.episodeTitle, url: brief.webUrl },
+    description: { text: brief.intro, title: '', lang: undefined, translated: false },
+    cover: brief.cover,
+    meta: '',
+    actions: {
+      delete: false,
+      // The issue card is a summary, not an item: it opens the original page and
+      // has no read state of its own to toggle.
+      read: false,
+      open: brief.webUrl !== '',
+      externalUrl: brief.webUrl,
+    },
+    attachments: [],
+    keywords: brief.keywords,
+    read: false,
   };
 }
 

@@ -2435,7 +2435,7 @@ export function Body({
                         {saveFlag.kind === 'saving' ? t('translate.saving') : t('translate.savedShort')}
                       </span>
                     )}
-                    <button type="button" className="am-toolbar-button am-toolbar-button--quiet" onClick={(event) => openAsk(event.currentTarget)}>
+                    <button type="button" className="am-toolbar-button" onClick={(event) => openAsk(event.currentTarget)}>
                       {t('translate.retranslate')}
                     </button>
                   </>

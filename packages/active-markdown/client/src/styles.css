@@ -981,6 +981,9 @@ svg.am-markmap-canvas .markmap-foreign > div {
 
 /* The view row bleeds to the pane edges so it reads as chrome, not as content. */
 .am-toolbar {
+  /* One type size for every control and status in the bar: the buttons, the
+     language, the stale notice, the save state and the progress line. */
+  --am-toolbar-size: 0.92em;
   position: sticky;
   top: 0;
   z-index: 3;
@@ -1011,7 +1014,7 @@ svg.am-markmap-canvas .markmap-foreign > div {
   background: transparent;
   color: var(--dsw-alias-label-secondary);
   font: inherit;
-  font-size: 0.92em;
+  font-size: var(--am-toolbar-size);
   white-space: nowrap;
   cursor: pointer;
 }
@@ -1143,19 +1146,19 @@ svg.am-markmap-canvas .markmap-foreign > div {
   align-items: center;
   gap: 4px;
   color: var(--dsw-alias-label-tertiary);
-  font-size: 0.85em;
+  font-size: var(--am-toolbar-size);
   white-space: nowrap;
 }
 
 .am-progress {
   color: var(--dsw-alias-label-tertiary);
-  font-size: 0.85em;
+  font-size: var(--am-toolbar-size);
   white-space: nowrap;
 }
 
 .am-stale {
   color: var(--dsw-alias-label-tertiary);
-  font-size: 0.85em;
+  font-size: var(--am-toolbar-size);
   white-space: nowrap;
 }
 
@@ -1163,7 +1166,7 @@ svg.am-markmap-canvas .markmap-foreign > div {
 .am-save-state {
   flex: none;
   color: var(--dsw-alias-label-tertiary);
-  font-size: 0.85em;
+  font-size: var(--am-toolbar-size);
   white-space: nowrap;
 }
 
@@ -2027,7 +2030,7 @@ svg.am-markmap-canvas .markmap-foreign > div {
   background: transparent;
   color: var(--dsw-alias-label-secondary);
   font: inherit;
-  font-size: 0.92em;
+  font-size: var(--am-toolbar-size);
   white-space: nowrap;
   cursor: pointer;
 }

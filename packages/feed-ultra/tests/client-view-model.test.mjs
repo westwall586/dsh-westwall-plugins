@@ -43,11 +43,15 @@ import {
   statusLabel,
   textLanguage,
   translateOutcome,
-  tweetActions,
-  tweetDisplayText,
+  rowActions,
+  rowOf,
   tweetDeleted,
-  tweetMeta,
+  tweetDisplayText,
+  tweetLikes,
+  tweetReads,
+  tweetTime,
   unreadCount,
+  withToggledExpanded,
 } from '../client/src/view-model.mjs';
 
 const zh = JSON.parse(readFileSync(new URL('../locale/zh.json', import.meta.url), 'utf8'));
@@ -268,7 +272,7 @@ test('brief meta parses the header fields and clips keywords to five', () => {
   assert.deepEqual(briefMeta({ meta: { detailStatus: 'weird' } }), null);
 });
 
-test('brief row meta joins source and relative time and leaves a missing score out', () => {
+test('brief row meta is one line: source, time, then the score behind a star', () => {
   const now = new Date('2026-11-10T12:00:00');
   const item = {
     title: 'Gemini 4 Carbon',
@@ -276,25 +280,14 @@ test('brief row meta joins source and relative time and leaves a missing score o
     publishedAt: '2026-11-10T11:00:00',
     extra: { source: 'Google DeepMind News', score: 92 },
   };
-  assert.deepEqual(briefItemMeta(item, now, t), {
-    text: 'Google DeepMind News · 1 小时前',
-    score: 92,
-  });
-  assert.deepEqual(briefItemMeta({ ...item, extra: { source: 'Google' } }, now, t), {
-    text: 'Google · 1 小时前',
-    score: null,
-  });
-  assert.deepEqual(briefItemMeta({ ...item, publishedAt: '' }, now, t), {
-    text: 'Google DeepMind News',
-    score: 92,
-  });
-  assert.deepEqual(briefItemMeta({ ...item, extra: { score: 0 } }, now, t).score, 0);
-  assert.deepEqual(briefItemMeta({ ...item, extra: { source: 'S', score: '92' } }, now, t), {
-    text: 'S · 1 小时前',
-    score: null,
-  });
-  assert.deepEqual(briefItemMeta({ ...item, extra: {} }, now, t), { text: '1 小时前', score: null });
-  assert.deepEqual(briefItemMeta({}, now, t), { text: '', score: null });
+  assert.equal(briefItemMeta(item, now, t), 'Google DeepMind News · 1 小时前 · ★ 92');
+  assert.equal(briefItemMeta({ ...item, extra: { source: 'Google' } }, now, t), 'Google · 1 小时前');
+  assert.equal(briefItemMeta({ ...item, publishedAt: '' }, now, t), 'Google DeepMind News · ★ 92');
+  assert.equal(briefItemMeta({ ...item, extra: { source: 'Google', score: 0 } }, now, t), 'Google · 1 小时前 · ★ 0');
+  assert.equal(briefItemMeta({ ...item, extra: { source: 'S', score: '92' } }, now, t), 'S · 1 小时前');
+  assert.equal(briefItemMeta({ ...item, extra: { score: 92500 } }, now, t), '1 小时前 · ★ 92.5k');
+  assert.equal(briefItemMeta({ ...item, extra: {} }, now, t), '1 小时前');
+  assert.equal(briefItemMeta({}, now, t), '');
 });
 
 test('status labels and counters map to copy', () => {
@@ -492,47 +485,62 @@ test('a manual channel owns its empty and never-pulled cards on every day', () =
   assert.equal(sectionEmptyState({ ...daily, status: 'empty' }), 'none');
 });
 
-test('tweet meta formats the author line and drops zero or missing counts', () => {
+test('a bookmark meta line is its relative time, and says when it was removed from X', () => {
+  const now = new Date('2026-11-10T12:00:00');
+  const item = { publishedAt: '2026-11-10T11:00:00', extra: {} };
+  assert.equal(tweetTime(item, now, t), '1 小时前');
+  assert.equal(tweetTime({ ...item, publishedAt: 'not-a-date' }, now, t), '');
+  assert.equal(tweetTime({ extra: {} }, now, t), '');
+  assert.equal(tweetTime({ ...item, extra: { xDeletedAt: '2026-11-11T06:00:00.000Z' } }, now, t), '');
+});
+
+test('a bookmark meta line keeps the like and read counts it used to show', () => {
   const now = new Date('2026-11-10T12:00:00');
   const item = {
-    title: 'first line',
-    description: 'body',
+    id: 'x_bookmarks:1',
+    title: 'A post',
+    description: 'Body',
+    url: 'https://x.com/a/status/1',
     publishedAt: '2026-11-10T11:00:00',
-    extra: { author: '林一', handle: 'linyi', favorites: 216, views: 1816 },
+    extra: { author: 'Author', handle: 'a', favorites: 1200, views: 34000 },
   };
-  assert.deepEqual(tweetMeta(item, now, t), {
-    author: '林一',
-    handle: '@linyi',
-    time: '1 小时前',
-    likes: '♥ 216',
-    reads: '1.8k 阅读',
-    deleted: false,
-  });
-  assert.deepEqual(tweetMeta({
-    ...item,
-    extra: { author: '林一', handle: '@linyi', favorites: 0, views: null },
-  }, now, t), {
-    author: '林一',
-    handle: '@linyi',
-    time: '1 小时前',
-    likes: '',
-    reads: '',
-    deleted: false,
-  });
-  assert.deepEqual(tweetMeta({ extra: {} }, now, t), {
-    author: '',
-    handle: '',
-    time: '',
-    likes: '',
-    reads: '',
-    deleted: false,
-  });
-  assert.equal(tweetMeta({ ...item, publishedAt: 'not-a-date' }, now, t).time, '');
+  const section = {
+    source: { id: 'x_bookmarks', type: 'x-bookmarks' },
+    capabilities: { translation: false, actions: ['deleteBookmark'] },
+  };
+  assert.equal(tweetLikes(item.extra, t), '♥ 1.2k');
+  assert.equal(tweetReads(item.extra, t), '34k 阅读');
+  assert.equal(rowOf(item, section, { now, uiLocale: 'zh-CN', t }).meta, '1 小时前 · ♥ 1.2k · 34k 阅读');
+
+  const bare = { ...item, extra: { author: 'Author', handle: 'a' } };
+  assert.equal(tweetLikes(bare.extra, t), '');
+  assert.equal(tweetReads(bare.extra, t), '');
+  assert.equal(rowOf(bare, section, { now, uiLocale: 'zh-CN', t }).meta, '1 小时前');
+});
+
+test('an expanded row toggles on and off, and the set drops its oldest id at the cap', () => {
+  const empty = new Set();
+  const one = withToggledExpanded(empty, 'a');
+  assert.deepEqual([...one], ['a']);
+
+  const off = withToggledExpanded(one, 'a');
+  assert.deepEqual([...off], []);
+
+  const two = withToggledExpanded(one, 'b');
+  assert.deepEqual([...two], ['a', 'b']);
+
+  const capped = withToggledExpanded(new Set(['a', 'b', 'c']), 'd', 3);
+  assert.deepEqual([...capped], ['b', 'c', 'd']);
+
+  const untouched = new Set(['a']);
+  withToggledExpanded(untouched, 'b');
+  assert.deepEqual([...untouched], ['a']);
 });
 
 test('a bookmark deleted on X keeps its card and loses only the delete action', () => {
   const item = {
     id: 'x_bookmarks__1',
+    url: 'https://x.com/a/status/1',
     read: false,
     extra: { author: 'A', xDeletedAt: '2026-11-11T06:00:00.000Z' },
   };
@@ -540,10 +548,9 @@ test('a bookmark deleted on X keeps its card and loses only the delete action', 
   assert.equal(tweetDeleted({ ...item, extra: { author: 'A' } }), false);
   assert.equal(tweetDeleted({ ...item, extra: { xDeletedAt: '' } }), false);
   assert.equal(tweetDeleted({ ...item, extra: { xDeletedAt: 42 } }), false);
-  assert.equal(tweetMeta(item, new Date('2026-11-11T07:00:00'), t).deleted, true);
 
   const section = { capabilities: { actions: ['deleteBookmark'] } };
-  assert.deepEqual(tweetActions(section, item), { delete: false, read: true, open: true });
+  assert.deepEqual(rowActions(section, item), { delete: false, read: true, open: true });
 });
 
 test('tweet display text keeps paragraph lines but drops blank lines', () => {
@@ -559,21 +566,22 @@ test('tweet display text keeps paragraph lines but drops blank lines', () => {
   assert.equal(tweetDisplayText(undefined), '');
 });
 
-test('tweet actions follow the channel capability and the read state', () => {
+test('row actions follow the section capability, the item state and the link', () => {
   const section = { capabilities: { actions: ['deleteBookmark'] } };
-  const item = { id: 'x_bookmarks__1', read: false, extra: {} };
-  assert.deepEqual(tweetActions(section, item), { delete: true, read: true, open: true });
-  assert.deepEqual(tweetActions(section, { ...item, read: true }), { delete: true, read: false, open: true });
-  assert.deepEqual(tweetActions({ capabilities: { actions: [] } }, item), {
+  const item = { id: 'x_bookmarks__1', url: 'https://x.com/a/status/1', read: false, extra: {} };
+  assert.deepEqual(rowActions(section, item), { delete: true, read: true, open: true });
+  assert.deepEqual(rowActions(section, { ...item, read: true }), { delete: true, read: false, open: true });
+  assert.deepEqual(rowActions({ capabilities: { actions: [] } }, item), {
     delete: false,
     read: true,
     open: true,
   });
-  assert.deepEqual(tweetActions({ capabilities: {} }, item), { delete: false, read: true, open: true });
-  assert.deepEqual(tweetActions({}, item), { delete: false, read: true, open: true });
-  assert.deepEqual(tweetActions({
+  assert.deepEqual(rowActions({ capabilities: {} }, item), { delete: false, read: true, open: true });
+  assert.deepEqual(rowActions({}, item), { delete: false, read: true, open: true });
+  assert.deepEqual(rowActions({
     capabilities: { actions: ['deleteBookmark', 'other'] },
   }, item).delete, true);
+  assert.equal(rowActions(section, { ...item, url: '' }).open, false);
 });
 
 test('the pull control names the batch size and shows only on today', () => {
@@ -795,4 +803,143 @@ test('translateOutcome surfaces a partial failure with no host error', () => {
 
 test('both locale files expose the same key set', () => {
   assert.deepEqual(Object.keys(zh).sort(), Object.keys(en).sort());
+});
+
+test('an article row carries the four slots and the meta line of its source', () => {
+  const now = new Date('2026-11-10T12:00:00');
+  const item = {
+    id: 'rss:1',
+    title: 'Cloudflare Workers',
+    description: 'Public repository for Agent Skills',
+    url: 'https://www.sspai.com/post/1',
+    publishedAt: '2026-11-10T11:00:00',
+    read: false,
+    extra: { imageUrl: 'https://img.example/cover.webp' },
+  };
+  const section = { source: { id: 'rss', type: 'rss' }, capabilities: { actions: [] } };
+  const row = rowOf(item, section, { now, uiLocale: 'zh-CN', t });
+  assert.equal(row.title.text, 'Cloudflare Workers');
+  assert.equal(row.title.url, 'https://www.sspai.com/post/1');
+  assert.deepEqual(row.description, descriptionOf(item, 'zh-CN'));
+  assert.equal(row.cover, 'https://img.example/cover.webp');
+  assert.equal(row.meta, 'sspai.com · 1 小时前');
+  assert.deepEqual(row.actions, {
+    delete: false,
+    read: true,
+    open: true,
+    externalUrl: 'https://www.sspai.com/post/1',
+  });
+  assert.deepEqual(row.attachments, []);
+  assert.equal(row.read, false);
+});
+
+test('a bestblogs row takes the brief shape from its channel and joins its score into the meta line', () => {
+  const now = new Date('2026-11-10T12:00:00');
+  const item = {
+    id: 'bestblogs_brief:1',
+    title: 'Gemini 4 Carbon',
+    description: '一句话摘要',
+    url: 'https://www.bestblogs.dev/article/1',
+    publishedAt: '2026-11-10T11:00:00',
+    extra: {
+      source: 'Google DeepMind News',
+      score: 92,
+      cover: 'https://media.bestblogs.dev/cover.webp',
+      originalUrl: 'https://deepmind.google/blog/gemini-4',
+      kind: 'article',
+    },
+  };
+  const section = { source: { id: 'bestblogs_brief', type: 'bestblogs-brief' }, capabilities: {} };
+  const row = rowOf(item, section, { now, uiLocale: 'zh-CN', t });
+  assert.equal(row.kind, 'brief');
+  assert.equal(row.meta, 'Google DeepMind News · 1 小时前 · ★ 92');
+  assert.equal(row.cover, 'https://media.bestblogs.dev/cover.webp');
+  assert.equal(row.actions.externalUrl, 'https://deepmind.google/blog/gemini-4');
+  assert.equal(row.actions.open, true);
+});
+
+test('an item outside the brief channel keeps the plain meta line, whatever extra.kind says', () => {
+  const now = new Date('2026-11-10T12:00:00');
+  const section = { source: { id: 'github_trending', type: 'github-trending' }, capabilities: {} };
+  const row = rowOf(
+    { title: 'repo/name', url: 'https://github.com/repo/name', publishedAt: '2026-11-10T11:00:00', extra: { kind: 'brief' } },
+    section,
+    { now, uiLocale: 'zh-CN', t },
+  );
+  assert.equal(row.kind, '');
+  assert.equal(row.meta, 'github.com · 1 小时前');
+});
+
+test('a cover field holding an empty string renders no cover at all', () => {
+  const now = new Date('2026-11-10T12:00:00');
+  const section = { source: { id: 'bestblogs_brief', type: 'bestblogs-brief' }, capabilities: {} };
+  const item = { title: 'T', description: 'D', url: 'https://www.bestblogs.dev/article/1', extra: { cover: '' } };
+  assert.equal(rowOf(item, section, { now, uiLocale: 'zh-CN', t }).cover, '');
+  assert.equal(rowOf({ ...item, extra: {} }, section, { now, uiLocale: 'zh-CN', t }).cover, '');
+  assert.equal(
+    rowOf({ ...item, extra: { cover: 'https://media.example/c.webp' } }, section, { now, uiLocale: 'zh-CN', t }).cover,
+    'https://media.example/c.webp',
+  );
+  assert.equal(
+    rowOf({ ...item, extra: { cover: 'media/local.webp' } }, section, { now, uiLocale: 'zh-CN', t }).cover,
+    '',
+    'a cover that is not a web URL keeps the letter tile',
+  );
+});
+
+test('a bookmark row makes the author the title and the body the description', () => {
+  const now = new Date('2026-11-10T12:00:00');
+  const section = {
+    source: { id: 'x_bookmarks', type: 'x-bookmarks' },
+    capabilities: { actions: ['deleteBookmark'], translation: false },
+  };
+  const item = {
+    id: 'x_bookmarks__1',
+    title: 'first line',
+    description: 'first line\n\nsecond paragraph',
+    url: 'https://x.com/linyi/status/1',
+    publishedAt: '2026-11-10T11:00:00',
+    extra: { author: '林一', handle: 'linyi' },
+  };
+  const row = rowOf(item, section, { now, uiLocale: 'zh-CN', t });
+  assert.equal(row.kind, 'tweet');
+  assert.equal(row.title.text, '林一');
+  assert.equal(row.title.url, 'https://x.com/linyi/status/1');
+  assert.equal(row.description.text, 'first line\nsecond paragraph');
+  assert.equal(row.description.lang, 'en');
+  assert.equal(row.meta, '1 小时前');
+  assert.deepEqual(row.actions, {
+    delete: true,
+    read: true,
+    open: true,
+    externalUrl: 'https://x.com/linyi/status/1',
+  });
+});
+
+test('a bookmark with no text of its own shows the stored placeholder, not an empty description', () => {
+  const now = new Date('2026-11-10T12:00:00');
+  const section = { source: { id: 'x_bookmarks', type: 'x-bookmarks' }, capabilities: { actions: [] } };
+  for (const description of ['', '<p><br></p>']) {
+    const row = rowOf({ description, title: '图片内容', url: 'https://x.com/a/status/1', extra: { author: 'A' } }, section, {
+      now,
+      uiLocale: 'zh-CN',
+      t,
+    });
+    assert.equal(row.description.text, '图片内容');
+  }
+});
+
+test('a bookmark keeps no translated text even when a record exists', () => {
+  const now = new Date('2026-11-10T12:00:00');
+  const section = { source: { id: 'x_bookmarks', type: 'x-bookmarks' }, capabilities: { actions: [], translation: false } };
+  const item = {
+    title: 'first line',
+    description: 'first line\n\nsecond paragraph',
+    descriptionTranslated: '译好了',
+    url: 'https://x.com/a/status/1',
+    extra: { author: 'A' },
+  };
+  const row = rowOf(item, section, { now, uiLocale: 'zh-CN', t });
+  assert.equal(row.description.text, 'first line\nsecond paragraph');
+  assert.equal(row.description.title, '');
 });

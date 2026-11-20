@@ -7,6 +7,7 @@
 const MINUTE_MS = 60_000;
 const HOUR_MS = 3_600_000;
 const RELATIVE_HOURS = 6;
+const STAR = '★';
 
 function pad2(value) {
   return String(value).padStart(2, '0');
@@ -130,6 +131,22 @@ export function isManualSection(section) {
   return section?.cadence === 'manual';
 }
 
+/**
+ * The ids whose description is expanded. Insertion order is age, so a new id
+ * goes last and the oldest leaves once the set passes the cap; a row that is
+ * already expanded is simply removed.
+ */
+export function withToggledExpanded(set, id, limit = 200) {
+  const next = new Set(set);
+  if (next.has(id)) {
+    next.delete(id);
+    return next;
+  }
+  next.add(id);
+  while (next.size > limit) next.delete(next.values().next().value);
+  return next;
+}
+
 /** The X bookmark channel, selected by source type rather than source id. */
 export function isTweetSection(section) {
   return section?.source?.type === 'x-bookmarks';
@@ -171,37 +188,39 @@ export function tweetDisplayText(text) {
 }
 
 /**
- * The tweet card's text header: author, handle, tweet time, likes, reads, and the
- * deleted tag. Missing or zero counts drop their segment instead of rendering 0.
+ * A bookmark's relative time line. Once it is deleted on X the time is dropped:
+ * the deleted tag beside it says the bookmark is gone.
  */
-export function tweetMeta(item, now, t) {
-  const extra = item?.extra ?? {};
-  const author = trimmed(extra.author);
-  const handle = trimmed(extra.handle).replace(/^@/, '');
-  const published = item?.publishedAt ? new Date(item.publishedAt) : null;
-  const time = published !== null && !Number.isNaN(published.getTime())
-    ? formatRelativeTime(item.publishedAt, now, t)
-    : '';
-  const favorites = tweetCount(extra.favorites);
-  const views = tweetCount(extra.views);
-  return {
-    author,
-    handle: handle === '' ? '' : `@${handle}`,
-    time,
-    likes: favorites === TWEET_COUNT_MISSING ? '' : t('x.likes', { n: formatCompact(favorites) }),
-    reads: views === TWEET_COUNT_MISSING ? '' : t('x.reads', { n: formatCompact(views) }),
-    deleted: tweetDeleted(item),
-  };
+export function tweetTime(item, now, t) {
+  if (tweetDeleted(item) || !item?.publishedAt) return '';
+  const published = new Date(item.publishedAt);
+  return Number.isNaN(published.getTime()) ? '' : formatRelativeTime(item.publishedAt, now, t);
 }
 
-/** Which tweet row actions the source capability and the item's own state allow. */
-export function tweetActions(section, item) {
+/**
+ * The like count segment of a bookmark's meta line, or '' when the source never
+ * recorded one. The reader used it to judge a bookmark before opening it, so the
+ * unified meta line keeps it instead of dropping it.
+ */
+export function tweetLikes(extra, t) {
+  const favorites = tweetCount(extra?.favorites);
+  return favorites === TWEET_COUNT_MISSING ? '' : t('x.likes', { n: formatCompact(favorites) });
+}
+
+/** The read-count segment of a bookmark's meta line, or '' when absent. */
+export function tweetReads(extra, t) {
+  const views = tweetCount(extra?.views);
+  return views === TWEET_COUNT_MISSING ? '' : t('x.reads', { n: formatCompact(views) });
+}
+
+/** Which item actions the section capability allows; the row adds the item's own state. */
+export function rowActions(section, item) {
   const declared = section?.capabilities?.actions;
   const canDelete = Array.isArray(declared) && declared.includes('deleteBookmark');
   return {
     delete: canDelete && !tweetDeleted(item),
     read: !item?.read,
-    open: true,
+    open: typeof item?.url === 'string' && item.url !== '',
   };
 }
 
@@ -380,16 +399,18 @@ export function briefMeta(section) {
 }
 
 /**
- * The row meta of one BestBlogs item: `source · relative time`, plus the score
- * the row appends behind its star. A missing score stays `null` so the row can
- * drop the segment and its separator together.
+ * The meta line of one BestBlogs item: source, relative time, then the score
+ * behind a star. A missing score drops together with its separator.
  */
 export function briefItemMeta(item, now, t) {
   const extra = item?.extra ?? {};
-  const source = trimmed(extra.source);
   const when = item?.publishedAt ? formatRelativeTime(item.publishedAt, now, t) : '';
-  const score = typeof extra.score === 'number' && Number.isFinite(extra.score) ? extra.score : null;
-  return { text: [source, when].filter(Boolean).join(' · '), score };
+  return [trimmed(extra.source), when, briefScore(extra)].filter(Boolean).join(' · ');
+}
+
+function briefScore(extra) {
+  const score = extra?.score;
+  return typeof score === 'number' && Number.isFinite(score) ? `${STAR} ${formatCompact(score)}` : '';
 }
 
 function hostOf(url) {
@@ -468,18 +489,117 @@ export function textLanguage(text) {
 /**
  * The description a row shows. `descriptionLang` is only a label for the
  * translation and is never a gate; the host sets the translation and that label
- * together, and only when a matching record exists.
+ * together, and only when a matching record exists. `translatable` is false for
+ * a channel that has no translation at all, so its text never leaves the original.
  */
-export function descriptionOf(item, uiLocale) {
-  const original = typeof item?.description === 'string' ? item.description.trim() : '';
-  if (original === '') return { text: '', title: '', lang: undefined, translated: false };
-  const translated = typeof item?.descriptionTranslated === 'string'
+export function descriptionOf(item, uiLocale, translatable = true) {
+  const original = typeof item?.description === "string" ? item.description.trim() : "";
+  if (original === "") return { text: "", title: "", lang: undefined, translated: false };
+  const translated = translatable && typeof item?.descriptionTranslated === "string"
     ? item.descriptionTranslated.trim()
-    : '';
-  if (translated !== '' && isChineseUi(uiLocale)) {
-    return { text: translated, title: original, lang: 'zh-CN', translated: true };
+    : "";
+  if (translated !== "" && isChineseUi(uiLocale)) {
+    return { text: translated, title: original, lang: "zh-CN", translated: true };
   }
-  return { text: original, title: '', lang: textLanguage(original), translated: false };
+  return { text: original, title: "", lang: textLanguage(original), translated: false };
+}
+
+/** One string field off `extra`, empty when absent. */
+function extraString(item, key) {
+  return typeof item?.extra?.[key] === 'string' ? item.extra[key].trim() : '';
+}
+
+/**
+ * The bookmark body. A bookmark with no text of its own shows the placeholder
+ * the extractor stored as its title, so the card keeps both text slots full.
+ * The extractor writes "no text" as `<p><br></p>`, which is not text.
+ */
+function tweetBody(item) {
+  const raw = typeof item?.description === 'string' ? item.description : '';
+  return raw.trim() === '' || /^<p>(?:<br\s*\/?>)*<\/p>$/i.test(raw.trim())
+    ? tweetDisplayText(item?.title)
+    : tweetDisplayText(raw);
+}
+
+/**
+ * The cover a row shows: a bookmark's media first, then a brief's episode art,
+ * then a feed item's image. `''` means no cover box at all; a cover field that
+ * is clearly not a web URL renders the letter tile instead.
+ */
+function coverOf(item, isTweet) {
+  const candidates = isTweet
+    ? ['cover', 'imageUrl']
+    : [item?.extra?.kind === 'brief' ? 'cover' : 'imageUrl', 'cover'];
+  for (const key of candidates) {
+    const value = extraString(item, key);
+    if (value === '') continue;
+    return /^(?:https?|data|blob):/i.test(value) ? value : '';
+  }
+  return '';
+}
+
+function attachmentsOf(item) {
+  return Array.isArray(item?.extra?.attachments)
+    ? item.extra.attachments.filter(entry => entry && typeof entry.url === 'string')
+    : [];
+}
+
+/**
+ * The shape a row takes, selected by the channel that produced it rather than by
+ * a field on the item: a brief's `extra.kind` records whether the entry is an
+ * article or a video, never that it is a brief, so reading it here would leave
+ * every real brief row on the plain path.
+ */
+function rowKindOf(section) {
+  if (section?.source?.type === 'bestblogs-brief') return 'brief';
+  return isTweetSection(section) ? 'tweet' : '';
+}
+
+/**
+ * Every row renders from this one shape, so the renderer branches on presence,
+ * never on which source the item came from. `cover` is one string across
+ * sources and empty when there is none; `meta` is one plain line.
+ *
+ * The sources reshape their own material into this shape here: a bookmark's
+ * body becomes `description` with its author as `title`, a brief's score joins
+ * its meta line, and a brief keeps `originalUrl` for the open-external action
+ * that leaves the row's own link alone.
+ */
+export function rowOf(item, section, { now, uiLocale, t }) {
+  const kind = rowKindOf(section);
+  const isTweet = kind === 'tweet';
+  const linked = typeof item?.url === 'string' ? item.url : '';
+  const title = isTweet
+    ? { text: extraString(item, 'author') || 'X', url: linked }
+    : { text: typeof item?.title === 'string' ? item.title : '', url: linked };
+  // A bookmark has no translation: the channel declares it off, and a record that
+  // reached the file anyway still must not replace the bookmark body.
+  const description = descriptionOf(
+    isTweet ? { ...item, description: tweetBody(item) } : item,
+    uiLocale,
+    section?.capabilities?.translation !== false,
+  );
+  const meta = isTweet
+    ? [
+      tweetTime(item, now, t),
+      tweetLikes(item.extra, t),
+      tweetReads(item.extra, t),
+      tweetDeleted(item) ? t('x.deletedTag') : '',
+    ].filter(Boolean).join(' · ')
+    : kind === 'brief'
+      ? briefItemMeta(item, now, t)
+      : itemMeta(item, now, t);
+  const originalUrl = kind === 'brief' ? extraString(item, 'originalUrl') : '';
+  return {
+    kind,
+    title,
+    description,
+    cover: coverOf(item, isTweet),
+    meta,
+    actions: { ...rowActions(section, item), externalUrl: originalUrl === '' ? linked : originalUrl },
+    attachments: attachmentsOf(item),
+    read: item?.read === true,
+  };
 }
 
 /**

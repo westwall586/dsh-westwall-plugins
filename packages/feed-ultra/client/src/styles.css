@@ -50,7 +50,11 @@
   font-size: calc(var(--dl-font-ratio) * 13px);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  /* The panel's breakpoints are measured here. Both panel @container blocks name
+     this container, and the rows grid carries its own name, so a panel width
+     query never resolves against a row or against that grid. */
   container-type: inline-size;
+  container-name: dl-panel;
 }
 
 .dl-root[data-dl-scheme="dark"],
@@ -302,6 +306,40 @@
   box-shadow: 0 6px 18px color-mix(in srgb, var(--dl-label-primary) 8%, transparent);
 }
 
+/* The one grid a section card holds: its header spans every column and the rows
+   sit in two of them. Two fixed tracks rather than auto-fit, because auto-fit
+   keeps opening columns as long as tracks fit, which turns a wide panel into
+   three and then four narrow ones instead of the two wide cards the list is
+   designed for. The panel query below drops to a single track when a second
+   380px card no longer fits, and .dl-list bounds the pair so neither track
+   outgrows 760. */
+.dl-rows {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 0 12px;
+  min-width: 0;
+}
+
+/* Two 760 tracks and their gutter is as wide as the list ever gets; the centring
+   has to sit here rather than on the grid, whose width is set by this cap. */
+.dl-list {
+  max-width: 1532px;
+  margin-inline: auto;
+}
+
+/* One card at a time until a second one fits: the panel minus its two 12px of
+   padding is at least two 380px cards and the gutter between them. */
+@container dl-panel (max-width: 875px) {
+  .dl-rows {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.dl-rows-all {
+  grid-column: 1 / -1;
+}
+
 .dl-card-head {
   display: flex;
   align-items: center;
@@ -393,15 +431,27 @@
 
 /* ---------- item rows ---------- */
 
+/* One card shape for every source. Rows are grid items, so `min-width: 0` stops
+   a long unbroken title from widening its column past the grid's track. A row
+   keeps its natural height; it never stretches to match a taller neighbour. */
 .dl-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  align-self: start;
+  min-width: 0;
   gap: 10px;
-  padding: 9px 14px;
+  padding: 11px 14px;
   border-top: var(--dl-hairline);
   cursor: default;
   user-select: text;
   transition: background-color 0.15s;
+}
+
+/* A row in the right column opens the first line of its section's grid, where
+   there is no row above it to carry the separator. */
+.dl-rows > .dl-row:first-child,
+.dl-rows > .dl-rows-all + .dl-row {
+  border-top: 0;
 }
 
 .dl-row.is-select {
@@ -427,6 +477,7 @@
   width: 5px;
   height: 5px;
   flex: 0 0 5px;
+  margin-top: 6px;
   border-radius: 999px;
   background: var(--dl-business);
   animation: dl-dot-in 0.45s var(--dl-ease) both;
@@ -438,13 +489,14 @@
 }
 
 .dl-row-title {
-  display: block;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
   font-size: 1.0769em;
   line-height: 1.5385em;
   font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   transition: color 0.2s var(--dl-ease);
 }
 
@@ -475,49 +527,72 @@
   border-radius: 2px;
 }
 
+/* The description is the one clamped slot: three lines until the reader asks for
+   the rest, and the text may break anywhere so an unbroken URL never widens it. */
 .dl-row-desc {
   margin-top: 1px;
   font-size: 0.9231em;
   line-height: 1.3077em;
   color: var(--dl-label-tertiary);
-  overflow: visible;
-  text-overflow: clip;
-  white-space: normal;
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.dl-row-desc.is-clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .dl-row.is-read .dl-row-desc {
   color: var(--dl-label-caption);
 }
 
-.dl-row-meta {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+.dl-row-more {
   margin-top: 3px;
-  font-size: 0.8462em;
-  color: var(--dl-label-tertiary);
-  overflow: hidden;
-  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--dl-link);
+  font: inherit;
+  font-size: 0.8846em;
+  cursor: pointer;
 }
 
-.dl-row-star {
-  display: inline-flex;
+.dl-row-more:hover {
+  text-decoration: underline;
+}
+
+.dl-row-more:focus-visible {
+  outline: 2px solid var(--dl-business);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* The meta line and the row's actions share this line: the meta text takes what
+   it needs and ellipses, the actions keep their width at the right. */
+.dl-row-foot {
+  display: flex;
   align-items: center;
-  flex: 0 0 auto;
-  color: var(--dl-label-tertiary);
+  gap: 8px;
+  min-width: 0;
+  min-height: calc(var(--dl-font-ratio) * 26px);
+  margin-top: 3px;
 }
 
 .dl-row-meta-text {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 0.8462em;
+  color: var(--dl-label-tertiary);
   font-variant-numeric: tabular-nums;
 }
 
-.dl-row.is-read .dl-row-meta,
-.dl-row.is-read .dl-row-star {
+.dl-row.is-read .dl-row-meta-text {
   color: var(--dl-label-caption);
 }
 
@@ -619,9 +694,10 @@
 
 .dl-row-cover {
   position: relative;
-  flex: 0 0 112px;
-  width: 112px;
-  height: 63px;
+  flex: 0 0 132px;
+  width: 132px;
+  height: 74px;
+  margin-top: 2px;
   border-radius: var(--dl-radius-sm);
   overflow: hidden;
   background: var(--dl-active);
@@ -657,39 +733,11 @@
   color: #ffffff;
 }
 
-.dl-row.is-brief .dl-row-title {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-
-.dl-row.is-brief .dl-row-desc {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
 .dl-row.is-read .dl-row-cover {
   opacity: 0.6;
 }
 
-.dl-row-sep {
-  color: var(--dl-label-caption);
-}
-
-.dl-row-score {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  flex: 0 0 auto;
-  font-variant-numeric: tabular-nums;
-}
-
-/* ---------- tweet cards ---------- */
+/* ---------- section header extras ---------- */
 
 .dl-card-pill {
   height: calc(var(--dl-font-ratio) * 17px);
@@ -701,111 +749,6 @@
   background: var(--dl-active);
   color: var(--dl-label-secondary);
   font-size: 0.7692em;
-}
-
-.dl-row.is-tweet {
-  align-items: flex-start;
-  padding: 11px 14px;
-}
-
-.dl-row.is-tweet .dl-unread-dot {
-  margin-top: 6px;
-}
-
-.dl-row.is-tweet .dl-acts {
-  align-self: center;
-}
-
-.dl-tweet {
-  min-width: 0;
-}
-
-.dl-tweet-head {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 4px;
-  font-size: 0.8462em;
-  line-height: 1.2308em;
-  color: var(--dl-label-tertiary);
-}
-
-.dl-tweet-head.dl-title-link:hover .dl-tweet-author {
-  color: var(--dl-link);
-}
-
-.dl-tweet-author {
-  font-size: 0.9231em;
-  font-weight: 600;
-  color: var(--dl-label-primary);
-}
-
-.dl-row.is-read .dl-tweet-author {
-  color: var(--dl-label-tertiary);
-}
-
-.dl-tweet-handle,
-.dl-tweet-head > span {
-  overflow-wrap: anywhere;
-}
-
-.dl-tweet-sep {
-  color: var(--dl-label-caption);
-}
-
-.dl-tweet-deleted {
-  height: calc(var(--dl-font-ratio) * 18px);
-  padding: 0 6px;
-  display: inline-flex;
-  align-items: center;
-  align-self: center;
-  border-radius: 4px;
-  background: var(--dl-active);
-  color: var(--dl-label-secondary);
-  font-size: 0.7692em;
-}
-
-.dl-tweet-text {
-  margin-top: 4px;
-  font-size: 0.9615em;
-  line-height: 1.5000em;
-  color: var(--dl-label-secondary);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.dl-row.is-read .dl-tweet-text {
-  color: var(--dl-label-caption);
-}
-
-.dl-tweet-text.is-clamped {
-  display: -webkit-box;
-  -webkit-line-clamp: 6;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.dl-tweet-text.is-placeholder {
-  color: var(--dl-label-tertiary);
-}
-
-.dl-tweet-expand {
-  margin-top: 3px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--dl-link);
-  font: inherit;
-  font-size: 0.8846em;
-  cursor: pointer;
-}
-
-.dl-tweet-expand:hover {
-  text-decoration: underline;
-}
-
-.dl-icon-btn--danger {
-  color: var(--dl-error);
 }
 
 .dl-row-delete-error {
@@ -853,25 +796,16 @@
   color: var(--dl-label-tertiary);
 }
 
+/* The row actions are always on screen, at the right of the foot line; they are
+   never hover-only, so a touch panel and a keyboard reach them the same way. */
+.dl-icon-btn--danger {
+  color: var(--dl-error);
+}
+
 .dl-acts {
   display: flex;
+  flex: 0 0 auto;
   gap: 2px;
-  opacity: 0;
-  transform: translateX(4px);
-  transition: opacity 0.16s, transform 0.16s var(--dl-ease);
-}
-
-.dl-row:hover .dl-acts,
-.dl-row:focus-within .dl-acts {
-  opacity: 1;
-  transform: none;
-}
-
-@media (hover: none) {
-  .dl-acts {
-    opacity: 1;
-    transform: none;
-  }
 }
 
 /* ---------- right rail ---------- */
@@ -2242,9 +2176,10 @@
 
 /* ---------- narrow panel ----------
    Breakpoints follow the panel's own width, not the window: the DSH app
-   sidebar changes how much room the main column has. */
+   sidebar changes how much room the main column has. Both queries name
+   `dl-panel`, so only `.dl-root` can answer them. */
 
-@container (max-width: 900px) {
+@container dl-panel (max-width: 900px) {
   .dl-side {
     display: none;
   }
@@ -2255,7 +2190,7 @@
   }
 }
 
-@container (max-width: 620px) {
+@container dl-panel (max-width: 620px) {
   .dl-rail {
     display: none;
   }
@@ -2268,10 +2203,6 @@
     flex: 0 0 84px;
     width: 84px;
     height: 47px;
-  }
-
-  .dl-row.is-brief .dl-row-desc {
-    -webkit-line-clamp: 1;
   }
 
   .dl-brief-keywords {

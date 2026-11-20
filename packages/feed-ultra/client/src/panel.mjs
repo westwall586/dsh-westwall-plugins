@@ -11,7 +11,6 @@ import {
   RefreshIcon,
   SelectIcon,
   SettingsIcon,
-  StarIcon,
   TrashIcon,
 } from './icons.mjs';
 import { createModelPicker } from './model-picker.mjs';
@@ -35,10 +34,8 @@ import {
   formatDateTitle,
   formatRelativeTime,
   formatWeekday,
-  githubStats,
   isFutureDay,
   isManualSection,
-  isTweetSection,
   itemMeta,
   itemsForChannel,
   manualEmptyCopy,
@@ -50,6 +47,7 @@ import {
   pullLabel,
   pullSummary,
   rssSectionMeta,
+  rowOf,
   sectionEmptyState,
   sectionHead,
   sectionKey,
@@ -58,10 +56,8 @@ import {
   shiftDayKey,
   shiftMonthKey,
   translateOutcome,
-  tweetActions,
-  tweetDisplayText,
-  tweetMeta,
   unreadCount,
+  withToggledExpanded,
 } from './view-model.mjs';
 
 const h = createElement;
@@ -91,12 +87,21 @@ const BASE_INITIAL_STATE = {
   filter: 'all',
   selectMode: false,
   selected: new Set(),
+  expanded: new Set(),
   month: '',
   calendar: new Map(),
   calendarMonth: '',
   calendarLoading: false,
   settingsPane: 'general',
 };
+
+/**
+ * Expanded descriptions are kept across channel, filter, view and day switches
+ * so a reader who comes back finds the rows they opened. One panel holds one
+ * day's items, so the set is cleared whenever the day changes, and it is capped
+ * as a backstop against a set that never shrinks while the day stays put.
+ */
+const EXPANDED_LIMIT = 200;
 
 function createInitialState(memory) {
   const selection = memory.readSelection();
@@ -183,6 +188,7 @@ function panelReducer(state, action) {
         date: action.date,
         month: monthKeyOf(action.date),
         selected: new Set(),
+        expanded: new Set(),
         day: null,
         dayLoading: true,
         dayError: null,
@@ -196,6 +202,7 @@ function panelReducer(state, action) {
         day: action.day,
         sources: action.sources,
         channel: resolveReadingChannel(state.channel, action.sources),
+        expanded: action.day.date === state.date ? state.expanded : new Set(),
         dayLoading: false,
         dayError: null,
         settingsPane: resolvePane(state.settingsPane, sourceIdsOf(action.sources)),
@@ -264,6 +271,8 @@ function panelReducer(state, action) {
     }
     case 'channel':
       return { ...state, channel: action.channel, selected: new Set() };
+    case 'toggle-expanded':
+      return { ...state, expanded: withToggledExpanded(state.expanded, action.id, EXPANDED_LIMIT) };
     case 'view':
       return { ...state, view: action.view, selectMode: false, selected: new Set() };
     case 'filter':
@@ -563,9 +572,12 @@ function usePanelData(ctx, api, text, readingMemory) {
     }
   }, [api, text]);
 
-  const openItem = useCallback((item) => {
+  /**
+   * Open one item in the Sidebar. `url` is the row's own link when the card
+   * passed it, so a row whose title differs from `item.url` still opens its link.
+   */
+  const openItem = useCallback((item, url = item.url) => {
     void markRead([item.id]);
-    const url = item.url;
     if (!url) {
       ctx.layout.selectPanel(null);
       return;
@@ -665,6 +677,7 @@ function usePanelData(ctx, api, text, readingMemory) {
     startSelect: () => dispatch({ type: 'select-mode', on: true }),
     cancelSelect: () => dispatch({ type: 'select-mode', on: false }),
     toggleSelect: id => dispatch({ type: 'select', id }),
+    toggleExpanded: id => dispatch({ type: 'toggle-expanded', id }),
     markSelected,
     selectMonth: (delta) => {
       const month = stateRef.current.month;
@@ -935,28 +948,23 @@ function BriefHeader({ brief, text, actions }) {
   );
 }
 
-/** The cover of one brief row: lazy image, letter placeholder, video badge. */
-function RowCover({ item, cover: explicit }) {
+/** The cover of one row: lazy image, letter placeholder when the image fails, video badge. */
+function RowCover({ initial, cover, video }) {
   const [coverFailed, setCoverFailed] = useState(false);
-  const cover = typeof explicit === 'string'
-    ? explicit
-    : (typeof item.extra?.cover === 'string' ? item.extra.cover : '');
-  const showCover = cover !== '' && !coverFailed;
-  const initial = typeof item.title === 'string' && item.title !== '' ? item.title.trim().charAt(0) : '';
   return h('div', { className: 'dl-row-cover' },
-    showCover
-      ? h('img', {
+    coverFailed
+      ? h('span', { className: 'dl-row-cover-fallback', 'aria-hidden': true }, initial)
+      : h('img', {
         src: cover,
         alt: '',
-        width: 112,
-        height: 63,
+        width: 132,
+        height: 74,
         loading: 'lazy',
         decoding: 'async',
         referrerPolicy: 'no-referrer',
         onError: () => setCoverFailed(true),
-      })
-      : h('span', { className: 'dl-row-cover-fallback', 'aria-hidden': true }, initial),
-    item.extra?.kind === 'video'
+      }),
+    video
       ? h('span', { className: 'dl-play', 'aria-hidden': true }, h(PlayIcon, { size: 8 }))
       : null,
   );
@@ -1082,17 +1090,16 @@ function SectionCard({
   selected,
   deleting = [],
   deleteErrors = {},
+  expanded = new Set(),
 }) {
   const now = new Date();
-  const isBriefChannel = section.source?.type === 'bestblogs-brief';
-  const isTweetChannel = isTweetSection(section);
   const manual = isManualSection(section);
   const isPooled = section.channelId !== undefined;
   const rss = isPooled ? rssSectionMeta(section) : null;
   const rssSources = rssChannel?.feedCount ?? rss?.feeds.length ?? 0;
   const rssFailed = rss?.failed ?? 0;
   const rssOverLimit = rss?.overLimit ?? 0;
-  const brief = isBriefChannel ? briefMeta(section) : null;
+  const brief = section.source?.type === 'bestblogs-brief' ? briefMeta(section) : null;
   const emptyState = sectionEmptyState(section);
   const pull = pullControl(section, { day, today, busy }, text);
   const showBrief = Boolean(brief)
@@ -1134,135 +1141,196 @@ function SectionCard({
   const showDot = section.status !== 'notPublished';
   const degraded = showBrief && brief.detailStatus === 'degraded';
 
-  return h('section', { className: 'dl-card', style: { '--dl-i': index } },
-    h('div', { className: 'dl-card-head' },
-      h('span', { className: 'dl-ch-dot', 'aria-hidden': true }),
-      h('span', { className: 'dl-card-title' }, channelName(section.source, text)),
-      manual ? h('span', { className: 'dl-card-pill' }, text('x.manual')) : null,
-      h('span', { className: 'dl-card-count' }, String(section.count)),
-      h('span', {
-        className: `dl-card-meta${isError ? ' is-error' : ''}`,
-        title: fetchError || section.fetch?.error || '',
-      },
-        showDot
-          ? h('span', { className: `dl-status-dot ${sectionDotClass(section, fetchError)}` })
-          : null,
-        h('span', { className: 'dl-card-meta-text' }, statusText),
+  // The rows are the section card's one grid. The header is a single cell spanning
+  // it, and auto-fit puts rows in two columns exactly when both columns fit. The
+  // cards sit in a list wrapper so the two-column width can be capped and centred
+  // without the section card shrinking away from the scroll area's edges.
+  return h('div', { className: 'dl-list' },
+    h('section', { className: 'dl-card', style: { '--dl-i': index } },
+      h('div', { className: 'dl-rows' },
+      h('div', { className: 'dl-rows-all' },
+        h('div', { className: 'dl-card-head' },
+          h('span', { className: 'dl-ch-dot', 'aria-hidden': true }),
+          h('span', { className: 'dl-card-title' }, channelName(section.source, text)),
+          manual ? h('span', { className: 'dl-card-pill' }, text('x.manual')) : null,
+          h('span', { className: 'dl-card-count' }, String(section.count)),
+          h('span', {
+            className: `dl-card-meta${isError ? ' is-error' : ''}`,
+            title: fetchError || section.fetch?.error || '',
+          },
+            showDot
+              ? h('span', { className: `dl-status-dot ${sectionDotClass(section, fetchError)}` })
+              : null,
+            h('span', { className: 'dl-card-meta-text' }, statusText),
+          ),
+          degraded ? h('span', { className: 'dl-card-hint' }, text('brief.detailsIncomplete')) : null,
+          head.statusText ? h('span', { className: 'dl-card-status' }, head.statusText) : null,
+          canRefresh
+            ? pull.show
+              ? h('button', {
+                type: 'button',
+                className: 'dl-btn dl-btn--sm',
+                disabled: pull.disabled,
+                onClick: () => void actions.refreshSection(section),
+              }, pull.label)
+              : h('button', {
+                type: 'button',
+                className: 'dl-icon-btn dl-icon-btn--sm',
+                title: isPooled ? text('section.rss.pull') : text('section.refetch'),
+                'aria-label': isPooled ? text('section.rss.pull') : text('section.refetch'),
+                disabled: head.refetchDisabled,
+                onClick: () => void actions.refreshSection(section),
+              }, h(RefreshIcon, { size: 12, className: busy ? 'dl-spin' : undefined }))
+            : null,
+          head.showTranslate
+            ? h('button', {
+              type: 'button',
+              className: 'dl-btn dl-btn--sm',
+              disabled: head.translateDisabled,
+              onClick: () => void actions.translateSource(section.source.id),
+            }, head.translateLabel)
+            : null,
+        ),
       ),
-      degraded ? h('span', { className: 'dl-card-hint' }, text('brief.detailsIncomplete')) : null,
-      head.statusText ? h('span', { className: 'dl-card-status' }, head.statusText) : null,
-      canRefresh
-        ? pull.show
-          ? h('button', {
+      head.showError
+        ? h('div', { className: 'dl-translate-error', role: 'status' },
+          h('span', { className: 'dl-translate-error-label' }, text('section.translationFailed')),
+          h('span', { className: 'dl-translate-error-text' }, head.errorMessage),
+          h('span', { className: 'dl-translate-error-hint' }, text('section.translationHint')))
+        : null,
+      isPooled && section.status === 'error'
+        ? h('div', { className: 'dl-section-error', role: 'status' },
+          h('span', { className: 'dl-section-error-text' }, section.fetch?.error || rssChannel?.error || text('card.failed')),
+          h('button', {
             type: 'button',
             className: 'dl-btn dl-btn--sm',
-            disabled: pull.disabled,
+            disabled: busy,
             onClick: () => void actions.refreshSection(section),
-          }, pull.label)
-          : h('button', {
-            type: 'button',
-            className: 'dl-icon-btn dl-icon-btn--sm',
-            title: isPooled ? text('section.rss.pull') : text('section.refetch'),
-            'aria-label': isPooled ? text('section.rss.pull') : text('section.refetch'),
-            disabled: head.refetchDisabled,
-            onClick: () => void actions.refreshSection(section),
-          }, h(RefreshIcon, { size: 12, className: busy ? 'dl-spin' : undefined }))
+          }, busy ? text('section.rss.pulling') : text('section.rss.pullShort')))
         : null,
-      head.showTranslate
-        ? h('button', {
-          type: 'button',
-          className: 'dl-btn dl-btn--sm',
-          disabled: head.translateDisabled,
-          onClick: () => void actions.translateSource(section.source.id),
-        }, head.translateLabel)
-        : null,
-    ),
-    head.showError
-      ? h('div', { className: 'dl-translate-error', role: 'status' },
-        h('span', { className: 'dl-translate-error-label' }, text('section.translationFailed')),
-        h('span', { className: 'dl-translate-error-text' }, head.errorMessage),
-        h('span', { className: 'dl-translate-error-hint' }, text('section.translationHint')))
-      : null,
-    isPooled && section.status === 'error'
-      ? h('div', { className: 'dl-section-error', role: 'status' },
-        h('span', { className: 'dl-section-error-text' }, section.fetch?.error || rssChannel?.error || text('card.failed')),
-        h('button', {
-          type: 'button',
-          className: 'dl-btn dl-btn--sm',
-          disabled: busy,
-          onClick: () => void actions.refreshSection(section),
-        }, busy ? text('section.rss.pulling') : text('section.rss.pullShort')))
-      : null,
-    showBrief ? h(BriefHeader, { brief, text, actions }) : null,
-    emptyState === 'none'
-      ? null
-      : h(SectionEmpty, {
-        kind: emptyState,
+      showBrief ? h(BriefHeader, { brief, text, actions }) : null,
+      emptyState === 'none'
+        ? null
+        : h(SectionEmpty, {
+          kind: emptyState,
+          section,
+          busy,
+          isToday: day === today,
+          canBackfill,
+          text,
+          actions,
+        }),
+      ...section.items.map(item => h(ItemRow, {
+        key: item.id,
+        item,
         section,
-        busy,
-        isToday: day === today,
-        canBackfill,
+        deleting: deleting.includes(item.id),
+        deleteError: deleteErrors[item.id] ?? '',
+        expanded: expanded.has(item.id),
+        uiLocale,
         text,
         actions,
-      }),
-    ...section.items.map(item => h(ItemRow, {
-      key: item.id,
-      item,
-      brief: isBriefChannel,
-      tweet: isTweetChannel,
-      section,
-      deleting: deleting.includes(item.id),
-      deleteError: deleteErrors[item.id] ?? '',
-      uiLocale,
-      text,
-      actions,
-      selectMode,
-      selected: selected.has(item.id),
-    })),
+        selectMode,
+        selected: selected.has(item.id),
+      })),
+      ),
+    ),
   );
 }
 
 /**
- * A tweet body clamped to six lines, with a local expand control. The control
- * only toggles expansion; it never marks the item read or opens the row.
+ * The one description slot every row uses. It clamps to three lines, and only
+ * when the clamped text actually overflows does it offer 详情 / 收起 in place.
+ *
+ * A container width change re-renders nothing here, so each measurement also
+ * subscribes to the body's own box: a window resize listener would miss the
+ * two-column switch, which is decided by the panel's width, not the window's.
  */
-function TweetText({ item, text }) {
-  const raw = typeof item.description === 'string' ? item.description : '';
-  const placeholder = raw.trim() === '';
-  const body = placeholder
-    ? (typeof item.title === 'string' ? item.title : '')
-    : tweetDisplayText(raw);
-  const [expanded, setExpanded] = useState(false);
+function RowDescription({ row, expanded, toggle, text }) {
   const [overflowing, setOverflowing] = useState(false);
-  const bodyRef = useRef(null);
+  const ref = useRef(null);
+  const showControl = overflowing || expanded;
 
-  // Six lines is a rendered length, so the control appears only once the
-  // clamped body actually overflows the column.
   useLayoutEffect(() => {
-    const node = bodyRef.current;
-    if (!node || expanded) return;
-    setOverflowing(node.scrollHeight > node.clientHeight + 1);
-  }, [expanded, body]);
+    const node = ref.current;
+    if (!node) return undefined;
+    const measure = () => setOverflowing(node.scrollHeight > node.clientHeight + 1);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [expanded, row.description.text, showControl]);
 
-  if (body === '') return null;
-  const classes = ['dl-tweet-text'];
-  if (placeholder) classes.push('is-placeholder');
-  if (!expanded) classes.push('is-clamped');
   return [
-    h('div', { key: 'body', ref: bodyRef, className: classes.join(' ') }, body),
-    overflowing || expanded
+    h('div', {
+      key: 'text',
+      ref,
+      className: `dl-row-desc${expanded ? ' is-expanded' : ' is-clamped'}`,
+      title: row.description.title || undefined,
+      lang: row.description.lang,
+    }, row.description.text),
+    showControl
       ? h('button', {
         key: 'toggle',
         type: 'button',
-        className: 'dl-tweet-expand',
+        className: 'dl-row-more',
         'aria-expanded': expanded,
         onClick: (event) => {
           event.stopPropagation();
-          setExpanded(value => !value);
+          toggle();
         },
-      }, text(expanded ? 'x.collapse' : 'x.expand'))
+      }, text(expanded ? 'row.collapse' : 'row.detail'))
       : null,
   ];
+}
+
+/**
+ * The row's action icons in one fixed place and order: delete, then mark read,
+ * then open. An absent action takes no room.
+ */
+function RowActions({ row, item, text, actions, deleting }) {
+  const buttons = [];
+  if (row.actions.delete) {
+    buttons.push(h('button', {
+      key: 'delete',
+      type: 'button',
+      className: 'dl-icon-btn dl-icon-btn--danger',
+      title: text('x.delete'),
+      'aria-label': text('x.delete'),
+      disabled: deleting,
+      onClick: (event) => {
+        event.stopPropagation();
+        void actions.deleteBookmark(item);
+      },
+    }, h(TrashIcon, { size: 13 })));
+  }
+  if (row.actions.read) {
+    buttons.push(h('button', {
+      key: 'read',
+      type: 'button',
+      className: 'dl-icon-btn',
+      title: text('row.markRead'),
+      'aria-label': text('row.markRead'),
+      onClick: (event) => {
+        event.stopPropagation();
+        void actions.markRead([item.id]);
+      },
+    }, h(CheckIcon, { size: 13 })));
+  }
+  if (row.actions.open || row.actions.externalUrl !== '') {
+    buttons.push(h('button', {
+      key: 'open',
+      type: 'button',
+      className: 'dl-icon-btn',
+      title: text('row.openExternal'),
+      'aria-label': text('row.openExternal'),
+      onClick: (event) => {
+        event.stopPropagation();
+        void actions.openExternal(item, row.actions.externalUrl);
+      },
+    }, h(OpenIcon, { size: 13 })));
+  }
+  return h('div', { className: 'dl-acts' }, ...buttons);
 }
 
 function selectionIntersects(node) {
@@ -1276,49 +1344,17 @@ function openTitle(event, item, actions) {
   event.preventDefault();
   event.stopPropagation();
   if (selectionIntersects(event.currentTarget)) return;
-  void actions.openItem(item);
+  void actions.openItem(item, event.currentTarget.href);
 }
 
-/** The text header and body of one tweet card; no avatar and no title line. */
-function TweetRowBody({ item, now, text, selectMode, onOpen }) {
-  const meta = tweetMeta(item, now, text);
-  const parts = [];
-  const push = (key, node, separator = true) => {
-    if (separator && parts.length > 0) {
-      parts.push(h('span', { key: `sep:${key}`, className: 'dl-tweet-sep', 'aria-hidden': true }, '·'));
-    }
-    parts.push(node);
-  };
-  if (meta.author) {
-    push('author', h('span', { key: 'author', className: 'dl-tweet-author' }, meta.author), false);
-  }
-  if (meta.handle) push('handle', h('span', { key: 'handle', className: 'dl-tweet-handle' }, meta.handle));
-  if (meta.time) push('time', h('span', { key: 'time' }, meta.time));
-  if (meta.likes) push('likes', h('span', { key: 'likes' }, meta.likes));
-  if (meta.reads) push('reads', h('span', { key: 'reads' }, meta.reads));
-  if (meta.deleted) {
-    push('deleted', h('span', { key: 'deleted', className: 'dl-tweet-deleted' }, text('x.deletedTag')));
-  }
-  const head = !selectMode && item.url
-    ? h('a', {
-      className: 'dl-tweet-head dl-title-link',
-      href: item.url,
-      title: text('row.openInSidebar'),
-      draggable: false,
-      onClick: onOpen,
-      onAuxClick: event => event.preventDefault(),
-    }, ...parts)
-    : h('div', { className: 'dl-tweet-head' }, ...parts);
-  return h('div', { className: 'dl-tweet' },
-    head,
-    h(TweetText, { item, text }),
-  );
-}
-
+/**
+ * One row, whatever its source: the four slots the card always has are the
+ * title, the description, the meta line and the actions; the cover and the
+ * attachments are optional. Every branch below asks whether a slot has
+ * content, never which source filled it.
+ */
 function ItemRow({
   item,
-  brief = false,
-  tweet = false,
   section = null,
   deleting = false,
   deleteError = '',
@@ -1327,26 +1363,26 @@ function ItemRow({
   actions,
   selectMode = false,
   selected = false,
+  expanded = false,
 }) {
-  const now = new Date();
-  const stats = brief || tweet ? null : githubStats(item.extra);
-  const meta = brief || tweet ? '' : itemMeta(item, now, text);
-  const briefInfo = brief ? briefItemMeta(item, now, text) : null;
-  const description = descriptionOf(item, uiLocale);
-  const imageUrl = typeof item.extra?.imageUrl === 'string' ? item.extra.imageUrl : '';
-  const attachments = Array.isArray(item.extra?.attachments)
-    ? item.extra.attachments.filter(entry => entry && typeof entry.url === 'string')
-    : [];
-  const externalUrl = brief
-    ? (typeof item.extra?.originalUrl === 'string' ? item.extra.originalUrl : '')
-    : item.url;
-  const visible = tweet ? tweetActions(section, item) : null;
+  const row = useMemo(
+    () => rowOf(item, section, { now: new Date(), uiLocale, t: text }),
+    [item, section, uiLocale, text],
+  );
   const classes = ['dl-row'];
-  if (item.read) classes.push('is-read');
+  if (row.read) classes.push('is-read');
   if (selectMode) classes.push('is-select');
   if (selected) classes.push('is-selected');
-  if (brief) classes.push('is-brief');
-  if (tweet) classes.push('is-tweet');
+  const titleNode = selectMode || !row.title.url
+    ? h('span', { className: 'dl-row-title', title: row.title.text }, row.title.text)
+    : h('a', {
+      className: 'dl-row-title dl-title-link',
+      href: row.title.url,
+      title: row.title.text,
+      draggable: false,
+      onClick: event => openTitle(event, item, actions),
+      onAuxClick: event => event.preventDefault(),
+    }, row.title.text);
   return h('div', {
     className: classes.join(' '),
     role: selectMode ? 'checkbox' : undefined,
@@ -1368,40 +1404,27 @@ function ItemRow({
       ? h('span', { className: `dl-check${selected ? ' is-on' : ''}`, 'aria-hidden': true },
         selected ? h(CheckIcon, { size: 10 }) : null)
       : h('span', { className: 'dl-unread-dot', 'aria-hidden': true }),
-    brief || imageUrl !== '' ? h(RowCover, { item, cover: brief ? undefined : imageUrl }) : null,
+    row.cover === ''
+      ? null
+      : h(RowCover, {
+        initial: row.title.text.trim().charAt(0),
+        cover: row.cover,
+        video: item.extra?.kind === 'video',
+      }),
     h('div', { className: 'dl-row-body' },
-      tweet
-        ? h(TweetRowBody, {
-          item,
-          now,
-          text,
-          selectMode,
-          onOpen: event => openTitle(event, item, actions),
-        })
-        : null,
-      tweet
+      titleNode,
+      row.description.text === ''
         ? null
-        : (selectMode || !item.url
-          ? h('span', { className: 'dl-row-title', title: item.title }, item.title)
-          : h('a', {
-            className: 'dl-row-title dl-title-link',
-            href: item.url,
-            title: item.title,
-            draggable: false,
-            onClick: event => openTitle(event, item, actions),
-            onAuxClick: event => event.preventDefault(),
-          }, item.title)),
-      tweet ? null : (description.text
-        ? h('div', {
-          className: 'dl-row-desc',
-          title: description.title || undefined,
-          lang: description.lang,
-        }, description.text)
-        : null),
-      tweet || attachments.length === 0
+        : h(RowDescription, {
+          row,
+          expanded,
+          toggle: () => actions.toggleExpanded(item.id),
+          text,
+        }),
+      row.attachments.length === 0
         ? null
         : h('div', { className: 'dl-row-attachments' },
-          ...attachments.map((attachment, index) => h('a', {
+          ...row.attachments.map((attachment, index) => h('a', {
             key: `${index}:${attachment.url}`,
             className: 'dl-attachment',
             href: attachment.url,
@@ -1413,30 +1436,12 @@ function ItemRow({
               window.open(attachment.url, '_blank', 'noopener,noreferrer');
             },
           }, h(OpenIcon, { size: 10 }), h('span', null, attachmentLabel(attachment, text))))),
-      tweet
-        ? null
-        : (brief
-          ? h('div', { className: 'dl-row-meta' },
-            briefInfo.text ? h('span', { className: 'dl-row-meta-text' }, briefInfo.text) : null,
-            briefInfo.score !== null
-              ? h('span', { className: 'dl-row-score' },
-                briefInfo.text ? h('span', { className: 'dl-row-sep' }, '·') : null,
-                h(StarIcon, { size: 10 }),
-                String(briefInfo.score))
-              : null,
-          )
-          : meta
-            ? h('div', { className: 'dl-row-meta' },
-              stats ? h('span', {
-                className: 'dl-row-star',
-                role: 'img',
-                'aria-label': text('gh.starsLabel'),
-                title: text('gh.starsLabel'),
-              }, h(StarIcon, { size: 11 })) : null,
-              h('span', { className: 'dl-row-meta-text' }, meta),
-            )
-            : null),
-      tweet && deleteError
+      // The actions share the meta line when there is one, and stand on the
+      // next line beside a meta line that is absent.
+      h('div', { className: 'dl-row-foot' },
+        row.meta ? h('span', { className: 'dl-row-meta-text', title: row.meta }, row.meta) : null,
+        selectMode ? null : h(RowActions, { row, item, text, actions, deleting })),
+      deleteError
         ? h('div', { className: 'dl-row-delete-error', role: 'status' },
           h('span', { className: 'dl-row-delete-error-text' }, deleteError),
           h('button', {
@@ -1450,49 +1455,6 @@ function ItemRow({
           }, text('section.retry')))
         : null,
     ),
-    selectMode
-      ? null
-      : h('div', { className: 'dl-acts' },
-        visible?.delete
-          ? h('button', {
-            type: 'button',
-            className: 'dl-icon-btn dl-icon-btn--danger',
-            title: text('x.delete'),
-            'aria-label': text('x.delete'),
-            disabled: deleting,
-            onClick: (event) => {
-              event.stopPropagation();
-              void actions.deleteBookmark(item);
-            },
-          }, h(TrashIcon, { size: 13 }))
-          : null,
-        (visible ? visible.read : !item.read)
-          ? h('button', {
-            type: 'button',
-            className: 'dl-icon-btn',
-            title: text('row.markRead'),
-            'aria-label': text('row.markRead'),
-            disabled: tweet ? deleting : undefined,
-            onClick: (event) => {
-              event.stopPropagation();
-              void actions.markRead([item.id]);
-            },
-          }, h(CheckIcon, { size: 13 }))
-          : null,
-        externalUrl
-          ? h('button', {
-            type: 'button',
-            className: 'dl-icon-btn',
-            title: text('row.openExternal'),
-            'aria-label': text('row.openExternal'),
-            disabled: tweet ? deleting : undefined,
-            onClick: (event) => {
-              event.stopPropagation();
-              void actions.openExternal(item, externalUrl);
-            },
-          }, h(OpenIcon, { size: 13 }))
-          : null,
-      ),
   );
 }
 
@@ -1839,6 +1801,7 @@ export function FeedUltraPanel({ ctx, api, text, ensureSettings, readingMemory }
         selected: state.selected,
         deleting: state.deleting,
         deleteErrors: state.deleteErrors,
+        expanded: state.expanded,
       })),
     );
   }

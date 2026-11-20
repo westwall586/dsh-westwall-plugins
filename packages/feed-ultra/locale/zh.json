@@ -23,6 +23,8 @@
   "row.openExternal": "在浏览器打开",
   "row.openInSidebar": "在侧栏打开",
   "row.read": "已读",
+  "row.detail": "详情",
+  "row.collapse": "收起",
   "x.manual": "手动",
   "x.pull": "拉取 {n} 条",
   "x.pulling": "拉取中…",

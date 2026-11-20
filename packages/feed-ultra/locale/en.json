@@ -23,6 +23,8 @@
   "row.openExternal": "Open in browser",
   "row.openInSidebar": "Open in sidebar",
   "row.read": "Read",
+  "row.detail": "Show more",
+  "row.collapse": "Show less",
   "x.manual": "Manual",
   "x.pull": "Pull {n}",
   "x.pulling": "Pulling…",

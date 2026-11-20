@@ -21,8 +21,13 @@ export function extraInstructionHash(extraInstruction) {
     const text = typeof extraInstruction === 'string' ? extraInstruction.trim() : '';
     return text === '' ? '' : sha256Hex(text);
 }
+/**
+ * 存储后端的记录键就是文件名（per-record 布局只接受 `[a-zA-Z0-9_-]+`），
+ * 而内容身份里有 `:` 与 provider/model 自带的 `.`，所以拼好之后再取一次
+ * 摘要当键。拆开看得懂的身份留在元数据里，不靠文件名承载。
+ */
 export function cacheKeyOf(input) {
-    return [
+    const identity = [
         sha256Hex(normalizeSource(input.sourceText)),
         input.lang,
         input.provider,
@@ -31,5 +36,6 @@ export function cacheKeyOf(input) {
         input.translateComments ? 'comments' : 'plain-code',
         extraInstructionHash(input.extraInstruction),
     ].join(':');
+    return sha256Hex(identity);
 }
 //# sourceMappingURL=digest.js.map

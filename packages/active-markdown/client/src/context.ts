@@ -296,6 +296,8 @@ export interface LoadedTranslation {
   meta: TranslationMeta
   /** The source moved on since this pair was saved; the text is still readable. */
   stale: boolean
+  /** Workspace-relative path of the markdown mirror, for the toolbar tooltip. */
+  file: string
 }
 
 /** The Host half as the Body sees it. */

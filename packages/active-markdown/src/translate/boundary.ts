@@ -2,6 +2,11 @@
 import { MAX_TEXT_BYTES, TranslateError } from './request.ts'
 
 export const MAX_TRANSLATED_BYTES = 2 * MAX_TEXT_BYTES
+/**
+ * 落盘比缓存宽松：缓存是「可丢的便利」，超限只是不命中；译文文件是读者要的
+ * 结果，能翻出来就该能存。上限仍有，免得一次误写把磁盘撑爆。
+ */
+export const MAX_SAVED_BYTES = 8 * MAX_TEXT_BYTES
 
 function requireBounded(value: unknown, what: string, limit: number): string {
   if (typeof value !== 'string' || value.trim() === '') {
@@ -19,6 +24,11 @@ export function requireText(value: unknown, what: string): string {
 
 export function requireTranslatedText(value: unknown): string {
   return requireBounded(value, '译文', MAX_TRANSLATED_BYTES)
+}
+
+/** 写工作区的译文；比自动缓存的 4 MiB 边界宽。 */
+export function requireSavedText(value: unknown): string {
+  return requireBounded(value, '译文', MAX_SAVED_BYTES)
 }
 
 const UNSAFE_SEGMENT = /[\\/\u0000-\u001f]/

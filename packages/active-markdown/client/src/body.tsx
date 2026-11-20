@@ -80,9 +80,12 @@ import { InstructionAsk } from './translate/ask.tsx'
 import { assembleTranslation, normalize, planTranslation } from './translate/plan.ts'
 import {
   lineAligned,
+  markSaveFailed,
   markSaved,
+  markSaving,
+  needsSave,
   readyState,
-  saveable,
+  saveFlagOf,
   staleNoticeOf,
   translatedText,
   type PromptRun,
@@ -135,8 +138,15 @@ export interface BodyProps extends BodyInjected {
 
 type View = 'source' | 'translated'
 
-/** The save action's own lifecycle; a failure shows in the status row, not in the prose. */
-type SaveState = { status: 'idle' } | { status: 'busy' } | { status: 'failed', message: string }
+/**
+ * Whether the workspace already holds a translation for the open document.
+ * The probe runs when a document loads, so the translate button can say
+ * "already translated" before the reader opens the translated view.
+ */
+type StoredState =
+  | { status: 'probing' }
+  | { status: 'none' }
+  | { status: 'saved', stale: boolean }
 
 /** Where the 重新翻译 popover hangs, in viewport coordinates. */
 interface Ask {
@@ -193,7 +203,6 @@ type Editor =
 
 /** The one error the toolbar shows as a chip; the full text lives in its popover. */
 type ToolbarError =
-  | { kind: 'save', message: string }
   | { kind: 'translate', message: string }
   | { kind: 'too-large', message: string }
 
@@ -466,7 +475,7 @@ export function Body({
   /** The instruction the last re-translate ran with; the popover reopens with it. */
   const [instruction, setInstruction] = useState('')
   const [ask, setAsk] = useState<Ask | null>(null)
-  const [save, setSave] = useState<SaveState>({ status: 'idle' })
+  const [stored, setStored] = useState<StoredState>({ status: 'probing' })
   const [notice, setNotice] = useState<Notice | null>(null)
   /** A save-as keeps its path on screen through the reload it starts. */
   const keepNotice = useRef<Notice | null>(null)
@@ -504,6 +513,8 @@ export function Body({
   const editorHeight = useRef(ANNOTATION_ESTIMATE_HEIGHT)
   const peekPanel = useRef<HTMLDivElement | null>(null)
   const requestToken = useRef(0)
+  /** The in-flight probe for a stored translation; a click waits for it. */
+  const probeRef = useRef<Promise<void> | null>(null)
   const reviewToken = useRef(0)
   const runController = useRef<AbortController | null>(null)
   const editCheckToken = useRef(0)
@@ -554,26 +565,36 @@ export function Body({
 
   /**
    * The stored translation a reopened document can show without a model call.
-   * A saved file wins over the automatic cache, and the token drops the answer
-   * once any other run has taken over the document.
+   * A saved file wins over the automatic cache; the probe also decides whether
+   * the translate button advertises "already translated". The promise is kept
+   * so a click that lands before it settles waits instead of paying for a
+   * second translation.
    */
   const restoreTranslation = useCallback((sourceText: string, token: number): void => {
     if (sessionId === undefined || path === undefined) return
-    void (async () => {
+    setStored({ status: 'probing' })
+    const probe = (async () => {
       const bridge = await host().catch(() => undefined)
-      if (bridge === undefined) return
+      if (bridge === undefined) {
+        setStored({ status: 'none' })
+        return
+      }
       const described = await bridge.describe().catch(() => FALLBACK_DESCRIBE)
+      if (token !== requestToken.current) return
       const settings = described.settings
       const saved = await bridge.load({ sessionId, path, lang: settings.lang }).catch(() => null)
+      if (token !== requestToken.current) return
       let restored: ReadyTranslation | undefined
       if (saved !== null) {
         restored = readyState({
           text: saved.text,
           sourceText,
-          persistence: { kind: 'saved', stale: saved.stale, dismissed: false },
+          persistence: { kind: 'saved', stale: saved.stale, dismissed: false, file: saved.file },
           run: storedRun(saved.meta, described.promptVersion, settings.translateComments),
         })
+        setStored({ status: 'saved', stale: saved.stale })
       } else {
+        setStored({ status: 'none' })
         const cached = await bridge.cacheGet({
           text: sourceText,
           lang: settings.lang,
@@ -581,6 +602,7 @@ export function Body({
           promptVersion: described.promptVersion,
           translateComments: settings.translateComments,
         }).catch(() => null)
+        if (token !== requestToken.current) return
         if (cached !== null) {
           restored = readyState({
             text: cached.text,
@@ -590,9 +612,10 @@ export function Body({
           })
         }
       }
-      if (restored === undefined || token !== requestToken.current) return
+      if (restored === undefined) return
       setTranslation(current => (current.status === 'idle' ? restored : current))
     })()
+    probeRef.current = probe
   }, [host, sessionId, path])
 
   useEffect(() => {
@@ -609,7 +632,7 @@ export function Body({
       setTranslation({ status: 'idle' })
       setInstruction('')
       setAsk(null)
-      setSave({ status: 'idle' })
+      setStored({ status: 'probing' })
       setEditor(null)
       setDrawerOpen(false)
       setUndo(null)
@@ -667,7 +690,7 @@ export function Body({
       setTranslation({ status: 'idle' })
       setInstruction('')
       setAsk(null)
-      setSave({ status: 'idle' })
+      setStored({ status: 'probing' })
       setEditor(null)
       setDrawerOpen(false)
       setUndo(null)
@@ -869,13 +892,12 @@ export function Body({
   const peekable = view === 'translated' && lineAligned(translation)
 
   const staleTranslation = staleNoticeOf(translation)
-  const toolbarError: ToolbarError | null = save.status === 'failed'
-    ? { kind: 'save', message: save.message }
-    : translation.status === 'failed'
-      ? { kind: 'translate', message: translation.message }
-      : translation.status === 'too-large'
-        ? { kind: 'too-large', message: t('translate.tooLarge', { lines: translation.lineCount }) }
-        : null
+  const saveFlag = saveFlagOf(translation)
+  const toolbarError: ToolbarError | null = translation.status === 'failed'
+    ? { kind: 'translate', message: translation.message }
+    : translation.status === 'too-large'
+      ? { kind: 'too-large', message: t('translate.tooLarge', { lines: translation.lineCount }) }
+      : null
   const langCode = translation.status === 'ready' ? translation.run.lang : described?.settings.lang
   const langLabel = described?.languages.find(option => option.code === langCode)?.label ?? t('view.translated')
 
@@ -1719,6 +1741,46 @@ export function Body({
     }
   }, [annotationList, sourceAtoms, sourceJoined, view, state.status])
 
+  /**
+   * Write a finished translation into the workspace mirror. Every successful
+   * translation lands here on its own: 保存 is not an action the reader takes,
+   * so the only manual path left is retrying a failed write. A save that lands
+   * after the document moved on is dropped by the token check.
+   */
+  const persistTranslation = useCallback((ready: ReadyTranslation): void => {
+    if (sessionId === undefined || path === undefined) return
+    const token = requestToken.current
+    setTranslation(current => (current.status === 'ready' && current.text === ready.text ? markSaving(current) : current))
+    void (async () => {
+      try {
+        const bridge = await host()
+        const saved = await bridge.save({
+          sessionId,
+          path,
+          text: ready.source,
+          translated: ready.text,
+          lang: ready.run.lang,
+          ...(ready.run.provider === undefined ? {} : { provider: ready.run.provider }),
+          ...(ready.run.model === undefined ? {} : { model: ready.run.model }),
+          promptVersion: ready.run.promptVersion,
+          extraInstruction: ready.run.extraInstruction,
+          aligned: aligned(ready.alignment),
+        })
+        setTranslation(current => (current.status === 'ready' && current.text === ready.text ? markSaved(current, saved.file) : current))
+        if (token === requestToken.current) setStored({ status: 'saved', stale: false })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        setTranslation(current => (current.status === 'ready' && current.text === ready.text ? markSaveFailed(current, message) : current))
+      }
+    })()
+  }, [host, sessionId, path])
+
+  /** The status label's failure face doubles as the retry. */
+  const retrySave = useCallback(() => {
+    const ready = needsSave(translation)
+    if (ready !== undefined) persistTranslation(ready)
+  }, [translation, persistTranslation])
+
   const translateDocument = useCallback((
     document: { text: string, absolutePath: string },
     extraInstruction: string,
@@ -1726,7 +1788,6 @@ export function Body({
   ): void => {
     stopRun()
     setPeek(null)
-    setSave({ status: 'idle' })
     const sourceLines = normalize(document.text).split('\n')
     const plan = planTranslation(document.text, parseDocument(document.text).blocks)
     if (plan.kind === 'too-large') {
@@ -1764,12 +1825,16 @@ export function Body({
           }).catch(() => null)
           if (token !== requestToken.current) return
           if (cached !== null) {
-            setTranslation(readyState({
+            // A cache hit answers a click, so it still has to reach the
+            // workspace: the reader asked for a translation, not for a preview.
+            const restored = readyState({
               text: cached.text,
               sourceText: document.text,
               persistence: { kind: 'unsaved' },
               run: storedRun(cached.meta, described.promptVersion, settings.translateComments, extraInstruction),
-            }))
+            })
+            setTranslation(restored)
+            persistTranslation(restored)
             return
           }
         }
@@ -1799,6 +1864,7 @@ export function Body({
         const text = assembleTranslation(plan.ranges, sourceLines, replies)
         const ready = readyState({ text, sourceText: document.text, persistence: { kind: 'unsaved' }, run })
         setTranslation(ready)
+        persistTranslation(ready)
         // Fire and forget: a lost cache write costs one re-translation later, and
         // must never change what the reader is looking at.
         void bridge.cachePut({
@@ -1821,7 +1887,7 @@ export function Body({
         if (runController.current === controller) runController.current = null
       }
     })()
-  }, [host, sessionId, path, stopRun])
+  }, [host, sessionId, path, persistTranslation, stopRun])
 
   const chooseView = useCallback((next: View) => {
     if (next === 'translated') {
@@ -1833,9 +1899,23 @@ export function Body({
     }
     setView(next)
     if (next !== 'translated' || state.status !== 'ready') return
-    if (translation.status === 'ready' || translation.status === 'running' || translation.status === 'too-large') return
-    translateDocument({ text: state.text, absolutePath: state.absolutePath }, instruction, true)
-  }, [state, translation, translateDocument, instruction])
+    const open = (): void => {
+      const current = translationRef.current
+      if (current.status === 'ready') {
+        // A cache hit has not reached the workspace yet; showing it is the
+        // moment it becomes worth writing.
+        if (current.persistence.kind === 'unsaved') persistTranslation(current)
+        return
+      }
+      if (current.status === 'running' || current.status === 'too-large') return
+      translateDocument({ text: state.text, absolutePath: state.absolutePath }, instruction, true)
+    }
+    // The probe decides between showing the stored translation and calling the
+    // model; waiting for it keeps a quick click from paying for a second one.
+    const probe = probeRef.current
+    if (probe === null) open()
+    else void probe.then(open)
+  }, [state, persistTranslation, translateDocument, instruction])
 
   /** Hang the instruction popover under whichever button opened it. */
   const openAsk = useCallback((anchor: HTMLElement) => {
@@ -1859,7 +1939,6 @@ export function Body({
     setTranslation({ status: 'idle' })
     setView('source')
     setPeek(null)
-    setSave({ status: 'idle' })
   }, [stopRun])
 
   /** Leaving translation keeps a finished result in memory, but a run in flight is cancelled. */
@@ -1872,42 +1951,12 @@ export function Body({
     setTocOpen(false)
     setErrorOpen(false)
     setPeek(null)
-    setSave({ status: 'idle' })
   }, [translation.status, stopRun])
-
-  const saveTranslation = useCallback(() => {
-    const ready = saveable(translation)
-    if (ready === undefined || state.status !== 'ready' || sessionId === undefined || path === undefined) return
-    setSave({ status: 'busy' })
-    void (async () => {
-      try {
-        const bridge = await host()
-        const saved = await bridge.save({
-          sessionId,
-          path,
-          text: state.text,
-          translated: ready.text,
-          lang: ready.run.lang,
-          ...(ready.run.provider === undefined ? {} : { provider: ready.run.provider }),
-          ...(ready.run.model === undefined ? {} : { model: ready.run.model }),
-          promptVersion: ready.run.promptVersion,
-          extraInstruction: ready.run.extraInstruction,
-          aligned: aligned(ready.alignment),
-        })
-        setTranslation(current => (current.status === 'ready' && current.text === ready.text ? markSaved(current) : current))
-        setSave({ status: 'idle' })
-        setNotice({ text: t('translate.saved', { file: saved.file }), undo: false })
-      } catch (error) {
-        setSave({ status: 'failed', message: error instanceof Error ? error.message : String(error) })
-      }
-    })()
-  }, [translation, state, sessionId, path, host, t])
 
   const retryToolbarError = useCallback((): void => {
     setErrorOpen(false)
-    if (toolbarError?.kind === 'save') saveTranslation()
-    else if (toolbarError?.kind === 'translate') chooseView('translated')
-  }, [toolbarError, saveTranslation, chooseView])
+    if (toolbarError?.kind === 'translate') chooseView('translated')
+  }, [toolbarError, chooseView])
 
   const visibleSourceLine = useCallback((): number => {
     const blocks = parsed.blocks
@@ -2259,13 +2308,18 @@ export function Body({
                 <span className="am-toolbar-spacer" />
                 <button
                   type="button"
-                  className="am-toolbar-button am-toolbar-button--quiet"
+                  className={stored.status === 'saved'
+                    ? 'am-toolbar-button am-toolbar-button--accent'
+                    : 'am-toolbar-button am-toolbar-button--quiet'}
                   aria-label={t('translate.entry')}
-                  title={t('translate.entry')}
+                  title={stored.status === 'saved'
+                    ? (stored.stale ? t('translate.stale') : t('translate.entry.saved'))
+                    : t('translate.entry')}
                   onClick={() => chooseView('translated')}
                 >
                   <GlobeIcon />
                   <span className="am-toolbar-label">{t('translate.entry')}</span>
+                  {stored.status === 'saved' && stored.stale ? <span className="am-toolbar-dot" aria-hidden="true" /> : null}
                 </button>
                 {showEditAction ? (
                   <button
@@ -2346,37 +2400,49 @@ export function Body({
                       {t('translate.cancel')}
                     </button>
                   </>
-                ) : toolbarError !== null ? (
-                  <button
-                    ref={errorChip}
-                    type="button"
-                    className="am-error-chip"
-                    aria-expanded={errorOpen}
-                    aria-haspopup="dialog"
-                    onClick={() => setErrorOpen(value => !value)}
-                  >
-                    <AlertIcon />
-                    {toolbarError.kind === 'save'
-                      ? t('translate.saveFailedShort')
-                      : toolbarError.kind === 'translate' ? t('translate.failedShort') : t('translate.tooLargeShort')}
-                  </button>
-                ) : staleTranslation ? (
-                  <span className="am-stale" title={t('translate.stale')}>{t('translate.staleShort')}</span>
-                ) : null}
-                {translation.status === 'running' ? null : (
-                  <button type="button" className="am-toolbar-button am-toolbar-button--quiet" onClick={(event) => openAsk(event.currentTarget)}>
-                    {t('translate.retranslate')}
-                  </button>
+                ) : (
+                  <>
+                    {toolbarError !== null ? (
+                      <button
+                        ref={errorChip}
+                        type="button"
+                        className="am-error-chip"
+                        aria-expanded={errorOpen}
+                        aria-haspopup="dialog"
+                        onClick={() => setErrorOpen(value => !value)}
+                      >
+                        <AlertIcon />
+                        {toolbarError.kind === 'translate' ? t('translate.failedShort') : t('translate.tooLargeShort')}
+                      </button>
+                    ) : staleTranslation ? (
+                      <span className="am-stale" title={t('translate.stale')}>{t('translate.staleShort')}</span>
+                    ) : null}
+                    {saveFlag === null ? null : saveFlag.kind === 'retry' ? (
+                      <button
+                        type="button"
+                        className="am-save-retry"
+                        title={`${saveFlag.message}${'\n'}${t('translate.saveRetry')}`}
+                        onClick={retrySave}
+                      >
+                        <AlertIcon />
+                        {t('translate.saveFailedShort')}
+                      </button>
+                    ) : (
+                      <span
+                        className="am-save-state"
+                        title={saveFlag.kind === 'saved' ? t('translate.saved', { file: saveFlag.file }) : undefined}
+                      >
+                        {saveFlag.kind === 'saving' ? t('translate.saving') : t('translate.savedShort')}
+                      </span>
+                    )}
+                    <button type="button" className="am-toolbar-button am-toolbar-button--quiet" onClick={(event) => openAsk(event.currentTarget)}>
+                      {t('translate.retranslate')}
+                    </button>
+                  </>
                 )}
-                {translation.status === 'running'
-                  ? <button type="button" className="am-primary" disabled>{t('translate.save')}</button>
-                  : toolbarError?.kind === 'save' || toolbarError?.kind === 'translate'
-                    ? <button type="button" className="am-primary" onClick={retryToolbarError}>{t('translate.retry')}</button>
-                    : translation.status === 'ready'
-                      ? saveable(translation) !== undefined
-                        ? <button type="button" className="am-primary" disabled={save.status === 'busy'} onClick={saveTranslation}>{save.status === 'busy' ? t('translate.saving') : t('translate.save')}</button>
-                        : <button type="button" className="am-primary am-primary--muted" disabled>{t('translate.savedShort')}</button>
-                      : <button type="button" className="am-primary" disabled>{t('translate.save')}</button>}
+                {toolbarError?.kind === 'translate'
+                  ? <button type="button" className="am-primary" onClick={retryToolbarError}>{t('translate.retry')}</button>
+                  : null}
               </>
             )}
           </div>
@@ -2406,14 +2472,10 @@ export function Body({
               className="am-error-popover"
               style={{ left: errorPlacement.left, top: errorPlacement.top }}
               role="dialog"
-              aria-label={toolbarError.kind === 'save'
-                ? t('translate.saveFailedShort')
-                : toolbarError.kind === 'translate' ? t('translate.failedShort') : t('translate.tooLargeShort')}
+              aria-label={toolbarError.kind === 'translate' ? t('translate.failedShort') : t('translate.tooLargeShort')}
             >
               <div className="am-error-title">
-                {toolbarError.kind === 'save'
-                  ? t('translate.saveFailedShort')
-                  : toolbarError.kind === 'translate' ? t('translate.failedShort') : t('translate.tooLargeShort')}
+                {toolbarError.kind === 'translate' ? t('translate.failedShort') : t('translate.tooLargeShort')}
               </div>
               <div className="am-error-message">{toolbarError.message}</div>
               <div className="am-error-actions">

@@ -1031,6 +1031,19 @@ svg.am-markmap-canvas .markmap-foreign > div {
   border-color: transparent;
 }
 
+/* The workspace already holds this document's translation: same quiet button,
+   tinted like a link so the state reads before the click. */
+.am-toolbar-button--accent {
+  border-color: color-mix(in srgb, var(--dsw-alias-link) 24%, transparent);
+  background: color-mix(in srgb, var(--dsw-alias-link) 8%, transparent);
+  color: var(--dsw-alias-link);
+}
+
+.am-toolbar-button--accent:hover {
+  background: color-mix(in srgb, var(--dsw-alias-link) 16%, transparent);
+  color: var(--dsw-alias-link);
+}
+
 .am-toolbar-label {
   min-width: 0;
 }
@@ -1145,6 +1158,35 @@ svg.am-markmap-canvas .markmap-foreign > div {
   color: var(--dsw-alias-label-tertiary);
   font-size: 0.85em;
   white-space: nowrap;
+}
+
+/* The automatic write's outcome; the failure face is the retry control. */
+.am-save-state {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
+.am-save-retry {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 9px;
+  border: 0.5px solid color-mix(in srgb, var(--dsw-alias-state-warn-primary) 40%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 10%, transparent);
+  color: var(--dsw-alias-state-warn-primary);
+  font: inherit;
+  font-size: 0.82em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.am-save-retry:hover {
+  background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 18%, transparent);
 }
 
 .am-error-chip {

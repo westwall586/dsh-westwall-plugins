@@ -1,5 +1,6 @@
 /**
- * 用户保存：把一份译文写成工作区里的镜像文件对，Markdown 给读，JSON 给机器。
+ * 译文落盘：把一份译文写成工作区里的镜像文件对，Markdown 给读，JSON 给机器。
+ * 每次翻译成功都会自动写一次；读者能点到的只有失败后的重试。
  * 路径从源路径直接算出，不维护中央清单：语言是目录，正文保持源文件名，元数据
  * 在平行的 index 树里。`docs/a/README.md` + `zh` 落到
  * `.dsh-active-markdown/translate/zh/docs/a/README.md`，元数据落到
@@ -11,7 +12,7 @@ import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, extname, isAbsolute, relative, resolve, sep } from 'node:path'
 import { z } from 'zod'
 import { countSourceLines, extraInstructionHash, normalizeSource, sha1Hex, sha256Hex } from './digest.ts'
-import { errorText, requireLanguage, requireSessionId, requireText, requireTranslatedText } from './boundary.ts'
+import { errorText, requireLanguage, requireSavedText, requireSessionId, requireText } from './boundary.ts'
 import { resolveModel, TranslateError, type ModelSelection } from './request.ts'
 
 export const STORE_ROOT = '.dsh-active-markdown'
@@ -75,6 +76,8 @@ export interface TranslationLoadView {
   readonly text: string
   readonly meta: TranslationMeta
   readonly stale: boolean
+  /** 相对工作区的正文镜像路径，与 save 返回的 `file` 同形，用来在界面上指认文件。 */
+  readonly file: string
 }
 
 /** 读写工作区的一层薄端口；测试用同一个端口指向临时目录。 */
@@ -198,7 +201,7 @@ export function createTranslationStore(deps: StoreDeps): TranslationStore {
     async save(input) {
       const sessionId = requireSessionId(input.sessionId)
       const text = requireText(input.text, '原文')
-      const translated = requireTranslatedText(input.translated)
+      const translated = requireSavedText(input.translated)
       const lang = requireLanguage(input.lang)
       const workspace = await deps.workspaceOf(sessionId)
       if (workspace === null) throw new TranslateError('unknown-session', `未知会话：${sessionId}`)
@@ -265,7 +268,7 @@ export function createTranslationStore(deps: StoreDeps): TranslationStore {
         // metadata is a record, never an instruction.
         const current = await deps.files.read(resolve(workspace, mirror.sourcePath))
         const stale = current === null || sha256Hex(normalizeSource(current)) !== meta.sourceHash
-        return { text, meta, stale }
+        return { text, meta, stale, file: `${TRANSLATE_ROOT}/${lang}/${mirror.relative}` }
       } catch (error) {
         throw new TranslateError('read-failed', `读取已保存译文失败（${mirror.relative}）：${errorText(error)}`)
       }

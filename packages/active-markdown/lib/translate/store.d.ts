@@ -42,6 +42,8 @@ export interface TranslationLoadView {
     readonly text: string;
     readonly meta: TranslationMeta;
     readonly stale: boolean;
+    /** 相对工作区的正文镜像路径，与 save 返回的 `file` 同形，用来在界面上指认文件。 */
+    readonly file: string;
 }
 /** 读写工作区的一层薄端口；测试用同一个端口指向临时目录。 */
 export interface FilePort {

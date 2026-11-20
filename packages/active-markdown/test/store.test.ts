@@ -16,7 +16,7 @@ import {
   type StorageDomainFacility,
   type TranslationCache,
 } from '../src/translate/cache.ts'
-import { MAX_TRANSLATED_BYTES } from '../src/translate/boundary.ts'
+import { MAX_SAVED_BYTES, MAX_TRANSLATED_BYTES } from '../src/translate/boundary.ts'
 import { PROMPT_VERSION } from '../src/translate/prompt.ts'
 import { TranslateError, type TranslateErrorCode } from '../src/translate/request.ts'
 import {
@@ -289,7 +289,7 @@ test('未知会话在写入前就被拒绝', async (t) => {
   )
 })
 
-test('超过旧 64 KiB 上限的译文照常命中，只有译文自己的 4 MiB 边界拒绝', async (t) => {
+test('超过旧 64 KiB 上限的译文照常命中；缓存停在 4 MiB，落盘更宽', async (t) => {
   const h = await harness(t)
   const long = '译'.repeat(70_000)
 
@@ -300,8 +300,14 @@ test('超过旧 64 KiB 上限的译文照常命中，只有译文自己的 4 MiB
     cachePut(h.cache, { translated: 'x'.repeat(MAX_TRANSLATED_BYTES + 1) }),
     isCode('text-too-large'),
   )
+
+  // 能翻译出来的结果就该能存：缓存的上限不是落盘的上限。
+  const bigger = 'x'.repeat(MAX_TRANSLATED_BYTES + 1)
+  const saved = (await save(h.store, { translated: bigger })) as { file: string }
+  assert.equal((await readFile(join(h.workspace, saved.file), 'utf8')).length, bigger.length)
+
   await assert.rejects(
-    save(h.store, { translated: 'x'.repeat(MAX_TRANSLATED_BYTES + 1) }),
+    save(h.store, { translated: 'x'.repeat(MAX_SAVED_BYTES + 1) }),
     isCode('text-too-large'),
   )
 })
@@ -313,6 +319,8 @@ test('保存后原文未变不算过期，原文一改就标过期且旧译文�
 
   const fresh = await h.store.load({ sessionId: SESSION, path: 'docs/a/README.md', lang: LANG })
   assert.equal(fresh?.stale, false)
+  // The load view names the mirror so the toolbar can say where the file is.
+  assert.equal(fresh?.file, '.dsh-active-markdown/translate/zh/docs/a/README.md')
 
   await writeSource(h.workspace, 'docs/a/README.md', `${SOURCE}\nA new paragraph.\n`)
   const stale = await h.store.load({ sessionId: SESSION, path: 'docs/a/README.md', lang: LANG })

@@ -683,6 +683,14 @@ export function createFeedUltraService(deps: FeedUltraServiceDeps): FeedUltraSer
             continue;
           }
 
+          // A deleted bookmark has been dealt with, so the card gets the same read stamp a click writes.
+          // The read stamp is best effort: failing it must not overturn a delete that already happened on X.
+          try {
+            await markRead(l, dayKeyOf(now), [id], at);
+          } catch (error) {
+            logLine(sourceId, 'delete', { id, outcome: 'local-read-failed', error: errorText(error) }, 'warn');
+          }
+
           logLine(sourceId, 'delete', {
             id,
             outcome: outcome.alreadyDeleted ? 'already' : 'deleted',

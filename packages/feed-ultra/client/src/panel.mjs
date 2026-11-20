@@ -245,7 +245,7 @@ function panelReducer(state, action) {
           : item));
         return { ...section, items };
       });
-      // The card stays and keeps its read state; only `extra.xDeletedAt` moves.
+      // The card stays, gains the deleted stamp, and becomes read.
       return { ...state, day: { ...state.day, sections } };
     }
     case 'fetch-error': {
@@ -545,8 +545,8 @@ function usePanelData(ctx, api, text, readingMemory) {
   }, [api, text]);
 
   /**
-   * Delete one item's bookmark on X. The local card stays and only gains
-   * `extra.xDeletedAt`, so read state, counts and the calendar never move.
+   * Delete one item's bookmark on X. The local card stays, gains
+   * `extra.xDeletedAt`, and becomes read so counts and the calendar follow.
    */
   const deleteBookmark = useCallback(async (item) => {
     const id = item?.id;
@@ -561,6 +561,7 @@ function usePanelData(ctx, api, text, readingMemory) {
           ? entry.deletedAt
           : new Date().toISOString();
         dispatch({ type: 'delete-mark', id, deletedAt });
+        dispatch({ type: 'mark-read', ids: [id], readAt: deletedAt });
         return true;
       }
       dispatch({ type: 'delete-error', id, error: entry?.error || text('x.deleteFailed') });

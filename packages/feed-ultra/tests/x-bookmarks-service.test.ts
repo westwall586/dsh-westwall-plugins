@@ -228,15 +228,14 @@ test('manual snapshots with zero items are empty, daily ones stay notPublished',
   assert.equal(dailyView.sections[0]?.status, 'notPublished');
 });
 
-test('deleteBookmark marks today and a historical day without touching order or read state', async (t) => {
+test('deleteBookmark marks the card read and keeps file order', async (t) => {
   const h = await setup(t);
   const l = layout(h.config.workspacePath);
   const target = item(TODAY, '1001', { keep: 'yes' });
   await writeDayItems(l, fact(TODAY, [item(TODAY, '2002'), target]));
   await writeDayItems(l, fact(YESTERDAY, [target]));
 
-  const read = await h.service.act('read', [target.id]);
-  assert.equal(read.results[0]?.status, 'ok');
+  const before = await h.service.day(TODAY);
 
   const result = await h.service.act('deleteBookmark', [target.id]);
   assert.deepEqual(result, {
@@ -267,6 +266,14 @@ test('deleteBookmark marks today and a historical day without touching order or 
 
   const view = await h.service.day(TODAY);
   assert.equal(view.sections[0]?.items.find((entry) => entry.id === target.id)?.read, true);
+  assert.equal(view.unread, before.unread - 1, 'the unread count drops by one');
+
+  const historical = await h.service.day(YESTERDAY);
+  assert.equal(
+    historical.sections[0]?.items.find((entry) => entry.id === target.id)?.read,
+    true,
+    'one read stamp covers the whole retention window',
+  );
 });
 
 test('an X delete that cannot write the local marker reports the dedicated error', async (t) => {
@@ -331,6 +338,8 @@ test('a failed remote delete leaves the local facts untouched', async (t) => {
   const stored = await readDayItems(l, TODAY, X.id);
   assert.ok(stored);
   assert.equal(stored.items[0]?.extra.xDeletedAt, undefined);
+  const view = await h.service.day(TODAY);
+  assert.equal(view.sections[0]?.items.find((entry) => entry.id === target.id)?.read, false, 'the card stays unread');
   assert.ok(h.logs.some((entry) => entry.message.includes('evidencePath=/tmp/e.html')));
 });
 

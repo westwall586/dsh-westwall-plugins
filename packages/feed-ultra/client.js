@@ -4945,6 +4945,7 @@ var DshFeedUltraClient = (() => {
         if (entry && entry.status === "ok") {
           const deletedAt = typeof entry.deletedAt === "string" && entry.deletedAt !== "" ? entry.deletedAt : (/* @__PURE__ */ new Date()).toISOString();
           dispatch({ type: "delete-mark", id, deletedAt });
+          dispatch({ type: "mark-read", ids: [id], readAt: deletedAt });
           return true;
         }
         dispatch({ type: "delete-error", id, error: entry?.error || text("x.deleteFailed") });

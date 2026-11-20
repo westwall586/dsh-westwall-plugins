@@ -1031,16 +1031,15 @@ svg.am-markmap-canvas .markmap-foreign > div {
   border-color: transparent;
 }
 
-/* The workspace already holds this document's translation: same quiet button,
-   tinted like a link so the state reads before the click. */
+/* The workspace already holds this document's translation: no frame of its own,
+   just the icon and the label in the link colour, so the toolbar keeps its shape.
+   The shared hover background still answers the pointer. */
 .am-toolbar-button--accent {
-  border-color: color-mix(in srgb, var(--dsw-alias-link) 24%, transparent);
-  background: color-mix(in srgb, var(--dsw-alias-link) 8%, transparent);
+  border-color: transparent;
   color: var(--dsw-alias-link);
 }
 
 .am-toolbar-button--accent:hover {
-  background: color-mix(in srgb, var(--dsw-alias-link) 16%, transparent);
   color: var(--dsw-alias-link);
 }
 

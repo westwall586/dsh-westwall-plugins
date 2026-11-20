@@ -5803,24 +5803,28 @@ var DshFeedUltraClient = (() => {
         "div",
         null,
         h4("div", { className: "dl-side-label" }, text("side.sources")),
-        ...sourceRows.map((source) => h4(
+        h4(
           "div",
-          { key: source.id, className: "dl-side-source" },
-          h4("span", { className: `dl-ch-dot dl-status-dot ${dotClass(source.status)}` }),
-          h4("span", { className: "dl-side-name" }, channelName(source, text)),
-          h4(
-            "span",
-            { className: "dl-side-time" },
-            source.lastSuccessAt ? formatRelativeTime(source.lastSuccessAt, now, text) : text("time.none")
-          )
-        )),
-        ...rssChannels.map((channel) => h4(
-          "div",
-          { key: channel.id, className: "dl-side-source" },
-          h4("span", { className: `dl-ch-dot dl-status-dot ${dotClass(channel.status)}` }),
-          h4("span", { className: "dl-side-name" }, channel.name),
-          h4("span", { className: "dl-side-time" }, rssChannelLine(channel, text))
-        ))
+          { className: "dl-side-list" },
+          ...sourceRows.map((source) => h4(
+            "div",
+            { key: source.id, className: "dl-side-source" },
+            h4("span", { className: `dl-ch-dot dl-status-dot ${dotClass(source.status)}` }),
+            h4("span", { className: "dl-side-name" }, channelName(source, text)),
+            h4(
+              "span",
+              { className: "dl-side-time" },
+              source.lastSuccessAt ? formatRelativeTime(source.lastSuccessAt, now, text) : text("time.none")
+            )
+          )),
+          ...rssChannels.map((channel) => h4(
+            "div",
+            { key: channel.id, className: "dl-side-source" },
+            h4("span", { className: `dl-ch-dot dl-status-dot ${dotClass(channel.status)}` }),
+            h4("span", { className: "dl-side-name" }, channel.name),
+            h4("span", { className: "dl-side-time" }, rssChannelLine(channel, text))
+          ))
+        )
       )
     );
   }
@@ -6139,6 +6143,13 @@ var DshFeedUltraClient = (() => {
      by scaling every type size through one ratio. The divisor must carry its unit: a
      bare 14 leaves a length behind and Chrome drops the declaration. */
   --dl-font-ratio: calc(var(--dsh-content-font-size, 14px) / 14px);
+  /* Widths that carry text have to grow with it. Rail widths are published by the
+     breakpoint block; what follows is the minimum a rail needs to keep its own
+     labels whole at the current 字号. Rounded up, because a rail that is a pixel
+     short ellipsizes a channel name. */
+  --dl-type-f: max(1, var(--dl-font-ratio));
+  --dl-rail-w: max(240px, calc(var(--dl-type-f) * 196px));
+  --dl-side-w: max(268px, calc(var(--dl-type-f) * 236px));
 }
 
 .dl-root {
@@ -6203,8 +6214,8 @@ var DshFeedUltraClient = (() => {
 /* ---------- left rail ---------- */
 
 .dl-rail {
-  width: 240px;
-  flex: 0 0 240px;
+  width: var(--dl-rail-w, 240px);
+  flex: 0 0 var(--dl-rail-w, 240px);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -6376,6 +6387,13 @@ var DshFeedUltraClient = (() => {
   color: var(--dl-business);
   font-size: 0.8077em;
   font-weight: 600;
+  white-space: nowrap;
+}
+
+/* A pill never shrinks below its label: the button form already wraps to the
+   next flex line when the bar runs out of room. */
+.dl-today-pill:is(button) {
+  flex: 0 0 auto;
 }
 
 .dl-today-pill::before {
@@ -6855,8 +6873,8 @@ var DshFeedUltraClient = (() => {
 /* ---------- right rail ---------- */
 
 .dl-side {
-  width: 268px;
-  flex: 0 0 268px;
+  width: var(--dl-side-w, 268px);
+  flex: 0 0 var(--dl-side-w, 268px);
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -6934,6 +6952,32 @@ var DshFeedUltraClient = (() => {
 
 .dl-side-source:hover {
   background: var(--dl-hover);
+}
+
+/* When 字号 is large the name and the time cannot share one line at any sane rail
+   width, so the time drops under the name instead of both being cut to "Gith…"
+   and "12 分…". The query container has to be the list, not the row: an element
+   that queries itself resolves \`inline-size\` against its own size, which is the
+   size the query is trying to change. */
+.dl-side-list {
+  container-type: inline-size;
+  container-name: dl-src;
+}
+
+@container dl-src (max-width: 190px) {
+  .dl-side-source {
+    flex-wrap: wrap;
+    row-gap: 0;
+  }
+
+  .dl-side-name {
+    flex: 1 1 auto;
+  }
+
+  .dl-side-time {
+    flex: 1 0 100%;
+    margin-left: 13px;
+  }
 }
 
 .dl-side-source .dl-ch-dot {
@@ -7123,6 +7167,11 @@ var DshFeedUltraClient = (() => {
   flex-direction: column;
   gap: 2px;
   padding: 0 2px;
+  /* Square cells: calendar tracks are 1fr each, so the cell height is the track
+     width, and the grid stays a grid at any rail width instead of stretching
+     into tall rectangles. */
+  container-type: inline-size;
+  container-name: dl-cal;
 }
 
 .dl-cal-head {
@@ -7138,6 +7187,7 @@ var DshFeedUltraClient = (() => {
   font-weight: 600;
   color: var(--dl-label-secondary);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .dl-cal-nav {
@@ -7172,9 +7222,24 @@ var DshFeedUltraClient = (() => {
 
 .dl-cal-week,
 .dl-cal-grid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  /* Cells are square via their own aspect-ratio; stretching them into the row's
+     full height would turn them back into tall rectangles. */
+  align-items: start;
   padding: 0 2px;
+}
+
+/* The day grid lives inside the panel, which is itself a size container. A query
+   naming a container the element cannot see falls back to the nearest ancestor —
+   here the panel — so these rules are gated on \`dl-cal\` to keep the panel's width
+   out of them. */
+@container dl-cal (min-width: 1px) {
+  .dl-cal-week,
+  .dl-cal-grid {
+    display: grid;
+    /* A bare \`fr\` floors at zero, so the seven columns divide whatever width the
+       rail gives them instead of being widened by a day label. */
+    grid-template-columns: repeat(7, 1fr);
+  }
 }
 
 .dl-cal-week span {
@@ -7187,7 +7252,8 @@ var DshFeedUltraClient = (() => {
 
 .dl-cal-cell {
   position: relative;
-  height: calc(var(--dl-font-ratio) * 26px);
+  height: auto;
+  aspect-ratio: 1;
   display: grid;
   place-items: center;
   padding: 0;
@@ -8221,27 +8287,53 @@ var DshFeedUltraClient = (() => {
   }
 }
 
-/* ---------- narrow panel ----------
-   Breakpoints follow the panel's own width, not the window: the DSH app
-   sidebar changes how much room the main column has. Both queries name
-   \`dl-panel\`, so only \`.dl-root\` can answer them. */
+/* ---------- panel width ----------
+   The panel is not the window. Inside the desktop app it shares the width with
+   the host's own sidebar, so every breakpoint here answers to the panel's own
+   width, and all of them name \`dl-panel\` so only \`.dl-root\` can answer.
 
-@container dl-panel (max-width: 900px) {
+   The two rails give room back before they are hidden. Widths are custom
+   properties rather than literals so this block is the single place that says
+   how wide a rail is at each step. */
+
+@container dl-panel (min-width: 1560px) {
+  .dl-root {
+    --dl-rail-w: 264px;
+    --dl-side-w: 300px;
+  }
+}
+
+/* Below here the right rail is hidden. Hiding it sooner than "no longer needed"
+   is worse than keeping it: the centre keeps the same 920px reading measure
+   either way, so the only thing that changes is which number shows 492px. At
+   920 the panel paid 268px of rail for 412px of cards — a 264px title column
+   next to a 176px cover. It is hidden until the centre can afford both. */
+@container dl-panel (max-width: 1279px) {
   .dl-side {
     display: none;
   }
+}
 
+@container dl-panel (max-width: 1080px) {
+  .dl-root {
+    --dl-rail-w: 208px;
+  }
+}
+
+@container dl-panel (max-width: 900px) {
   .dl-set-row {
     grid-template-columns: minmax(0, 1fr);
     row-gap: 8px;
   }
 }
 
-@container dl-panel (max-width: 620px) {
+@container dl-panel (max-width: 680px) {
   .dl-rail {
     display: none;
   }
 
+  /* With the rail gone the panel has one job, and the date has to be somewhere
+     the day switcher is not. */
   .dl-set-tabs {
     display: flex;
   }
@@ -8251,7 +8343,6 @@ var DshFeedUltraClient = (() => {
     width: 112px;
     height: 63px;
   }
-
 }
 
 /* RSS settings page */

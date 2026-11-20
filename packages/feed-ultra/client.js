@@ -6122,6 +6122,10 @@ var DshFeedUltraClient = (() => {
   --dl-contrast-fill: #0f1115;
   --dl-hairline: 0.5px solid var(--dl-border-hairline);
   color-scheme: light;
+  /* DSH publishes 字号大小 as --dsh-content-font-size on body, so the panel follows it
+     by scaling every type size through one ratio. The divisor must carry its unit: a
+     bare 14 leaves a length behind and Chrome drops the declaration. */
+  --dl-font-ratio: calc(var(--dsh-content-font-size, 14px) / 14px);
 }
 
 .dl-root {
@@ -6135,7 +6139,7 @@ var DshFeedUltraClient = (() => {
   background: var(--dl-bg-base);
   color: var(--dl-label-primary);
   font-family: var(--dl-font);
-  font-size: 13px;
+  font-size: calc(var(--dl-font-ratio) * 13px);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   container-type: inline-size;
@@ -6210,7 +6214,7 @@ var DshFeedUltraClient = (() => {
 }
 
 .dl-brand-name {
-  font-size: 13px;
+  font-size: 1.0000em;
   font-weight: 600;
   letter-spacing: 0.01em;
 }
@@ -6227,7 +6231,7 @@ var DshFeedUltraClient = (() => {
 .dl-rail-label,
 .dl-side-label {
   padding: 0 6px 4px;
-  font-size: 10.5px;
+  font-size: 0.8077em;
   font-weight: 600;
   letter-spacing: 0.05em;
   color: var(--dl-label-tertiary);
@@ -6242,7 +6246,7 @@ var DshFeedUltraClient = (() => {
   border: 0;
   border-radius: var(--dl-radius-sm);
   background: transparent;
-  font-size: 12.5px;
+  font-size: 0.9615em;
   color: var(--dl-label-secondary);
   cursor: pointer;
   text-align: left;
@@ -6269,7 +6273,7 @@ var DshFeedUltraClient = (() => {
 }
 
 .dl-channel-count {
-  font-size: 11px;
+  font-size: 0.8462em;
   color: var(--dl-label-tertiary);
   font-variant-numeric: tabular-nums;
 }
@@ -6323,14 +6327,14 @@ var DshFeedUltraClient = (() => {
 }
 
 .dl-day-title {
-  font-size: 18px;
+  font-size: 1.3846em;
   font-weight: 600;
   letter-spacing: -0.01em;
   margin-left: 6px;
 }
 
 .dl-weekday {
-  font-size: 12px;
+  font-size: 0.9231em;
   color: var(--dl-label-tertiary);
 }
 
@@ -6339,7 +6343,7 @@ var DshFeedUltraClient = (() => {
 }
 
 .dl-counts {
-  font-size: 11.5px;
+  font-size: 0.8846em;
   color: var(--dl-label-tertiary);
   font-variant-numeric: tabular-nums;
 }
@@ -6348,12 +6352,12 @@ var DshFeedUltraClient = (() => {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  height: 20px;
+  height: calc(var(--dl-font-ratio) * 20px);
   padding: 0 8px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--dl-business) 12%, transparent);
   color: var(--dl-business);
-  font-size: 10.5px;
+  font-size: 0.8077em;
   font-weight: 600;
 }
 
@@ -6406,18 +6410,18 @@ var DshFeedUltraClient = (() => {
 }
 
 .dl-card-title {
-  font-size: 12px;
+  font-size: 0.9231em;
   font-weight: 600;
   letter-spacing: 0.02em;
 }
 
 .dl-card-count {
-  height: 17px;
+  height: calc(var(--dl-font-ratio) * 17px);
   padding: 0 6px;
   border-radius: 999px;
   display: inline-grid;
   place-items: center;
-  font-size: 10.5px;
+  font-size: 0.8077em;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   background: color-mix(in srgb, var(--dl-business) 12%, transparent);
@@ -6430,7 +6434,7 @@ var DshFeedUltraClient = (() => {
   align-items: center;
   gap: 5px;
   min-width: 0;
-  font-size: 11px;
+  font-size: 0.8462em;
   color: var(--dl-label-tertiary);
 }
 
@@ -6442,7 +6446,7 @@ var DshFeedUltraClient = (() => {
 
 .dl-card-status {
   flex: 0 0 auto;
-  font-size: 11px;
+  font-size: 0.8462em;
   color: var(--dl-label-tertiary);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -6455,7 +6459,7 @@ var DshFeedUltraClient = (() => {
   padding: 8px 14px;
   border-top: var(--dl-hairline);
   background: color-mix(in srgb, var(--dl-error) 5%, transparent);
-  font-size: 11px;
+  font-size: 0.8462em;
 }
 
 .dl-translate-error-label {
@@ -6527,8 +6531,8 @@ var DshFeedUltraClient = (() => {
 
 .dl-row-title {
   display: block;
-  font-size: 14px;
-  line-height: 20px;
+  font-size: 1.0769em;
+  line-height: 1.5385em;
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -6565,8 +6569,8 @@ var DshFeedUltraClient = (() => {
 
 .dl-row-desc {
   margin-top: 1px;
-  font-size: 12px;
-  line-height: 17px;
+  font-size: 0.9231em;
+  line-height: 1.3077em;
   color: var(--dl-label-tertiary);
   overflow: visible;
   text-overflow: clip;
@@ -6583,7 +6587,7 @@ var DshFeedUltraClient = (() => {
   align-items: center;
   gap: 4px;
   margin-top: 3px;
-  font-size: 11px;
+  font-size: 0.8462em;
   color: var(--dl-label-tertiary);
   overflow: hidden;
   min-width: 0;
@@ -6613,7 +6617,7 @@ var DshFeedUltraClient = (() => {
 
 .dl-card-hint {
   flex: 0 0 auto;
-  font-size: 11px;
+  font-size: 0.8462em;
   color: var(--dl-warn);
   white-space: nowrap;
 }
@@ -6658,8 +6662,8 @@ var DshFeedUltraClient = (() => {
   margin: 0;
   flex: 1;
   min-width: 0;
-  font-size: 15px;
-  line-height: 22px;
+  font-size: 1.1538em;
+  line-height: 1.6923em;
   font-weight: 600;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -6669,8 +6673,8 @@ var DshFeedUltraClient = (() => {
 
 .dl-brief-intro {
   margin: 4px 0 0;
-  font-size: 13px;
-  line-height: 19px;
+  font-size: 1.0000em;
+  line-height: 1.4615em;
   color: var(--dl-label-secondary);
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -6687,14 +6691,14 @@ var DshFeedUltraClient = (() => {
 }
 
 .dl-brief-chip {
-  height: 18px;
+  height: calc(var(--dl-font-ratio) * 18px);
   display: inline-flex;
   align-items: center;
   padding: 0 7px;
   background: var(--dl-bg-rail);
   border: var(--dl-hairline);
   border-radius: 999px;
-  font-size: 10.5px;
+  font-size: 0.8077em;
   color: var(--dl-label-secondary);
 }
 
@@ -6727,7 +6731,7 @@ var DshFeedUltraClient = (() => {
   place-items: center;
   width: 100%;
   height: 100%;
-  font-size: 15px;
+  font-size: 1.1538em;
   font-weight: 600;
   color: var(--dl-label-dimmed);
 }
@@ -6780,7 +6784,7 @@ var DshFeedUltraClient = (() => {
 /* ---------- tweet cards ---------- */
 
 .dl-card-pill {
-  height: 17px;
+  height: calc(var(--dl-font-ratio) * 17px);
   padding: 0 6px;
   display: inline-flex;
   align-items: center;
@@ -6788,7 +6792,7 @@ var DshFeedUltraClient = (() => {
   border-radius: 4px;
   background: var(--dl-active);
   color: var(--dl-label-secondary);
-  font-size: 10px;
+  font-size: 0.7692em;
 }
 
 .dl-row.is-tweet {
@@ -6813,8 +6817,8 @@ var DshFeedUltraClient = (() => {
   align-items: baseline;
   flex-wrap: wrap;
   gap: 4px;
-  font-size: 11px;
-  line-height: 16px;
+  font-size: 0.8462em;
+  line-height: 1.2308em;
   color: var(--dl-label-tertiary);
 }
 
@@ -6823,7 +6827,7 @@ var DshFeedUltraClient = (() => {
 }
 
 .dl-tweet-author {
-  font-size: 12px;
+  font-size: 0.9231em;
   font-weight: 600;
   color: var(--dl-label-primary);
 }
@@ -6842,7 +6846,7 @@ var DshFeedUltraClient = (() => {
 }
 
 .dl-tweet-deleted {
-  height: 18px;
+  height: calc(var(--dl-font-ratio) * 18px);
   padding: 0 6px;
   display: inline-flex;
   align-items: center;
@@ -6850,13 +6854,13 @@ var DshFeedUltraClient = (() => {
   border-radius: 4px;
   background: var(--dl-active);
   color: var(--dl-label-secondary);
-  font-size: 10px;
+  font-size: 0.7692em;
 }
 
 .dl-tweet-text {
   margin-top: 4px;
-  font-size: 12.5px;
-  line-height: 19.5px;
+  font-size: 0.9615em;
+  line-height: 1.5000em;
   color: var(--dl-label-secondary);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -6884,7 +6888,7 @@ var DshFeedUltraClient = (() => {
   background: transparent;
   color: var(--dl-link);
   font: inherit;
-  font-size: 11.5px;
+  font-size: 0.8846em;
   cursor: pointer;
 }
 
@@ -6901,7 +6905,7 @@ var DshFeedUltraClient = (() => {
   align-items: center;
   gap: 6px;
   margin-top: 4px;
-  font-size: 11px;
+  font-size: 0.8462em;
   color: var(--dl-error);
 }
 
@@ -6929,15 +6933,15 @@ var DshFeedUltraClient = (() => {
 }
 
 .dl-section-empty-title {
-  font-size: 12.5px;
-  line-height: 18px;
+  font-size: 0.9615em;
+  line-height: 1.3846em;
   color: var(--dl-label-primary);
 }
 
 .dl-section-empty-sub {
   margin-top: 2px;
-  font-size: 11.5px;
-  line-height: 17px;
+  font-size: 0.8846em;
+  line-height: 1.3077em;
   color: var(--dl-label-tertiary);
 }
 
@@ -7009,26 +7013,26 @@ var DshFeedUltraClient = (() => {
   inset: 0;
   display: grid;
   place-items: center;
-  font-size: 15px;
+  font-size: 1.1538em;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
 .dl-ring-note {
-  font-size: 12px;
+  font-size: 0.9231em;
   color: var(--dl-label-secondary);
 }
 
 .dl-ring-total {
   display: block;
-  font-size: 15px;
+  font-size: 1.1538em;
   font-weight: 600;
   color: var(--dl-label-primary);
   font-variant-numeric: tabular-nums;
 }
 
 .dl-ring-sub {
-  font-size: 11px;
+  font-size: 0.8462em;
   color: var(--dl-label-tertiary);
 }
 
@@ -7037,7 +7041,7 @@ var DshFeedUltraClient = (() => {
   align-items: center;
   gap: 7px;
   padding: 6px 4px;
-  font-size: 12px;
+  font-size: 0.9231em;
   border-radius: var(--dl-radius-sm);
   transition: background-color 0.15s;
 }
@@ -7064,7 +7068,7 @@ var DshFeedUltraClient = (() => {
   min-width: 0;
   margin-left: auto;
   overflow: hidden;
-  font-size: 11px;
+  font-size: 0.8462em;
   color: var(--dl-label-tertiary);
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -7093,13 +7097,13 @@ var DshFeedUltraClient = (() => {
 
 .dl-state-title {
   margin: 0;
-  font-size: 13.5px;
+  font-size: 1.0385em;
   font-weight: 500;
 }
 
 .dl-state-sub {
   margin: 6px 0 0;
-  font-size: 12.5px;
+  font-size: 0.9615em;
   line-height: 1.7;
   color: var(--dl-label-secondary);
   overflow-wrap: anywhere;
@@ -7121,7 +7125,7 @@ var DshFeedUltraClient = (() => {
   border-radius: var(--dl-radius-sm);
   background: color-mix(in srgb, var(--dl-error) 9%, transparent);
   color: var(--dl-error);
-  font-size: 11.5px;
+  font-size: 0.8846em;
 }
 
 .dl-inline-error-text {
@@ -7133,7 +7137,7 @@ var DshFeedUltraClient = (() => {
 /* ---------- controls ---------- */
 
 .dl-btn {
-  height: 26px;
+  height: calc(var(--dl-font-ratio) * 26px);
   padding: 0 10px;
   display: inline-flex;
   align-items: center;
@@ -7142,7 +7146,7 @@ var DshFeedUltraClient = (() => {
   border-radius: var(--dl-radius-sm);
   background: var(--dl-bg-base);
   color: var(--dl-label-primary);
-  font-size: 11.5px;
+  font-size: 0.8846em;
   white-space: nowrap;
   cursor: pointer;
   transition: background-color 0.15s, transform 0.12s var(--dl-ease), box-shadow 0.15s;
@@ -7179,9 +7183,9 @@ var DshFeedUltraClient = (() => {
 }
 
 .dl-btn--sm {
-  height: 22px;
+  height: calc(var(--dl-font-ratio) * 22px);
   padding: 0 8px;
-  font-size: 11px;
+  font-size: 0.8462em;
 }
 
 .dl-btn:disabled {
@@ -7190,8 +7194,8 @@ var DshFeedUltraClient = (() => {
 }
 
 .dl-icon-btn {
-  width: 26px;
-  height: 26px;
+  width: calc(var(--dl-font-ratio) * 26px);
+  height: calc(var(--dl-font-ratio) * 26px);
   display: grid;
   place-items: center;
   border: 0;
@@ -7218,8 +7222,8 @@ var DshFeedUltraClient = (() => {
 }
 
 .dl-icon-btn--sm {
-  width: 22px;
-  height: 22px;
+  width: calc(var(--dl-font-ratio) * 22px);
+  height: calc(var(--dl-font-ratio) * 22px);
 }
 
 .dl-spin {
@@ -7244,7 +7248,7 @@ var DshFeedUltraClient = (() => {
 }
 
 .dl-cal-month {
-  font-size: 11.5px;
+  font-size: 0.8846em;
   font-weight: 600;
   color: var(--dl-label-secondary);
   font-variant-numeric: tabular-nums;
@@ -7256,8 +7260,8 @@ var DshFeedUltraClient = (() => {
 }
 
 .dl-cal-nav-btn {
-  width: 20px;
-  height: 20px;
+  width: calc(var(--dl-font-ratio) * 20px);
+  height: calc(var(--dl-font-ratio) * 20px);
   display: grid;
   place-items: center;
   padding: 0;
@@ -7288,16 +7292,16 @@ var DshFeedUltraClient = (() => {
 }
 
 .dl-cal-week span {
-  height: 18px;
-  line-height: 18px;
+  height: calc(var(--dl-font-ratio) * 18px);
+  line-height: 1.3846em;
   text-align: center;
-  font-size: 10px;
+  font-size: 0.7692em;
   color: var(--dl-label-tertiary);
 }
 
 .dl-cal-cell {
   position: relative;
-  height: 26px;
+  height: calc(var(--dl-font-ratio) * 26px);
   display: grid;
   place-items: center;
   padding: 0;
@@ -7305,7 +7309,7 @@ var DshFeedUltraClient = (() => {
   border-radius: var(--dl-radius-sm);
   background: transparent;
   color: var(--dl-label-primary);
-  font-size: 11px;
+  font-size: 0.8462em;
   font-variant-numeric: tabular-nums;
   cursor: pointer;
   transition: background-color 0.15s, color 0.15s, transform 0.15s var(--dl-ease);
@@ -7401,7 +7405,7 @@ var DshFeedUltraClient = (() => {
   border-radius: var(--dl-radius-sm);
   background: transparent;
   color: var(--dl-label-secondary);
-  font-size: 12px;
+  font-size: 0.9231em;
   text-align: left;
   cursor: pointer;
   transition: background-color 0.15s, color 0.15s;
@@ -7420,7 +7424,7 @@ var DshFeedUltraClient = (() => {
   border-radius: var(--dl-radius-sm);
   background: var(--dl-active);
   color: var(--dl-label-primary);
-  font-size: 12.5px;
+  font-size: 0.9615em;
   font-weight: 600;
 }
 
@@ -7437,7 +7441,7 @@ var DshFeedUltraClient = (() => {
 }
 
 .dl-chip {
-  height: 24px;
+  height: calc(var(--dl-font-ratio) * 24px);
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -7446,7 +7450,7 @@ var DshFeedUltraClient = (() => {
   border-radius: 999px;
   background: transparent;
   color: var(--dl-label-secondary);
-  font-size: 11.5px;
+  font-size: 0.8846em;
   cursor: pointer;
   font-variant-numeric: tabular-nums;
   transition: background-color 0.15s, color 0.15s;
@@ -7471,7 +7475,7 @@ var DshFeedUltraClient = (() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 26px;
+  height: calc(var(--dl-font-ratio) * 26px);
   padding: 0 4px 0 10px;
   border-radius: 999px;
   background: var(--dl-active);
@@ -7480,7 +7484,7 @@ var DshFeedUltraClient = (() => {
 }
 
 .dl-bulk-count {
-  font-size: 11.5px;
+  font-size: 0.8846em;
   font-variant-numeric: tabular-nums;
 }
 
@@ -7550,7 +7554,7 @@ var DshFeedUltraClient = (() => {
 }
 
 .dl-set-nav-label {
-  font-size: 12.5px;
+  font-size: 0.9615em;
 }
 
 .dl-set-nav-item[aria-current="page"] .dl-set-nav-label {
@@ -7558,7 +7562,7 @@ var DshFeedUltraClient = (() => {
 }
 
 .dl-set-nav-sub {
-  font-size: 10.5px;
+  font-size: 0.8077em;
   color: var(--dl-label-tertiary);
   font-variant-numeric: tabular-nums;
 }
@@ -7575,7 +7579,7 @@ var DshFeedUltraClient = (() => {
 
 .dl-set-tab {
   flex: 0 0 auto;
-  height: 26px;
+  height: calc(var(--dl-font-ratio) * 26px);
   padding: 0 10px;
   display: inline-flex;
   align-items: center;
@@ -7584,7 +7588,7 @@ var DshFeedUltraClient = (() => {
   border-radius: 999px;
   background: transparent;
   color: var(--dl-label-secondary);
-  font-size: 12px;
+  font-size: 0.9231em;
   white-space: nowrap;
   cursor: pointer;
   transition: background-color 0.15s, color 0.15s;
@@ -7619,14 +7623,14 @@ var DshFeedUltraClient = (() => {
 .dl-set-readonly {
   margin: 0;
   flex: 1;
-  font-size: 11.5px;
+  font-size: 0.8846em;
   line-height: 1.6;
   color: var(--dl-label-tertiary);
 }
 
 .dl-set-notice {
   margin-left: auto;
-  font-size: 11px;
+  font-size: 0.8462em;
   font-weight: 500;
   color: var(--dl-success);
   animation: dl-rise 0.2s var(--dl-ease) both;
@@ -7655,7 +7659,7 @@ var DshFeedUltraClient = (() => {
 }
 
 .dl-set-label {
-  font-size: 12.5px;
+  font-size: 0.9615em;
   color: var(--dl-label-primary);
 }
 
@@ -7672,7 +7676,7 @@ var DshFeedUltraClient = (() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11.5px;
+  font-size: 0.8846em;
   color: var(--dl-label-tertiary);
   font-variant-numeric: tabular-nums;
 }
@@ -7689,15 +7693,15 @@ var DshFeedUltraClient = (() => {
 }
 
 .dl-set-hint {
-  font-size: 11px;
+  font-size: 0.8462em;
   line-height: 1.5;
   color: var(--dl-label-tertiary);
 }
 
 .dl-set-note {
   margin: 14px 2px 0;
-  font-size: 11px;
-  line-height: 16px;
+  font-size: 0.8462em;
+  line-height: 1.2308em;
   color: var(--dl-label-tertiary);
   overflow-wrap: anywhere;
 }
@@ -7713,12 +7717,12 @@ var DshFeedUltraClient = (() => {
 
 .dl-set-pane-title {
   flex: 0 0 auto;
-  font-size: 13px;
+  font-size: 1.0000em;
   font-weight: 600;
 }
 
 .dl-set-pill {
-  height: 19px;
+  height: calc(var(--dl-font-ratio) * 19px);
   flex: 0 0 auto;
   padding: 0 7px;
   display: inline-flex;
@@ -7726,7 +7730,7 @@ var DshFeedUltraClient = (() => {
   border-radius: 999px;
   background: color-mix(in srgb, var(--dl-business) 10%, transparent);
   color: var(--dl-business);
-  font-size: 10.5px;
+  font-size: 0.8077em;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
@@ -7740,7 +7744,7 @@ var DshFeedUltraClient = (() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11px;
+  font-size: 0.8462em;
   color: var(--dl-label-tertiary);
 }
 
@@ -7773,14 +7777,14 @@ var DshFeedUltraClient = (() => {
 
 .dl-set-badge {
   flex: 0 0 auto;
-  height: 17px;
+  height: calc(var(--dl-font-ratio) * 17px);
   padding: 0 6px;
   display: inline-grid;
   place-items: center;
   border-radius: 999px;
   background: var(--dl-active);
   color: var(--dl-label-secondary);
-  font-size: 10px;
+  font-size: 0.7692em;
   font-weight: 600;
 }
 
@@ -7789,7 +7793,7 @@ var DshFeedUltraClient = (() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11.5px;
+  font-size: 0.8846em;
   color: var(--dl-label-primary);
 }
 
@@ -7802,19 +7806,19 @@ var DshFeedUltraClient = (() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 10.5px;
+  font-size: 0.8077em;
   color: var(--dl-label-tertiary);
 }
 
 .dl-set-model-note {
   max-width: 100%;
   overflow-wrap: anywhere;
-  font-size: 10.5px;
+  font-size: 0.8077em;
   color: var(--dl-warn);
 }
 
 .dl-set-time {
-  height: 26px;
+  height: calc(var(--dl-font-ratio) * 26px);
   width: 96px;
   padding: 0 8px;
   border: 0.5px solid var(--dl-border-hairline);
@@ -7822,7 +7826,7 @@ var DshFeedUltraClient = (() => {
   background: var(--dl-bg-base);
   color: var(--dl-label-primary);
   font-family: inherit;
-  font-size: 11.5px;
+  font-size: 0.8846em;
 }
 
 .dl-set-time:disabled {
@@ -7840,7 +7844,7 @@ var DshFeedUltraClient = (() => {
 
 .dl-set-field-hint {
   max-width: 100%;
-  font-size: 10.5px;
+  font-size: 0.8077em;
   line-height: 1.4;
   color: var(--dl-warn);
   text-align: right;
@@ -7885,14 +7889,14 @@ var DshFeedUltraClient = (() => {
 }
 
 .dl-select {
-  height: 26px;
+  height: calc(var(--dl-font-ratio) * 26px);
   padding: 0 8px;
   border: 0.5px solid var(--dl-border-hairline);
   border-radius: var(--dl-radius-sm);
   background: var(--dl-bg-base);
   color: var(--dl-label-primary);
   font-family: inherit;
-  font-size: 11.5px;
+  font-size: 0.8846em;
   cursor: pointer;
   transition: background-color 0.15s, border-color 0.15s, color 0.15s;
 }
@@ -7928,13 +7932,13 @@ var DshFeedUltraClient = (() => {
 
 .dl-modal-title {
   margin: 0;
-  font-size: 13.5px;
+  font-size: 1.0385em;
   font-weight: 600;
 }
 
 .dl-modal-body {
   margin: 8px 0 0;
-  font-size: 12.5px;
+  font-size: 0.9615em;
   line-height: 1.7;
   color: var(--dl-label-secondary);
 }
@@ -7975,7 +7979,7 @@ var DshFeedUltraClient = (() => {
     0 18px 48px color-mix(in srgb, var(--dl-label-primary) 18%, transparent);
   color: var(--dl-label-primary);
   font-family: var(--dl-font);
-  font-size: 13px;
+  font-size: calc(var(--dl-font-ratio) * 13px);
   line-height: 1.5;
 }
 
@@ -7997,14 +8001,14 @@ var DshFeedUltraClient = (() => {
   gap: 6px;
   width: auto;
   min-width: 100%;
-  height: 34px;
+  height: calc(var(--dl-font-ratio) * 34px);
   padding: 0 8px;
   border: 0;
   border-radius: var(--dl-radius-md);
   background: transparent;
   color: var(--dl-label-primary);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: 1.0000em;
+  line-height: 1.5385em;
   text-align: left;
   cursor: pointer;
 }
@@ -8058,7 +8062,7 @@ var DshFeedUltraClient = (() => {
   background: transparent;
   color: var(--dl-label-primary);
   font-family: inherit;
-  font-size: 12px;
+  font-size: 0.9231em;
   line-height: normal;
 }
 
@@ -8083,13 +8087,13 @@ var DshFeedUltraClient = (() => {
   align-items: center;
   justify-content: center;
   width: 24px;
-  height: 24px;
+  height: calc(var(--dl-font-ratio) * 24px);
   padding: 0;
   border: 0;
   border-radius: 50%;
   background: transparent;
   color: var(--dl-label-secondary);
-  font-size: 14px;
+  font-size: 1.0769em;
   line-height: 1;
   cursor: pointer;
 }
@@ -8123,8 +8127,8 @@ var DshFeedUltraClient = (() => {
   padding: 4px 7px 2px;
   background: var(--dl-popover-header-fill);
   color: var(--dl-label-tertiary);
-  font-size: 11px;
-  line-height: 16px;
+  font-size: 0.8462em;
+  line-height: 1.2308em;
   font-weight: 500;
 }
 
@@ -8135,14 +8139,14 @@ var DshFeedUltraClient = (() => {
   gap: 6px;
   width: auto;
   min-width: 100%;
-  min-height: 34px;
+  min-height: calc(var(--dl-font-ratio) * 34px);
   padding: 5px 7px;
   border: 0;
   border-radius: var(--dl-radius-md);
   background: transparent;
   color: inherit;
-  font-size: 13px;
-  line-height: 18px;
+  font-size: 1.0000em;
+  line-height: 1.3846em;
   text-align: left;
   cursor: pointer;
 }
@@ -8170,8 +8174,8 @@ var DshFeedUltraClient = (() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
-  line-height: 18px;
+  font-size: 1.0000em;
+  line-height: 1.3846em;
 }
 
 .dl-picker-option-hint {
@@ -8181,7 +8185,7 @@ var DshFeedUltraClient = (() => {
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: right;
-  font-size: 11px;
+  font-size: 0.8462em;
   color: var(--dl-label-tertiary);
 }
 
@@ -8202,8 +8206,8 @@ var DshFeedUltraClient = (() => {
   gap: 6px;
   padding: 8px;
   color: var(--dl-label-tertiary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.9231em;
+  line-height: 1.3846em;
 }
 
 .dl-picker-status.is-error {
@@ -8225,8 +8229,8 @@ var DshFeedUltraClient = (() => {
   border-radius: var(--dl-radius-md);
   background: color-mix(in srgb, var(--dl-warn) 12%, transparent);
   color: var(--dl-warn);
-  font-size: 11px;
-  line-height: 16px;
+  font-size: 0.8462em;
+  line-height: 1.2308em;
 }
 
 .dl-picker-warning-text {
@@ -8405,30 +8409,30 @@ var DshFeedUltraClient = (() => {
 
 .dl-rss-add-icon {
   color: var(--dl-label-tertiary);
-  font-size: 13px;
+  font-size: 1.0000em;
 }
 
 .dl-rss-add-input {
   flex: 1;
   min-width: 0;
-  height: 26px;
+  height: calc(var(--dl-font-ratio) * 26px);
   border: 0;
   outline: 0;
   background: transparent;
   color: var(--dl-label-primary);
   font: inherit;
-  font-size: 12.5px;
+  font-size: 0.9615em;
 }
 
 .dl-rss-add-target {
   flex: 0 0 auto;
-  font-size: 10.5px;
+  font-size: 0.8077em;
   color: var(--dl-label-tertiary);
   white-space: nowrap;
 }
 
 .dl-rss-notice {
-  font-size: 11px;
+  font-size: 0.8462em;
   color: var(--dl-success);
 }
 
@@ -8448,7 +8452,7 @@ var DshFeedUltraClient = (() => {
 
 .dl-rss-side-label {
   padding: 4px 2px 6px;
-  font-size: 10.5px;
+  font-size: 0.8077em;
   font-weight: 600;
   color: var(--dl-label-tertiary);
   letter-spacing: 0.04em;
@@ -8460,14 +8464,14 @@ var DshFeedUltraClient = (() => {
   align-items: center;
   gap: 6px;
   width: 100%;
-  min-height: 28px;
+  min-height: calc(var(--dl-font-ratio) * 28px);
   padding: 3px 5px 3px 7px;
   border: 0;
   border-radius: var(--dl-radius-sm);
   background: transparent;
   color: var(--dl-label-secondary);
   font: inherit;
-  font-size: 12px;
+  font-size: 0.9231em;
   text-align: left;
   cursor: pointer;
 }
@@ -8507,7 +8511,7 @@ var DshFeedUltraClient = (() => {
 .dl-rss-inbox-count,
 .dl-rss-channel-count {
   flex: 0 0 auto;
-  font-size: 10.5px;
+  font-size: 0.8077em;
   color: var(--dl-label-tertiary);
 }
 
@@ -8520,12 +8524,12 @@ var DshFeedUltraClient = (() => {
 .dl-rss-drag {
   flex: 0 0 auto;
   width: 16px;
-  height: 22px;
+  height: calc(var(--dl-font-ratio) * 22px);
   border: 0;
   border-radius: 4px;
   background: transparent;
   color: var(--dl-label-dimmed);
-  font-size: 10px;
+  font-size: 0.7692em;
   line-height: 1;
   cursor: grab;
 }
@@ -8537,14 +8541,14 @@ var DshFeedUltraClient = (() => {
 .dl-rss-channel-input {
   flex: 1;
   min-width: 0;
-  height: 24px;
+  height: calc(var(--dl-font-ratio) * 24px);
   padding: 0 6px;
   border: 0.5px solid var(--dl-business);
   border-radius: var(--dl-radius-sm);
   background: var(--dl-bg-base);
   color: var(--dl-label-primary);
   font: inherit;
-  font-size: 12px;
+  font-size: 0.9231em;
 }
 
 .dl-rss-channel-actions {
@@ -8587,7 +8591,7 @@ var DshFeedUltraClient = (() => {
   background: transparent;
   color: var(--dl-error);
   font: inherit;
-  font-size: 11px;
+  font-size: 0.8462em;
   cursor: pointer;
   padding: 2px 4px;
 }
@@ -8597,7 +8601,7 @@ var DshFeedUltraClient = (() => {
   background: transparent;
   color: var(--dl-label-secondary);
   font: inherit;
-  font-size: 11px;
+  font-size: 0.8462em;
   cursor: pointer;
   padding: 2px 4px;
 }
@@ -8621,7 +8625,7 @@ var DshFeedUltraClient = (() => {
   background: transparent;
   color: var(--dl-label-secondary);
   font: inherit;
-  font-size: 11.5px;
+  font-size: 0.8846em;
   text-align: left;
   cursor: pointer;
 }
@@ -8641,7 +8645,7 @@ var DshFeedUltraClient = (() => {
 
 .dl-rss-footnote {
   margin: 8px 2px 0;
-  font-size: 10.5px;
+  font-size: 0.8077em;
   line-height: 1.55;
   color: var(--dl-label-tertiary);
 }
@@ -8659,13 +8663,13 @@ var DshFeedUltraClient = (() => {
 }
 
 .dl-rss-main-title {
-  font-size: 12px;
+  font-size: 0.9231em;
   font-weight: 600;
   color: var(--dl-label-primary);
 }
 
 .dl-rss-main-count {
-  font-size: 10.5px;
+  font-size: 0.8077em;
   color: var(--dl-label-tertiary);
 }
 
@@ -8686,14 +8690,14 @@ var DshFeedUltraClient = (() => {
 
 .dl-rss-search-input {
   width: 100%;
-  height: 26px;
+  height: calc(var(--dl-font-ratio) * 26px);
   padding: 0 10px 0 27px;
   border: var(--dl-hairline);
   border-radius: var(--dl-radius-sm);
   background: var(--dl-bg-base);
   color: var(--dl-label-primary);
   font: inherit;
-  font-size: 11.5px;
+  font-size: 0.8846em;
 }
 
 .dl-rss-table {
@@ -8715,7 +8719,7 @@ var DshFeedUltraClient = (() => {
 .dl-rss-thead {
   background: var(--dl-bg-rail);
   border-bottom: var(--dl-hairline);
-  font-size: 10.5px;
+  font-size: 0.8077em;
   font-weight: 600;
   color: var(--dl-label-tertiary);
   letter-spacing: 0.04em;
@@ -8747,7 +8751,7 @@ var DshFeedUltraClient = (() => {
 }
 
 .dl-rss-name-main {
-  font-size: 12px;
+  font-size: 0.9231em;
   color: var(--dl-label-primary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -8755,7 +8759,7 @@ var DshFeedUltraClient = (() => {
 }
 
 .dl-rss-name-host {
-  font-size: 10.5px;
+  font-size: 0.8077em;
   color: var(--dl-label-tertiary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -8776,7 +8780,7 @@ var DshFeedUltraClient = (() => {
   background: transparent;
   color: var(--dl-label-secondary);
   font: inherit;
-  font-size: 11.5px;
+  font-size: 0.8846em;
   text-align: left;
   padding: 0;
   cursor: text;
@@ -8788,7 +8792,7 @@ var DshFeedUltraClient = (() => {
 
 .dl-rss-note-input {
   width: 100%;
-  height: 26px;
+  height: calc(var(--dl-font-ratio) * 26px);
   padding: 0 8px;
   border: 0.5px solid var(--dl-business);
   border-radius: var(--dl-radius-sm);
@@ -8796,7 +8800,7 @@ var DshFeedUltraClient = (() => {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--dl-business) 18%, transparent);
   color: var(--dl-label-primary);
   font: inherit;
-  font-size: 11.5px;
+  font-size: 0.8846em;
 }
 
 .dl-rss-row-actions {
@@ -8807,14 +8811,14 @@ var DshFeedUltraClient = (() => {
 }
 
 .dl-rss-pick {
-  height: 24px;
+  height: calc(var(--dl-font-ratio) * 24px);
   padding: 0 9px;
   border: 0.5px solid var(--dl-border-strong);
   border-radius: var(--dl-radius-sm);
   background: transparent;
   color: var(--dl-label-secondary);
   font: inherit;
-  font-size: 11px;
+  font-size: 0.8462em;
   cursor: pointer;
 }
 
@@ -8825,7 +8829,7 @@ var DshFeedUltraClient = (() => {
 
 .dl-rss-empty {
   padding: 18px 14px;
-  font-size: 11.5px;
+  font-size: 0.8846em;
   color: var(--dl-label-tertiary);
 }
 
@@ -8838,7 +8842,7 @@ var DshFeedUltraClient = (() => {
 }
 
 .dl-rss-pager-text {
-  font-size: 10.5px;
+  font-size: 0.8077em;
   color: var(--dl-label-tertiary);
 }
 
@@ -8850,14 +8854,14 @@ var DshFeedUltraClient = (() => {
 
 .dl-rss-page {
   min-width: 22px;
-  height: 22px;
+  height: calc(var(--dl-font-ratio) * 22px);
   padding: 0 6px;
   border: 0;
   border-radius: var(--dl-radius-sm);
   background: transparent;
   color: var(--dl-label-secondary);
   font: inherit;
-  font-size: 11px;
+  font-size: 0.8462em;
   cursor: pointer;
 }
 
@@ -8901,7 +8905,7 @@ var DshFeedUltraClient = (() => {
   background: transparent;
   color: var(--dl-label-primary);
   font: inherit;
-  font-size: 12px;
+  font-size: 0.9231em;
   text-align: left;
   cursor: pointer;
 }
@@ -8926,7 +8930,7 @@ var DshFeedUltraClient = (() => {
 
 .dl-rss-pop-count,
 .dl-rss-pop-current {
-  font-size: 10.5px;
+  font-size: 0.8077em;
   color: var(--dl-label-tertiary);
 }
 
@@ -8938,7 +8942,7 @@ var DshFeedUltraClient = (() => {
 
 .dl-rss-pop-new {
   gap: 6px;
-  font-size: 11.5px;
+  font-size: 0.8846em;
   color: var(--dl-label-secondary);
 }
 
@@ -8966,7 +8970,7 @@ var DshFeedUltraClient = (() => {
 .dl-section-error-text {
   flex: 1;
   min-width: 0;
-  font-size: 11px;
+  font-size: 0.8462em;
   line-height: 1.5;
   color: var(--dl-label-secondary);
   word-break: break-word;
@@ -9016,7 +9020,7 @@ var DshFeedUltraClient = (() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13.5px;
+  font-size: 1.0385em;
   font-weight: 600;
   color: var(--dl-label-primary);
 }
@@ -9026,7 +9030,7 @@ var DshFeedUltraClient = (() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11.5px;
+  font-size: 0.8846em;
   color: var(--dl-label-secondary);
 }
 
@@ -9035,7 +9039,7 @@ var DshFeedUltraClient = (() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 10.5px;
+  font-size: 0.8077em;
   color: var(--dl-label-tertiary);
 }
 
@@ -9048,7 +9052,7 @@ var DshFeedUltraClient = (() => {
 
 .dl-preview-count {
   white-space: nowrap;
-  font-size: 10.5px;
+  font-size: 0.8077em;
   color: var(--dl-label-tertiary);
 }
 
@@ -9056,13 +9060,13 @@ var DshFeedUltraClient = (() => {
   display: grid;
   place-items: center;
   width: 24px;
-  height: 24px;
+  height: calc(var(--dl-font-ratio) * 24px);
   padding: 0;
   border: 0;
   border-radius: var(--dl-radius-sm);
   background: transparent;
   color: var(--dl-label-tertiary);
-  font-size: 16px;
+  font-size: 1.2308em;
   line-height: 1;
   cursor: pointer;
 }
@@ -9081,7 +9085,7 @@ var DshFeedUltraClient = (() => {
 
 .dl-preview-loading-text {
   margin: 6px 0 2px;
-  font-size: 11.5px;
+  font-size: 0.8846em;
   color: var(--dl-label-tertiary);
 }
 
@@ -9127,14 +9131,14 @@ var DshFeedUltraClient = (() => {
 
 .dl-preview-state-title {
   margin: 0;
-  font-size: 12.5px;
+  font-size: 0.9615em;
   font-weight: 600;
   color: var(--dl-label-primary);
 }
 
 .dl-preview-state-text {
   margin: 0;
-  font-size: 11.5px;
+  font-size: 0.8846em;
   line-height: 1.6;
   color: var(--dl-label-secondary);
   word-break: break-word;
@@ -9146,7 +9150,7 @@ var DshFeedUltraClient = (() => {
 
 .dl-preview-truncated {
   margin: 8px 0 0;
-  font-size: 10.5px;
+  font-size: 0.8077em;
   color: var(--dl-label-tertiary);
 }
 
@@ -9154,7 +9158,7 @@ var DshFeedUltraClient = (() => {
   margin: 0;
   padding: 26px 0;
   text-align: center;
-  font-size: 11.5px;
+  font-size: 0.8846em;
   color: var(--dl-label-tertiary);
 }
 
@@ -9185,7 +9189,7 @@ var DshFeedUltraClient = (() => {
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  font-size: 12.5px;
+  font-size: 0.9615em;
   font-weight: 600;
   color: var(--dl-label-primary);
   text-decoration: none;
@@ -9199,7 +9203,7 @@ var DshFeedUltraClient = (() => {
 .dl-preview-open {
   flex: 0 0 auto;
   white-space: nowrap;
-  font-size: 10.5px;
+  font-size: 0.8077em;
   color: var(--dl-label-tertiary);
   text-decoration: none;
 }
@@ -9215,14 +9219,14 @@ var DshFeedUltraClient = (() => {
   -webkit-line-clamp: 3;
   overflow: hidden;
   margin: 4px 0 0;
-  font-size: 11.5px;
+  font-size: 0.8846em;
   line-height: 1.6;
   color: var(--dl-label-secondary);
 }
 
 .dl-preview-item-meta {
   margin: 5px 0 0;
-  font-size: 10.5px;
+  font-size: 0.8077em;
   color: var(--dl-label-tertiary);
 }
 
@@ -9230,7 +9234,7 @@ var DshFeedUltraClient = (() => {
   margin: 0;
   padding: 9px 16px 12px;
   border-top: var(--dl-hairline);
-  font-size: 10.5px;
+  font-size: 0.8077em;
   line-height: 1.5;
   color: var(--dl-label-tertiary);
 }
@@ -9253,7 +9257,7 @@ var DshFeedUltraClient = (() => {
   border-radius: 999px;
   background: var(--dl-bg-rail);
   color: var(--dl-label-secondary);
-  font-size: 10.5px;
+  font-size: 0.8077em;
   text-decoration: none;
 }
 

@@ -11,6 +11,11 @@
     - id: active-markdown
       name: '@westwall/dsh-active-markdown'
 
+# from packages/codegraph
+- insert:
+    - id: codegraph
+      name: '@westwall/dsh-codegraph'
+
 # from packages/feed-ultra
 - insert:
     - id: dsh-feed-ultra

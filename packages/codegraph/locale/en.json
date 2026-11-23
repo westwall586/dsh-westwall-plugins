@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "CodeGraph",
+    "description": "Agents often grep first and reconstruct context from scattered files. Turning CodeGraph on for a workspace lets its sessions pull symbol source and call paths in one call; switch it from the workspace menu, and turning it off keeps the index."
+  }
+}

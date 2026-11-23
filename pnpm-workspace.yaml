@@ -11,5 +11,12 @@ autoInstallPeers: false
 allowBuilds:
   # feed-ultra 用 esbuild 打浏览器半体（client.js）。
   esbuild: true
+  # 宿主侧原生/大依赖的安装脚本：插件库只在构建时需要它们的类型，
+  # 不需要运行它们的 postinstall（也不下载预编译二进制）。
+  '@deepseek-ai/dsh-subprocess-local': false
+  '@google/genai': false
+  koffi: false
+  node-pty: false
+  protobufjs: false
 minimumReleaseAgeExclude:
   - '@deepseek-ai/dsh-client-ui-primitives@0.2.2-rc.5'

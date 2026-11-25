@@ -111,3 +111,44 @@ test('游标同样只在换文档或换视图时归零', () => {
   preferences.resetCursorOn(identity, 'translated\0a.md')
   assert.equal(preferences.getUpdateCursor(), 0)
 })
+
+test('视图停在译文，同一份文档重读还是译文', () => {
+  const preferences = createPreferences(createPreferencesSlot())
+  assert.equal(preferences.getView(), 'source')
+  preferences.setView('translated')
+  assert.equal(preferences.getView(), 'translated')
+})
+
+test('视图变化通知订阅者，设成同一个值不发通知', () => {
+  const preferences = createPreferences(createPreferencesSlot())
+  let notified = 0
+  preferences.subscribe(() => { notified += 1 })
+  preferences.setView('translated')
+  assert.equal(notified, 1)
+  preferences.setView('translated')
+  assert.equal(notified, 1)
+})
+
+test('视图跟着 crate：同一份文档反复取是同一个，关掉页签再开是新的一份', () => {
+  const documents = store()
+  documents.viewFor(SESSION, PATH).setView('translated')
+  assert.equal(documents.viewFor(SESSION, PATH).getView(), 'translated')
+  // 关闭页签清掉 crate；重开是全新的一份，从原文开始。
+  documents.dispose(SESSION, PATH, 'close')
+  assert.equal(documents.viewFor(SESSION, PATH).getView(), 'source')
+})
+
+test('第一次打开由 crate 认领，重建出来的 body 是续接而不是重新打开', () => {
+  const documents = store()
+  const first = documents.viewFor(SESSION, PATH)
+  assert.equal(first.takeFirstOpen(), true)
+  // 宿主切页签会重建 body：同一份文档再问一次，必须是续接。
+  assert.equal(documents.viewFor(SESSION, PATH).takeFirstOpen(), false)
+})
+
+test('关闭页签后重新打开又算第一次打开', () => {
+  const documents = store()
+  assert.equal(documents.viewFor(SESSION, PATH).takeFirstOpen(), true)
+  documents.dispose(SESSION, PATH, 'close')
+  assert.equal(documents.viewFor(SESSION, PATH).takeFirstOpen(), true)
+})

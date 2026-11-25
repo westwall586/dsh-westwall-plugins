@@ -242,6 +242,7 @@ const EMPTY_PARSED: ParsedDocument = { blocks: [] }
 const EMPTY_DIFF: DocumentDiff = { statuses: [], counts: { updated: 0 } }
 const EMPTY_ANCHORS: ReadonlySet<string> = new Set()
 const ANNOTATION_HIGHLIGHT = 'am-annotation'
+
 /** The identity used before the document path is known; it never reaches the store. */
 const NO_NOTES: Notes = {
   subscribe: () => () => {},
@@ -504,6 +505,13 @@ export function Body({
   const file = useMemo(() => sessionFileOf(resourceAddress), [resourceAddress])
   const [state, setState] = useState<BodyState>({ status: 'loading' })
   const container = useRef<HTMLDivElement | null>(null)
+  /**
+   * The view this body shows. The crate holds the authoritative value: the host
+   * unmounts a document body on every tab or session switch, so a `useState` here
+   * alone would fall back to `source` each time. Reading position is kept per view,
+   * so that fallback would also make the restore read the other view's offset and
+   * look like the position was lost. The sync effect below bridges the two.
+   */
   const [view, setView] = useState<View>('source')
   const [peek, setPeek] = useState<Peek | null>(null)
   /** The instruction the last re-translate ran with; the popover reopens with it. */
@@ -589,7 +597,17 @@ export function Body({
   const { edit: draft, state: edit } = useEdit(documents, sessionId, path)
   // Folder folds and the update cursor are document preferences: they survive a
   // tab switch and reset when another document takes the pane.
-  const { preferences, collapsed, updateCursor } = useViewPreferences(documents, sessionId, path)
+  const { preferences, view: storedView, collapsed, updateCursor } = useViewPreferences(documents, sessionId, path)
+  // Adopt the crate's view when this body mounts (a tab or session coming back);
+  // a later change from inside this body writes back so the next mount inherits it.
+  //
+  // The write-back is driven by the setter, not by an effect on `view`: an effect
+  // would run on mount too, and at that instant `view` still holds the `useState`
+  // initial value, so it would overwrite the remembered view with `source` before
+  // the adopt effect could read it.
+  useEffect(() => {
+    setView(storedView)
+  }, [storedView])
   const editRef = useRef(edit)
   editRef.current = edit
   /**
@@ -739,13 +757,20 @@ export function Body({
     }
     const controller = new AbortController()
     requestToken.current += 1
-    const changedDocument = docKeyRef.current !== documentKey
+    // A rebuilt body sees its own `docKeyRef` empty, so it cannot tell "the same
+    // document coming back" from "another document took the pane". The crate can:
+    // the first body to reach this document claims the first open, and every body
+    // rebuilt later is a continuation. A close drops the crate, so reopening loads
+    // as a first open again.
+    const firstOpen = preferences?.takeFirstOpen() ?? true
+    const changedDocument = docKeyRef.current !== documentKey && firstOpen
+    docKeyRef.current = documentKey
     const previous = lastLoadRef.current
     if (changedDocument) {
       // 换文档：上一次读到的正文不再属于这次比较。
       lastLoadRef.current = null
       docKeyRef.current = documentKey
-      setView('source')
+      chooseView('source')
       setInstruction('')
       setAsk(null)
       setStored({ status: 'probing' })
@@ -826,7 +851,7 @@ export function Body({
         return
       }
       if (rewrite) {
-        setView('source')
+        chooseView('source')
         setInstruction('')
         setAsk(null)
         setStored({ status: 'probing' })
@@ -1847,7 +1872,7 @@ export function Body({
       setNotice({ text: t('annotate.blockMissing'), undo: false })
       return
     }
-    setView('source')
+    chooseView('source')
     setPeek(null)
     setDrawerOpen(false)
     requestAnimationFrame(() => {
@@ -1931,6 +1956,10 @@ export function Body({
   }, [translation, run, absolutePath, instruction])
 
   const chooseView = useCallback((next: View) => {
+    // The crate keeps the view across body unmounts; the local state only drives
+    // this render tree. Writing here, and not in an effect on `view`, keeps the
+    // mount-time initial value from overwriting the remembered one.
+    preferences?.setView(next)
     if (next === 'translated') {
       setDrawerOpen(false)
       setEditor(null)
@@ -1978,20 +2007,20 @@ export function Body({
     if (state.status !== 'ready') return
     setAsk(null)
     setInstruction(nextInstruction)
-    setView('translated')
+    chooseView('translated')
     run?.start({ text: state.text, absolutePath: state.absolutePath }, nextInstruction, false)
   }, [state, run])
 
   const cancelTranslation = useCallback(() => {
     run?.abort()
-    setView('source')
+    chooseView('source')
     setPeek(null)
   }, [run])
 
   /** Leaving translation keeps a finished result in memory, but a run in flight is cancelled. */
   const exitTranslation = useCallback(() => {
     if (translation.status === 'running') run?.abort()
-    setView('source')
+    chooseView('source')
     setTocOpen(false)
     setErrorOpen(false)
     setPeek(null)
@@ -2048,7 +2077,7 @@ export function Body({
     const ready = stateRef.current
     if (ready.status !== 'ready' || sessionId === undefined || path === undefined) return
     if (view === 'translated') {
-      setView('source')
+      chooseView('source')
       return
     }
     const pendingCount = annotationList.length
@@ -2062,7 +2091,7 @@ export function Body({
           setNotice({ text: t('edit.pending', { count: pendingCount }), undo: false })
           return
         case 'translated':
-          setView('source')
+          chooseView('source')
           return
         case 'too-large':
           setNotice({ text: t('edit.tooLarge'), undo: false })

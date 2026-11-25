@@ -1,9 +1,19 @@
+import type { View } from './view.ts'
+
 /**
- * 一份文档的视图偏好：目录折叠锚点集与“更新 N 处”的游标。锚点来自标题锚点，
- * 所以同一份文档在原文与译文之间切换时它们仍然对得上；但换文档就要清空，
- * 而切页签、切会话不清。
+ * 一份文档的视图偏好：停在哪个视图、目录折叠锚点集与“更新 N 处”的游标。
+ * 锚点来自标题锚点，所以同一份文档在原文与译文之间切换时它们仍然对得上；
+ * 但换文档就要清空，而切页签、切会话不清。
  */
 export interface ViewPreferencesSlot {
+  /**
+   * 当前停在哪一侧。宿主切走文档会把 body 卸载，视图若只活在 body 的
+   * `useState` 里，切会话回来就会退回原文，而阅读位置是按视图分开记的，
+   * 于是读的是另一份、看上去像位置丢了。所以它跟着 crate 走。
+   */
+  view: View
+  /** 是否已经有 body 为这份文档跑过打开流程。 */
+  opened: boolean
   /** null 表示从未折叠过任何一节，读出来是共用的空集合。 */
   collapsed: ReadonlySet<string> | null
   updateCursor: number
@@ -11,6 +21,18 @@ export interface ViewPreferencesSlot {
 }
 
 export interface ViewPreferences {
+  /** 当前停在哪一侧；切会话回来时 body 据此恢复。 */
+  getView(): View
+  setView(next: View): void
+  /**
+   * 这份 crate 是否已经被某个 body 走过一次“打开文档”。
+   *
+   * 宿主每次切页签、切会话都会卸载并重建 body，重建出来的 body 自己的 ref 全是空的，
+   * 它无法靠自身分辨“同一份文档回来了”和“另一份文档占了阅读区”。这条标记归 crate：
+   * 第一次打开时返回 false 并置位，之后（重建的 body）返回 true。关闭与外部更改会丢掉
+   * 整个 crate，所以重新打开会重新走一次初始化。
+   */
+  takeFirstOpen(): boolean
   /**
    * 这份偏好的身份。同一个路径上的 crate 会被丢弃再建（切会话、页签关闭再打开），
    * 等价于 `===` 的对象同一性，让订阅者分辨“同一个 crate”与“同路径的新 crate”。
@@ -37,7 +59,7 @@ export interface ViewPreferences {
 export const EMPTY_COLLAPSED: ReadonlySet<string> = new Set()
 
 export function createPreferencesSlot(): ViewPreferencesSlot {
-  return { collapsed: null, updateCursor: 0, listeners: new Set() }
+  return { view: 'source', opened: false, collapsed: null, updateCursor: 0, listeners: new Set() }
 }
 
 export function createPreferences(slot: ViewPreferencesSlot): ViewPreferences {
@@ -52,6 +74,17 @@ export function createPreferences(slot: ViewPreferencesSlot): ViewPreferences {
 
   return {
     clock,
+    getView: () => slot.view,
+    takeFirstOpen() {
+      if (slot.opened) return false
+      slot.opened = true
+      return true
+    },
+    setView(next) {
+      if (slot.view === next) return
+      slot.view = next
+      notify()
+    },
     getCollapsed: () => slot.collapsed ?? EMPTY_COLLAPSED,
     resetCollapsedOn(identity, key) {
       if (identity === null) return

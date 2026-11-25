@@ -9,6 +9,7 @@ import { EMPTY_COLLAPSED, type ViewPreferences } from './kernel/preferences.ts'
 import type { TranslationRun } from './kernel/translation.ts'
 import type { TranslationState } from '../translate/state.ts'
 import type { EditState } from '../edit/state.ts'
+import type { View } from './kernel/view.ts'
 import type { DocumentStore, NotesWriter } from './document.ts'
 import type { DocumentRef } from './ref.ts'
 
@@ -97,6 +98,8 @@ export function useViewPreferences(
   path: string | undefined,
 ): {
   preferences: ViewPreferences | null
+  /** 当前停在哪一侧；body 重建后从这里恢复，而不是退回默认值。 */
+  view: View
   collapsed: ReadonlySet<string>
   updateCursor: number
 } {
@@ -118,8 +121,13 @@ export function useViewPreferences(
     () => (preferences === null ? 0 : preferences.getUpdateCursor()),
     [preferences],
   )
+  const getView = useCallback(
+    () => (preferences === null ? 'source' : preferences.getView()),
+    [preferences],
+  )
+  const view = useSyncExternalStore(subscribe, getView, getView)
   const collapsed = useSyncExternalStore(subscribe, getCollapsed, getCollapsed)
   const updateCursor = useSyncExternalStore(subscribe, getCursor, getCursor)
-  return { preferences, collapsed, updateCursor }
+  return { preferences, view, collapsed, updateCursor }
 }
 

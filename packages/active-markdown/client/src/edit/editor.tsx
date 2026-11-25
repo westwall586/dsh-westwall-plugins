@@ -53,10 +53,13 @@ const theme = EditorView.theme({
     color: 'var(--dsw-alias-label-primary)',
     backgroundColor: 'transparent',
     fontFamily: 'var(--dsh-font-family-code)',
-    fontSize: 'var(--dsh-code-font-size)',
+    /* The source is content the reader reads, not code being quoted in it, so it
+       follows the host's content size rather than the code size: the rendered
+       view beside it and the source swap without a size jump. */
+    fontSize: 'var(--dsh-content-font-size, 14px)',
   },
   '&.cm-focused': { outline: 'none' },
-  '.cm-scroller': { overflow: 'auto', fontFamily: 'inherit', lineHeight: '1.65' },
+  '.cm-scroller': { overflow: 'auto', fontFamily: 'inherit', lineHeight: '1.55' },
   '.cm-content': { padding: '10px 0', caretColor: 'var(--dsw-alias-link)' },
   '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--dsw-alias-link)' },
   '.cm-selectionBackground, &.cm-focused .cm-selectionBackground, .cm-content ::selection': {

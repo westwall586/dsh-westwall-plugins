@@ -1,6 +1,14 @@
 /** The document body: read, fallbacks, the rendered Markdown, and annotations. */
 import * as React from 'react'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 import { createPortal } from 'react-dom'
 import type { AttachmentController, AttachmentFailure } from './annotate/attachment.ts'
 import type { PendingHub } from './annotate/committer.ts'
@@ -30,8 +38,8 @@ import {
   type JoinedLines,
   type TextLineAtom,
 } from './annotate/selection.ts'
+import type { DocumentRef, DocumentStore, Notes, View } from './store/index.ts'
 import { EMPTY_SNAPSHOT, refFrom, useNotes } from './store/index.ts'
-import type { DocumentRef, DocumentStore, Notes } from './store/index.ts'
 import type {
   ContextMenuTarget,
   DescribeView,
@@ -129,14 +137,19 @@ export interface BodyInjected {
 export interface BodyProps extends BodyInjected {
   resourceAddress: string
   content: BodyContent
+  /**
+   * The host's scrollport report. The document body is its own scroller now, so
+   * this is only ever handed a real node, never `null`: a `null` would make the
+   * host fall back to its own body and rewrite `scrollTop` over the position
+   * restored here.
+   */
+  scrollportRef?: (node: HTMLElement) => void
   t: Translate
   /** The composer's session; the addressed file may belong to another session. */
   sessionId: string
   inputActions: InputActionsView | undefined
   useInput: UseInput
 }
-
-type View = 'source' | 'translated'
 
 /**
  * Whether the workspace already holds a translation for the open document.
@@ -467,6 +480,7 @@ function AlertIcon(): ReactNode {
 export function Body({
   resourceAddress,
   content,
+  scrollportRef,
   readBytes,
   openResource,
   openExternal,
@@ -540,6 +554,9 @@ export function Body({
   stateRef.current = state
   const editRef = useRef(edit)
   editRef.current = edit
+  const viewRef = useRef<View>(view)
+  // Reading the view from this ref keeps the scroll listener out of a resubscribe.
+  viewRef.current = view
   const translationRef = useRef(translation)
   translationRef.current = translation
 
@@ -562,6 +579,46 @@ export function Body({
   const phase = useInput(state => state.phase)
   const inputAttachmentIds = useInput(state => state.attachmentIds)
   const composerBusy = phase === 'sending' || phase === 'submitting'
+
+  // The position belongs to the document, not to this body: an unmount keeps it.
+  const reading = useMemo(
+    () => (sessionId === undefined || path === undefined ? null : documents.readingFor(sessionId, path)),
+    [documents, sessionId, path],
+  )
+  /** The element that owns this document's scrolling; it restores once it has a height. */
+  const scrolling = useCallback((node: HTMLDivElement | null): void => {
+    container.current = node
+    if (node === null) return
+    // Order matters: the host writes its own remembered offset when it binds, so
+    // this document's position has to be applied after that callback has run.
+    scrollportRef?.(node)
+    if (reading !== null) node.scrollTop = reading.get(viewRef.current)
+  }, [reading, scrollportRef])
+
+  // Scroll events feed the crate. The last one before a tab switch is flushed on
+  // unmount, so the throttle window cannot swallow it.
+  useEffect(() => {
+    const node = container.current
+    if (node === null || reading === null) return
+    const onScroll = (): void => { reading.record(viewRef.current, node.scrollTop) }
+    node.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      node.removeEventListener('scroll', onScroll)
+      reading.flush()
+    }
+  }, [reading])
+
+  // A view switch is a jump within the same scroller, so the incoming view takes
+  // its own position and the outgoing one keeps its own.
+  useLayoutEffect(() => {
+    const previous = viewRef.current
+    if (previous === view) return
+    viewRef.current = view
+    const node = container.current
+    if (node === null) return
+    if (reading !== null) reading.record(previous, node.scrollTop)
+    node.scrollTop = reading === null ? 0 : reading.get(view)
+  }, [view, reading])
 
   const applyEdit = useCallback((event: EditEvent): EditState => {
     const next = editReduce(editRef.current, event)
@@ -2270,7 +2327,7 @@ export function Body({
   const editExternal = editSessionValue?.external === true
 
   return (
-    <div className="am-root" ref={container} data-active-markdown data-editing={editPhase ? 'true' : undefined}>
+    <div className="am-root" ref={scrolling} data-active-markdown data-editing={editPhase ? 'true' : undefined}>
       {state.status === 'loading' && <div className="am-status" role="status"><span className="am-spinner" aria-hidden="true" />{t('loading')}</div>}
       {state.status === 'too-large' && (
         <EmptyState

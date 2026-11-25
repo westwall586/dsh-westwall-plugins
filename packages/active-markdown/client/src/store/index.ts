@@ -3,6 +3,8 @@ export { composeId, crateId, refFrom, type DocumentIdentity, type DocumentKey, t
 export { createCrate, type Crate, type CrateDeps, type Disposal } from './crate.ts'
 export { createDocumentStore, type DocumentStore, type DocumentStoreDeps, type NotesWriter } from './document.ts'
 export { useNotes } from './binding.ts'
+export { createReading, createReadingSlot, type Reading, type ReadingSlot } from './kernel/reading.ts'
+export { type View } from './kernel/view.ts'
 export {
   EMPTY_SNAPSHOT,
   type AnnotationCommit,

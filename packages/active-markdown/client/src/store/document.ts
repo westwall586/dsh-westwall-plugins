@@ -8,11 +8,14 @@
  */
 import type { HostBridge } from '../context.ts'
 import type { Notes } from './kernel/notes.ts'
+import type { Reading } from './kernel/reading.ts'
 import { createCrate, type Crate, type Disposal } from './crate.ts'
 import { crateId, type DocumentRef } from './ref.ts'
 
 export interface DocumentStoreDeps {
   host(): Promise<HostBridge>
+  /** 阅读位置的节流窗口；省略用默认值。 */
+  readingDelayMs?: number
 }
 
 /** 调用方按 (文档, composer) 取批注面；`withLock` 与 `notes` 必须走同一个实例。 */
@@ -27,6 +30,8 @@ export interface DocumentStore {
   notesFor(compose: string, path: string, session: string): NotesWriter
   /** 归还一次 notesFor 的引用；不销毁状态。 */
   release(compose: string, path: string, session: string): void
+  /** 取该文档的阅读位置；文档不存在时为 null。 */
+  readingFor(session: string, path: string): Reading | null
   /** 登记一次 body 挂载。 */
   mount(ref: DocumentRef): void
   /** 撤销一次挂载；crate 与快照都保留。 */
@@ -49,7 +54,14 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
     const id = crateId({ session, path })
     let entry = entries.get(id)
     if (entry === undefined) {
-      entry = { crate: createCrate({ key: { session, path }, host: deps.host }), mounts: 0 }
+      entry = {
+        crate: createCrate({
+          key: { session, path },
+          host: deps.host,
+          ...(deps.readingDelayMs === undefined ? {} : { readingDelayMs: deps.readingDelayMs }),
+        }),
+        mounts: 0,
+      }
       entries.set(id, entry)
     }
     return entry
@@ -70,6 +82,10 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
 
     release(compose, path, session) {
       entries.get(crateId({ session, path }))?.crate.releaseCompose(compose)
+    },
+
+    readingFor(session, path) {
+      return entries.get(crateId({ session, path }))?.crate.reading ?? null
     },
 
     mount(ref) {

@@ -3,7 +3,8 @@
  * 所以生命周期收敛到一处 `dispose(reason)` 的 switch 里，而不是散在调用方。
  */
 import type { HostBridge } from '../context.ts'
-import { createNotes, createWriteChains, createNotesSlot, type NotesHandle, type NotesSlot } from './kernel/notes.ts'
+import { createNotes, createWriteChains, createNotesSlot, type NotesHandle } from './kernel/notes.ts'
+import { createReading, createReadingSlot, type Reading, type ReadingSlot } from './kernel/reading.ts'
 import type { DocumentKey } from './ref.ts'
 
 /**
@@ -16,6 +17,8 @@ export type Disposal = 'leave' | 'close' | 'external-change' | 'unload'
 export interface CrateDeps {
   key: DocumentKey
   host(): Promise<HostBridge>
+  /** 阅读位置的节流窗口；省略用默认值。 */
+  readingDelayMs?: number
 }
 
 export interface Crate {
@@ -27,6 +30,8 @@ export interface Crate {
   notesFor(compose: string): NotesHandle
   /** 引用计数减一；减到零只摘句柄，槽仍留在 crate 里。 */
   releaseCompose(compose: string): void
+  /** 阅读位置：按视图分开，body 的滚动容器写入它。 */
+  readonly reading: Reading
   /** 没有任何 composer 维度被持有。 */
   readonly empty: boolean
   dispose(reason: Disposal): void
@@ -42,6 +47,8 @@ export function createCrate(deps: CrateDeps): Crate {
   // 槽与写链都归 crate：这两样比句柄活得久，否则切走再切回会连快照一起丢。
   const chains = createWriteChains()
   const entries = new Map<string, ComposeEntry>()
+  const readingSlot: ReadingSlot = createReadingSlot()
+  const reading = createReading({ slot: readingSlot, ...(deps.readingDelayMs === undefined ? {} : { delayMs: deps.readingDelayMs }) })
 
   const notesFor = (compose: string): NotesHandle => {
     if (disposed) throw new Error('crate is disposed')
@@ -76,6 +83,7 @@ export function createCrate(deps: CrateDeps): Crate {
     key: deps.key,
     notesFor,
     releaseCompose,
+    reading,
     get empty() {
       return entries.size === 0
     },
@@ -84,6 +92,9 @@ export function createCrate(deps: CrateDeps): Crate {
         case 'leave':
           return
         case 'unload':
+          // 只清内存：位置在帧内，磁盘批注不动，否则插件一重载就清空批注。
+          reading.clear()
+          reading.dispose()
           drop()
           return
         case 'close':

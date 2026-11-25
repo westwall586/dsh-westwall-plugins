@@ -1,8 +1,18 @@
+/* The body owns its scrolling: the host's own body scroller above it stays at
+   rest, so a reading position has exactly one owner and one coordinate space.
+   Height is definite through the host's flex chain (`.preview` → `.content` →
+   the body), which is also what lets the sticky toolbar stick. */
 [data-active-markdown] {
   --am-pad-x: clamp(16px, 4%, 56px);
   position: relative;
   container-type: inline-size;
   box-sizing: border-box;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* A remembered offset is a pixel distance; anchoring would move it when content
+     above it reflows after a remount. */
+  overflow-anchor: none;
   padding: 20px var(--am-pad-x) 72px;
   color: var(--dsw-alias-label-primary);
   /* The theme's markdown scale is the single source for size, leading, and family. */

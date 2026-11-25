@@ -77,6 +77,40 @@ test('切走再挂回读同一个 crate 的位置', () => {
   assert.equal(documents.readingFor(REF.session, REF.path)?.get('source'), 640)
 })
 
-test('没被打开过的文档没有阅读位置', () => {
-  assert.equal(store().readingFor('s1', '/w/missing.md'), null)
+test('没被打开过的文档也给出阅读位置，并顺带建好 crate', () => {
+  const documents = store()
+  const port = documents.readingFor('s1', '/w/missing.md')
+  assert.equal(port.get('source'), 0)
+  assert.equal(documents.has('s1', '/w/missing.md'), true, '取位置时 crate 已经建好')
+})
+
+test('切会话回来：元素被替换重挂，readingFor 仍是同一个 port 且位置还在', () => {
+  const documents = store()
+  documents.mount(REF)
+  const first = documents.readingFor(REF.session, REF.path)
+  first.record('source', 550)
+  assert.equal(first.get('source'), 550)
+
+  // 切走：元素卸载。crate 与位置都留着。
+  documents.unmount(REF)
+  documents.release(REF.compose, REF.path, REF.session)
+
+  // 切回来：元素是新的，crate 还是那一个。
+  documents.mount(REF)
+  const again = documents.readingFor(REF.session, REF.path)
+  assert.equal(again, first, '同一个 port')
+  assert.equal(again.get('source'), 550)
+})
+
+test('切会话回来时 crate 已被丢弃：新 crate 也能建出来并给出位置', () => {
+  const documents = store()
+  documents.mount(REF)
+  documents.readingFor(REF.session, REF.path).record('source', 550)
+  documents.unmount(REF)
+  void documents.dispose(REF.session, REF.path, 'close')
+
+  // 刷新恢复之类的场景：读取先于挂载 effect 发生，位置端口必须现成可用。
+  const fresh = documents.readingFor(REF.session, REF.path)
+  assert.equal(fresh.get('source'), 0)
+  assert.equal(documents.has(REF.session, REF.path), true)
 })

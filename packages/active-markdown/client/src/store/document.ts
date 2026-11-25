@@ -38,16 +38,23 @@ export interface DocumentStore {
    * 所以谁都不需要引用计数：结束运行只走 crate 的 abort 或 dispose。
    */
   runFor(session: string, path: string): TranslationRun
-  /** 取该文档的阅读位置；文档不存在时为 null。 */
-  readingFor(session: string, path: string): Reading | null
-  /** 取该文档的编辑草稿；文档不存在时为 null。 */
-  editFor(session: string, path: string): Edit | null
-  /** 取该文档的视图偏好；文档不存在时为 null。 */
-  viewFor(session: string, path: string): ViewPreferences | null
+  /**
+   * 取该文档的阅读位置；文档还没被打开过时先建 crate。body 在渲染期就要拿到它，
+   * 而这时挂载 effect 还没跑：返回 null 会让恢复环节永远跳过，新挂上的元素停在 0。
+   */
+  readingFor(session: string, path: string): Reading
+  /** 取该文档的编辑草稿；文档还没被打开过时先建 crate。 */
+  editFor(session: string, path: string): Edit
+  /** 取该文档的视图偏好；文档还没被打开过时先建 crate。 */
+  viewFor(session: string, path: string): ViewPreferences
+  /**
+   * “本 body 现在看的是哪个 crate”。body 每次渲染都会读位置与视图偏好，那两个读取
+   * 会登记当前 crate；这里只按地址找回来，找不到返回 null，不新建。调用方用它区分
+   * “同一份文档重建出来的页面”与“换到另一份文档”。
+   */
+  crateIdentity(session: string, path: string): object | null
   /** crate 记住读到的那条绝对路径；之后的批注与翻译都按它找文件。 */
   rememberPath(session: string, path: string, absolutePath: string): void
-  /** 地址里的路径是相对的：把绝对路径记到该会话下已有的每一个 crate 上。 */
-  rememberPathFor(session: string, absolutePath: string): void
   /** 登记一次 body 挂载。 */
   mount(ref: DocumentRef): void
   /** 撤销一次挂载；crate 与快照都保留。 */
@@ -100,9 +107,21 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
     return entry
   }
 
+  /**
+   * 当前 body 的 crate。它不能靠身份查询自己建：一个查询不该为某个地址凭空造出状态。
+   * 登记发生在端口读取上（body 每次渲染都会读位置与视图偏好），查询只按地址找回来。
+   */
+  const live = new Map<string, Crate>()
+
+  const remember = (id: string, crate: Crate): Crate => {
+    live.set(id, crate)
+    return crate
+  }
+
   const clear = (id: string, reason: Disposal): void | Promise<void> => {
     const entry = entries.get(id)
     if (entry === undefined) return
+    live.delete(id)
     entries.delete(id)
     return entry.crate.dispose(reason)
   }
@@ -122,25 +141,23 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
     },
 
     readingFor(session, path) {
-      return entries.get(crateId({ session, path }))?.crate.reading ?? null
+      return remember(crateId({ session, path }), find(path, session).crate).reading
     },
 
     editFor(session, path) {
-      return entries.get(crateId({ session, path }))?.crate.edit ?? null
+      return find(path, session).crate.edit
     },
 
     viewFor(session, path) {
-      return entries.get(crateId({ session, path }))?.crate.view ?? null
+      return remember(crateId({ session, path }), find(path, session).crate).view
     },
 
     rememberPath(session, path, absolutePath) {
-      entries.get(crateId({ session, path }))?.crate.rememberPath(absolutePath)
+      find(path, session).crate.rememberPath(absolutePath)
     },
 
-    rememberPathFor(session, absolutePath) {
-      for (const entry of entries.values()) {
-        if (entry.crate.key.session === session) entry.crate.rememberPath(absolutePath)
-      }
+    crateIdentity(session, path) {
+      return live.get(crateId({ session, path })) ?? null
     },
 
     mount(ref) {

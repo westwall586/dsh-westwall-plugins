@@ -100,6 +100,8 @@ export function useViewPreferences(
   collapsed: ReadonlySet<string>
   updateCursor: number
 } {
+  // 和 readingFor 一样，读取即建 crate：body 的渲染期不能拿到 null，否则那些
+  // “换文档/换视图才清”的效果会在重建后的第一次运行里把恢复的状态清掉。
   const preferences = useMemo(
     () => (session === undefined || path === undefined ? null : store.viewFor(session, path)),
     [store, session, path],

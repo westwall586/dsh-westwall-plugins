@@ -597,6 +597,10 @@ export function Body({
    * by path: a tab that was closed and reopened reaches a new crate under the same
    * path, and a memo held from the old one would write into a disposed crate while
    * the restore below reads the new, empty one.
+   *
+   * `readingFor` creates the crate, so this is never null while the address names a
+   * session and a path: the restore effect runs before the mount effect has ever
+   * touched this crate, and a null here would make it skip forever.
    */
   const reading = sessionId === undefined || path === undefined ? null : documents.readingFor(sessionId, path)
   /** What the remember/restore effects below re-run on: this crate, or a new one at the same path. */
@@ -972,8 +976,7 @@ export function Body({
   const knownPath = state.status === 'ready' ? state.absolutePath : undefined
   useEffect(() => {
     if (knownPath === undefined || sessionId === undefined || path === undefined) return
-    if (documents.has(sessionId, path)) documents.rememberPath(sessionId, path, knownPath)
-    else documents.rememberPathFor(sessionId, knownPath)
+    documents.rememberPath(sessionId, path, knownPath)
   }, [documents, sessionId, path, knownPath, readingClock])
   // 登记靠 `tab.signal` 的生命周期，`useTabInfo()` 读到的就是它；登记项随 body 卸载
   // 撤销，页签在隐藏状态被关掉时由 apply 层的观察者接手。
@@ -1103,10 +1106,23 @@ export function Body({
     preferences?.setUpdateCursor(next)
   }, [preferences, updateCursor])
 
-  useEffect(() => {
-    preferences?.setCollapsed(EMPTY_ANCHORS)
-    setActiveToc(undefined)
-  }, [preferences, path, view])
+  // “是不是同一份文档”只能按 crate 身份判：宿主读文件时会按会话解析地址，切会话
+  // 回来的同一个页面可能带着另一个会话 id 或另一条路径，而路径字符串本身也不足以
+  // 分辨“关掉又打开”后的新 crate。身份跟着端口走：渲染期读到的是本 body 的 crate。
+  const identity = sessionId === undefined || path === undefined ? null : documents.crateIdentity(sessionId, path)
+  // 折叠只随“换文档或换视图”清：同一个 crate 的初始化（首次加载到内容）、切会话里的
+  // 重读、以及重建出来的 body（元素被整体替换）都发生在同一份文档上，把它们当成
+  // 换文档会清掉刚恢复的折叠状态。判断放在 port 里：每次渲染把（文档身份, 视图）交
+  // 过去，由 port 记住上一次的值并决定要不要清；body 自己的 ref 被替换时会归零。
+  const foldedKey = `${view}\u0000${path ?? ''}`
+  useLayoutEffect(() => {
+    preferences?.resetCollapsedOn(identity, foldedKey)
+  }, [preferences, identity, foldedKey])
+
+  // 游标同理，判据也是（文档身份, 视图），同样交给 port 记住。
+  useLayoutEffect(() => {
+    preferences?.resetCursorOn(identity, foldedKey)
+  }, [preferences, identity, foldedKey])
 
   useLayoutEffect(() => {
     if (!tocOpen) {

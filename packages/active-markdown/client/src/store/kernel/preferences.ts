@@ -11,7 +11,22 @@ export interface ViewPreferencesSlot {
 }
 
 export interface ViewPreferences {
+  /**
+   * 这份偏好的身份。同一个路径上的 crate 会被丢弃再建（切会话、页签关闭再打开），
+   * 等价于 `===` 的对象同一性，让订阅者分辨“同一个 crate”与“同路径的新 crate”。
+   */
+  readonly clock: object
   getCollapsed(): ReadonlySet<string>
+  /**
+   * 只在“换了文档或换了视图”时清空折叠。判断由 port 记住，不放在调用方的 ref 里：
+   * 重建出来的 body（切会话回来时元素被整体替换）会带着空 ref，把刚恢复的折叠
+   * 状态当成第一次运行清掉。
+   * @param identity - 文档身份；`null` 表示地址还不完整，下一帧再说。
+   * @param key - 视图与内容身份，同一个文档换内容或换视图都要重来。
+   */
+  resetCollapsedOn(identity: object | null, key: string): void
+  /** 更新游标的归零，判据与 `resetCollapsedOn` 相同。 */
+  resetCursorOn(identity: object | null, key: string): void
   setCollapsed(next: ReadonlySet<string>): void
   toggleCollapsed(anchor: string): void
   getUpdateCursor(): number
@@ -26,12 +41,33 @@ export function createPreferencesSlot(): ViewPreferencesSlot {
 }
 
 export function createPreferences(slot: ViewPreferencesSlot): ViewPreferences {
+  const clock: object = {}
+  /** 上一次清空时依据的（文档身份, 视图）；`null` 表示还没清过。 */
+  let folded: { readonly identity: object | null, readonly key: string } | null = null
+  /** 同上，给更新游标用。 */
+  let cursor: { readonly identity: object | null, readonly key: string } | null = null
   const notify = (): void => {
     for (const listener of [...slot.listeners]) listener()
   }
 
   return {
+    clock,
     getCollapsed: () => slot.collapsed ?? EMPTY_COLLAPSED,
+    resetCollapsedOn(identity, key) {
+      if (identity === null) return
+      if (folded !== null && folded.identity === identity && folded.key === key) return
+      folded = { identity, key }
+      slot.collapsed = EMPTY_COLLAPSED
+      notify()
+    },
+    resetCursorOn(identity, key) {
+      if (identity === null) return
+      if (cursor !== null && cursor.identity === identity && cursor.key === key) return
+      cursor = { identity, key }
+      if (slot.updateCursor === 0) return
+      slot.updateCursor = 0
+      notify()
+    },
     setCollapsed(next) {
       slot.collapsed = next
       notify()

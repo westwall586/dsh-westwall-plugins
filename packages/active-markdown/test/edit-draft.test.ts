@@ -63,9 +63,26 @@ test('只有真的变了才通知订阅者，且通知时已能读到新状态',
   assert.deepEqual(seen, ['editing', 'saving', 'reading'], '重复的 save 不通知')
 })
 
-test('文档消失后取不到编辑草稿与视图偏好', () => {
+test('切会话回来：编辑草稿与视图偏好跟着 crate 留下', () => {
   const documents = store()
   documents.mount(REF)
-  assert.equal(documents.editFor(SESSION, '/w/missing.md'), null)
-  assert.equal(documents.viewFor(SESSION, '/w/missing.md'), null)
+  documents.editFor(SESSION, PATH)?.reduce({ type: 'enter', text: '原文', version: 'v1', line: 1 })
+  documents.viewFor(SESSION, PATH)?.toggleCollapsed('dsh-插件库')
+
+  // 切走再切回：元素被替换重挂，crate 不变，两个取法都返回同一份状态。
+  documents.unmount(REF)
+  documents.release(REF.compose, REF.path, REF.session)
+  documents.mount(REF)
+
+  assert.equal(documents.editFor(SESSION, PATH)?.getState().status, 'editing')
+  assert.deepEqual([...(documents.viewFor(SESSION, PATH)?.getCollapsed() ?? [])], ['dsh-插件库'])
+})
+
+test('没被打开过的文档也给出编辑草稿与视图偏好', () => {
+  const documents = store()
+  const draft = documents.editFor(SESSION, '/w/missing.md')
+  const view = documents.viewFor(SESSION, '/w/missing.md')
+  assert.equal(draft.getState().status, 'reading')
+  assert.equal(view.getUpdateCursor(), 0)
+  assert.equal(documents.has(SESSION, '/w/missing.md'), true)
 })

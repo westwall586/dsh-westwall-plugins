@@ -65,7 +65,6 @@ import {
 } from './edit/model.ts'
 import { ConflictPanel, EditBanner, EditToolbar, useEditCommand } from './edit/panel.tsx'
 import { scrollportOf } from './scroll.ts'
-import { installTraceHelpers, trace } from './store/trace.ts'
 import { dirty as draftDirty, sessionOf, type EditEvent } from './edit/state.ts'
 import { decideLoad, type LoadDecision, type PreviousLoad } from './document-load.ts'
 import { createImageResolver, type ImageResolver } from './images.ts'
@@ -504,9 +503,6 @@ export function Body({
   useInput,
 }: BodyProps): ReactNode {
   const file = useMemo(() => sessionFileOf(resourceAddress), [resourceAddress])
-  // Expose the trace dump in the console once any document is open, so a desktop
-  // session can be inspected without reaching into React internals.
-  useEffect(() => { installTraceHelpers() }, [])
   const [state, setState] = useState<BodyState>({ status: 'loading' })
   const container = useRef<HTMLDivElement | null>(null)
   /**
@@ -665,11 +661,9 @@ export function Body({
   // out; a view switch is the one jump that does not come from this effect.
   useLayoutEffect(() => {
     const node = container.current
-    trace('body.restore-check', { hasNode: node !== null, hasReading: reading !== null, status: state.status })
     if (node === null || reading === null || state.status !== 'ready') return
     restored.current = true
     const target = reading.get(view)
-    trace('body.restore', { view, target, current: Math.round(node.scrollTop), status: state.status })
     if (node.scrollTop !== target) node.scrollTop = target
   }, [state.status, state.status === 'ready' ? state.version : undefined, view, reading, readingClock])
 
@@ -683,7 +677,6 @@ export function Body({
     if (node === null) return
     if (reading !== null) reading.record(previous, node.scrollTop)
     const next = reading === null ? 0 : reading.get(view)
-    trace('body.view-switch', { from: previous, to: view, savedForPrevious: Math.round(node.scrollTop), target: next })
     node.scrollTop = next
   }, [view, reading])
 
@@ -772,15 +765,6 @@ export function Body({
     // as a first open again.
     const firstOpen = preferences?.takeFirstOpen() ?? true
     const changedDocument = docKeyRef.current !== documentKey && firstOpen
-    trace('body.load', {
-      sessionId,
-      composeSessionId,
-      documentKey,
-      previousKey: docKeyRef.current,
-      firstOpen,
-      changedDocument,
-      status: state.status,
-    })
     docKeyRef.current = documentKey
     const previous = lastLoadRef.current
     if (changedDocument) {

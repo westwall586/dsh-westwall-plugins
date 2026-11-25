@@ -14,7 +14,6 @@ import type { Reading } from './kernel/reading.ts'
 import type { TranslationRun } from './kernel/translation.ts'
 import { createCrate, type Crate, type Disposal } from './crate.ts'
 import { crateId, type DocumentRef } from './ref.ts'
-import { trace } from './trace.ts'
 
 export interface DocumentStoreDeps {
   host(): Promise<HostBridge>
@@ -124,7 +123,6 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
 
   const clear = (id: string, reason: Disposal): void | Promise<void> => {
     const entry = entries.get(id)
-    trace('store.clear', { id, reason, found: entry !== undefined })
     if (entry === undefined) return
     live.delete(id)
     entries.delete(id)
@@ -158,7 +156,6 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
     },
 
     rememberPath(session, path, absolutePath) {
-      trace('store.rememberPath', { session, path, absolutePath })
       find(path, session).crate.rememberPath(absolutePath)
     },
 
@@ -170,11 +167,9 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
       const entry = find(ref.path, ref.session)
       entry.mounts += 1
       entry.everMounted = true
-      trace('store.mount', { session: ref.session, path: ref.path, compose: ref.compose })
     },
 
     unmount(ref) {
-      trace('store.unmount', { session: ref.session, path: ref.path })
       // 计数只降不删：销毁留给 dispose，普通卸载不跑 switch。
       const entry = entries.get(crateId({ session: ref.session, path: ref.path }))
       if (entry === undefined) return

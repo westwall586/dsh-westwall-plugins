@@ -12,7 +12,6 @@
  * 关闭；尚未确认关闭的 crate 一律按 `unload` 处理（只清内存，不动磁盘）。
  */
 import type { DocumentStore } from './document.ts'
-import { trace } from './trace.ts'
 import { fileAddressOf } from '../source.ts'
 import { crateId, type DocumentRef } from './ref.ts'
 
@@ -91,22 +90,14 @@ export function createCloseObserver(deps: CloseObserverDeps): CloseObserver {
     },
 
     check() {
-      if (disposed) {
-        trace('check.disposed')
-        return
-      }
+      if (disposed) return
       const open = deps.openAddresses()
-      trace('check.start', { open: [...open], held: [...held.keys()] })
       const gone = new Set<string>()
       for (const [id, entry] of [...held]) {
         if (open.has(entry.address)) continue
         // 空快照说明页签库还没发布第一次快照（应用启动、窗口重建时都是这样），
         // 不是“页签都关了”；这时把任何登记当成关闭都会清掉刚恢复的文档。
-        if (open.size === 0) {
-          trace('check.empty-snapshot-skip', { id })
-          continue
-        }
-        trace('check.held-gone', { id, address: entry.address })
+        if (open.size === 0) continue
         held.delete(id)
         gone.add(id)
       }
@@ -128,12 +119,10 @@ export function createCloseObserver(deps: CloseObserverDeps): CloseObserver {
         const matched = [fromKey, fromAbsolute].find(candidate => candidate !== undefined && open.has(candidate))
         const stillOpen = matched !== undefined
         const address = matched ?? fromAbsolute ?? fromKey
-        trace('check.touch', { id, keyPath: path, absolutePath, address, stillOpen })
         if (stillOpen) return
         gone.add(id)
       })
       // 磁盘清理在本轮中途就会改 store，先把要关的收齐再动手。
-      trace('check.done', { gone: [...gone] })
       for (const id of gone) {
         const at = id.indexOf('\u0000')
         close(id.slice(0, at), id.slice(at + 1))

@@ -5,7 +5,6 @@
  * 写入走节流而不是逐像素：滚动事件每帧都来，而位置只在切走时被读一次。
  */
 import type { View } from './view.ts'
-import { trace } from '../trace.ts'
 
 export interface ReadingSlot {
   source: number
@@ -60,7 +59,6 @@ export function createReading(deps: ReadingDeps): Reading {
     if (pending === null) return
     const { view, top } = pending
     pending = null
-    trace('reading.write', { view, top, previous: slot[view] })
     if (slot[view] === top) return
     slot[view] = top
     notify()

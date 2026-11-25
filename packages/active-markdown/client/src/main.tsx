@@ -12,7 +12,6 @@ import { en, zh } from './locales.ts'
 import { createSettingsPage } from './settings.tsx'
 import { createDocumentStore } from './store/index.ts'
 import { createCloseObserver, type Registration } from './store/observer.ts'
-import { installTraceHelpers, trace } from './store/trace.ts'
 
 const NS = 'active-markdown'
 const ID = 'active-markdown'
@@ -39,9 +38,6 @@ export default {
     }, 'active-markdown styles')
 
     const t = ctx.locale.bind(NS)
-    // The dump must exist before any document opens; a closed tab is exactly the
-    // case that has no body to install it.
-    installTraceHelpers()
 
     // One document store for the plugin's lifetime; each document's state lives
     // in its own crate, and the body and the session committer reach the same one.
@@ -137,16 +133,8 @@ export default {
         const sidebar = scoped.get('sidebarRight') as SidebarRight | null | undefined
         sidebarService = sidebar
         const openTabs = sidebar?.openTabs
-        trace('main.wire', {
-          hasSidebar: sidebar !== null && sidebar !== undefined,
-          hasOpenTabs: openTabs !== undefined,
-          snapshotSize: openTabs?.getSnapshot()?.length ?? -1,
-        })
         if (openTabs === undefined) return
-        const unsubscribe = openTabs.subscribe(() => {
-          trace('main.openTabs-publish', { size: openTabs.getSnapshot().length })
-          observer.check()
-        })
+        const unsubscribe = openTabs.subscribe(() => observer.check())
         // Only the subscription is undone here. `observer.dispose()` is a one-way
         // latch that stops every later check, so calling it from an effect cleanup
         // would kill the observer the first time this effect re-runs — which is

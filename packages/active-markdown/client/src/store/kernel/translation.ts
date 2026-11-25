@@ -5,13 +5,16 @@
  * 运行的结束只由显式的 `abort` 触发（用户点返回原文/重新翻译、关闭页签、文件被
  * 外部修改）。挂载与卸载不碰它：切页签会让 body 卸载，而翻译必须继续。
  */
-import type { DescribeView, HostBridge, TranslationMeta } from '../../context.ts'
+import type { DescribeView, HostBridge, ModelChoice, TranslationMeta } from '../../context.ts'
 import { parseDocument } from '../../markdown/blocks.ts'
 import { assembleTranslation, normalize, planTranslation } from '../../translate/plan.ts'
 import type { PromptRun, ReadyTranslation, TranslationState } from '../../translate/state.ts'
 import { readyState } from '../../translate/state.ts'
 import { aligned } from '../../translate/verify.ts'
 import type { DocumentKey } from '../ref.ts'
+
+/** `ModelChoice` 非空时的 `provider`/`model` 两项，空时没有这两项。 */
+type TranslationProvider = { provider?: string, model?: string }
 
 /** 运行所属的文件身份；`session` 授权模型调用与落盘。 */
 export type RunKey = Pick<DocumentKey, 'session' | 'path'>
@@ -63,6 +66,11 @@ function sameIntent(intent: Intent, source: RunSource, extraInstruction: string,
   return intent.source.text === source.text
     && intent.instruction === extraInstruction
     && intent.reuseStored === reuseStored
+}
+
+/** 让一次普通翻译也带上整套模型选择：缓存与落盘的 key 是整份设置，不能只带 lang。 */
+export function providerOf(model: ModelChoice | null): TranslationProvider {
+  return model === null ? {} : { provider: model.provider, model: model.model }
 }
 
 /** 存下来的元数据给出运行身份，缺失的提示版本用当前描述兜底。 */
@@ -167,10 +175,10 @@ export function createTranslationRun(deps: TranslationRunDeps): TranslationRun {
           const promptVersion = described.promptVersion
           const model = settings.model
           const run: PromptRun = {
+            ...providerOf(model),
             promptVersion,
             extraInstruction,
             lang: settings.lang,
-            ...(model === null ? {} : { provider: model.provider, model: model.model }),
             translateComments: settings.translateComments,
           }
           // 用户点的是“看译文”，已有结果就不必再付一次模型调用；显式重新翻译

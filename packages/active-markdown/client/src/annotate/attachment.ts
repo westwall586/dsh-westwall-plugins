@@ -1,7 +1,7 @@
 /**
  * The attach transaction for one document's feedback file: prepare the pending
  * snapshot, register a runtime draft, add it to the composer, then record the
- * pending review. The whole transaction holds the draft key's lock so a body
+ * pending review. The whole transaction holds the composer's lock so a body
  * edit cannot rewrite the draft between the file hash and the pending save.
  *
  * Nothing here falls back to inserting text: without the draft channel the
@@ -15,10 +15,14 @@ import type {
 } from '../context.ts'
 import { feedbackFileOf, newRoundId, sha256Bytes, sha256Hex, normalizeSourceText } from './feedback.ts'
 import type { Annotation, PendingReview } from './model.ts'
-import type { AnnotationStore, DraftKey, PendingRefusal } from './store.ts'
+import type { Notes, PendingRefusal } from '../store/index.ts'
 
 export interface AttachmentDeps {
-  store: AnnotationStore
+  /** 该文档在输入框会话里的批注面；与 `withLock` 必须来自同一个 handle。 */
+  store: Notes
+  withLock<T>(job: () => Promise<T>): Promise<T>
+  /** The composer's session, which owns the draft; the address may be another one. */
+  composeSession(): string | undefined
   host(): Promise<HostBridge>
   /** The concrete conversation service for a session; null when unavailable. */
   conversation(sessionId: string): ConversationPort | null
@@ -29,7 +33,6 @@ export interface AttachmentDeps {
 }
 
 export interface AttachmentRequest {
-  key: DraftKey
   /** The composer's session; the address session may differ. */
   composeSessionId: string | undefined
   /** Canonical absolute document path. */
@@ -72,7 +75,6 @@ export interface RegenerateRequest extends AttachmentRequest {
 }
 
 export interface DetachRequest {
-  key: DraftKey
   roundId: string
   input: InputActionsView | undefined
   phase: InputPhase
@@ -190,37 +192,38 @@ export function createAttachmentController(deps: AttachmentDeps): AttachmentCont
   }
 
   const prepare = async (
-    key: DraftKey,
+    sessionId: string,
     path: string,
     roundId: string,
     text: string,
   ): Promise<{ sourceHash: string, snapshotSaved: boolean }> => {
     try {
       const host = await deps.host()
-      const view = await host.reviewPrepare({ sessionId: key.sessionId, path, roundId, text })
+      const view = await host.reviewPrepare({ sessionId, path, roundId, text })
       return { sourceHash: view.sourceHash, snapshotSaved: view.snapshotWritten }
     } catch {
       return { sourceHash: await sha256Hex(normalizeSourceText(text)), snapshotSaved: false }
     }
   }
 
-  const discardPrepared = async (key: DraftKey, path: string, roundId: string): Promise<void> => {
+  const discardPrepared = async (sessionId: string, path: string, roundId: string): Promise<void> => {
     try {
       const host = await deps.host()
-      await host.reviewDetach({ sessionId: key.sessionId, path, roundId })
+      await host.reviewDetach({ sessionId, path, roundId })
     } catch {
       // The pending snapshot ages out; annotations were never touched.
     }
   }
 
-  const attach = (request: AttachmentRequest): Promise<AttachResult> => deps.store.withLock(request.key, async () => {
-    const { key, composeSessionId, input, phase } = request
-    if (composeSessionId === undefined || composeSessionId !== key.sessionId) {
+  const attach = (request: AttachmentRequest): Promise<AttachResult> => deps.withLock(async () => {
+    const { composeSessionId, input, phase } = request
+    const sessionId = deps.composeSession()
+    if (composeSessionId === undefined || composeSessionId !== sessionId) {
       return { status: 'refused', reason: 'compose-session' }
     }
     if (request.annotations.length === 0) return { status: 'refused', reason: 'empty' }
     if (!isPlain(phase)) return { status: 'refused', reason: 'composer-busy' }
-    const snapshot = deps.store.getSnapshot(key)
+    const snapshot = deps.store.getSnapshot()
     if (snapshot.status !== 'ready') return { status: 'refused', reason: 'unavailable' }
     if (snapshot.pending !== null) return { status: 'refused', reason: 'duplicate' }
     const conversation = deps.conversation(composeSessionId)
@@ -235,13 +238,13 @@ export function createAttachmentController(deps: AttachmentDeps): AttachmentCont
       ...(request.editedSinceOpen === true ? { editedSinceOpen: true } : {}),
     })
     const fileHash = await sha256Hex(file.content)
-    const prepared = await prepare(key, request.path, roundId, request.text)
+    const prepared = await prepare(sessionId, request.path, roundId, request.text)
 
     let drafts: readonly unknown[] = []
     try {
       drafts = conversation.createDrafts(composeSessionId, [makeFile(file.fileName, file.content)], true)
     } catch (error) {
-      if (prepared.snapshotSaved) await discardPrepared(key, request.path, roundId)
+      if (prepared.snapshotSaved) await discardPrepared(sessionId, request.path, roundId)
       return { status: 'failed', reason: 'draft-failed', message: messageOf(error) }
     }
     const ids = draftIdsOf(drafts)
@@ -251,7 +254,7 @@ export function createAttachmentController(deps: AttachmentDeps): AttachmentCont
       } catch {
         // Nothing registered to release.
       }
-      if (prepared.snapshotSaved) await discardPrepared(key, request.path, roundId)
+      if (prepared.snapshotSaved) await discardPrepared(sessionId, request.path, roundId)
       return { status: 'failed', reason: 'draft-failed', message: 'conversation created no draft' }
     }
     let accepted: boolean
@@ -263,7 +266,7 @@ export function createAttachmentController(deps: AttachmentDeps): AttachmentCont
       } catch {
         // Keep the original failure.
       }
-      if (prepared.snapshotSaved) await discardPrepared(key, request.path, roundId)
+      if (prepared.snapshotSaved) await discardPrepared(sessionId, request.path, roundId)
       return { status: 'failed', reason: 'draft-failed', message: messageOf(error) }
     }
     if (!accepted) {
@@ -272,7 +275,7 @@ export function createAttachmentController(deps: AttachmentDeps): AttachmentCont
       } catch {
         // The refusal already says what happened.
       }
-      if (prepared.snapshotSaved) await discardPrepared(key, request.path, roundId)
+      if (prepared.snapshotSaved) await discardPrepared(sessionId, request.path, roundId)
       return { status: 'refused', reason: 'composer-busy' }
     }
 
@@ -287,7 +290,7 @@ export function createAttachmentController(deps: AttachmentDeps): AttachmentCont
       feedback: file.content,
       createdAt: now().toISOString(),
     }
-    const written = await deps.store.attach(key, pending)
+    const written = await deps.store.attach(pending)
     if (written.status !== 'saved') {
       removeFromComposer(input, ids[0]!)
       try {
@@ -297,7 +300,7 @@ export function createAttachmentController(deps: AttachmentDeps): AttachmentCont
       }
       try {
         const host = await deps.host()
-        await host.reviewDetach({ sessionId: key.sessionId, path: request.path, roundId })
+        await host.reviewDetach({ sessionId, path: request.path, roundId })
       } catch {
         // The pending snapshot will age out; annotations were never touched.
       }
@@ -311,13 +314,14 @@ export function createAttachmentController(deps: AttachmentDeps): AttachmentCont
     return { status: 'attached', pending, snapshotSaved: prepared.snapshotSaved }
   })
 
-  const regenerate = (request: RegenerateRequest): Promise<AttachResult> => deps.store.withLock(request.key, async () => {
-    const { key, composeSessionId, input, phase, roundId } = request
-    if (composeSessionId === undefined || composeSessionId !== key.sessionId) {
+  const regenerate = (request: RegenerateRequest): Promise<AttachResult> => deps.withLock(async () => {
+    const { composeSessionId, input, phase, roundId } = request
+    const sessionId = deps.composeSession()
+    if (composeSessionId === undefined || composeSessionId !== sessionId) {
       return { status: 'refused', reason: 'compose-session' }
     }
     if (!isPlain(phase)) return { status: 'refused', reason: 'composer-busy' }
-    const snapshot = deps.store.getSnapshot(key)
+    const snapshot = deps.store.getSnapshot()
     const current = snapshot.pending
     if (current === null) return { status: 'refused', reason: 'no-pending' }
     if (current.roundId !== roundId) return { status: 'refused', reason: 'round-mismatch' }
@@ -337,7 +341,7 @@ export function createAttachmentController(deps: AttachmentDeps): AttachmentCont
       ...(request.editedSinceOpen === true ? { editedSinceOpen: true } : {}),
     })
     const fileHash = await sha256Hex(file.content)
-    const prepared = await prepare(key, request.path, roundId, request.text)
+    const prepared = await prepare(sessionId, request.path, roundId, request.text)
 
     let drafts: readonly unknown[] = []
     try {
@@ -387,7 +391,7 @@ export function createAttachmentController(deps: AttachmentDeps): AttachmentCont
       feedback: file.content,
       createdAt: now().toISOString(),
     }
-    const written = await deps.store.regenerate(key, roundId, pending)
+    const written = await deps.store.regenerate(roundId, pending)
     if (written.status !== 'saved') {
       removeFromComposer(input, ids[0]!)
       try {
@@ -408,16 +412,17 @@ export function createAttachmentController(deps: AttachmentDeps): AttachmentCont
     return { status: 'attached', pending, snapshotSaved: prepared.snapshotSaved }
   })
 
-  const detach = (request: DetachRequest): Promise<DetachResult> => deps.store.withLock(request.key, async () => {
+  const detach = (request: DetachRequest): Promise<DetachResult> => deps.withLock(async () => {
+    const sessionId = deps.composeSession()
     if (!isPlain(request.phase)) return { status: 'refused', reason: 'composer-busy' }
     if (!mayRemove(request.input)) return { status: 'refused', reason: 'unavailable' }
-    const current = deps.store.getSnapshot(request.key).pending
+    const current = deps.store.getSnapshot().pending
     if (current === null) return { status: 'refused', reason: 'no-pending' }
     if (current.roundId !== request.roundId) return { status: 'refused', reason: 'round-mismatch' }
     removeFromComposer(request.input, current.draftAttachmentId)
-    const conversation = deps.conversation(request.key.sessionId)
+    const conversation = sessionId === undefined ? null : deps.conversation(sessionId)
     if (conversation !== null) releaseOne(conversation, current.draftAttachmentId)
-    const written = await deps.store.detach(request.key, request.roundId)
+    const written = await deps.store.detach(request.roundId)
     if (written.status === 'failed') return { status: 'failed', reason: 'save-failed', message: written.message }
     if (written.status === 'refused') return { status: 'refused', reason: written.reason as AttachmentFailure }
     remembered.delete(request.roundId)

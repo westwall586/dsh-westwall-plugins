@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { createAttachmentController, type AttachmentRequest } from '../client/src/annotate/attachment.ts'
 import { normalizeSourceText, sha256Hex } from '../client/src/annotate/feedback.ts'
 import type { Annotation } from '../client/src/annotate/model.ts'
-import { createAnnotationStore } from '../client/src/annotate/store.ts'
+import { createDocumentStore } from '../client/src/store/document.ts'
 import type {
   AnnotationLoadRequest,
   AnnotationSaveRequest,
@@ -14,7 +14,7 @@ import type {
   ReviewPrepareRequest,
 } from '../client/src/context.ts'
 
-const KEY = { sessionId: 's1', path: '/w/a.md' }
+const KEY = { session: 's1', path: '/w/a.md' }
 
 function annotation(overrides: Partial<Annotation> = {}): Annotation {
   return {
@@ -39,7 +39,7 @@ function annotation(overrides: Partial<Annotation> = {}): Annotation {
 
 interface Harness {
   host: HostBridge
-  store: ReturnType<typeof createAnnotationStore>
+  store: ReturnType<ReturnType<typeof createDocumentStore>['notesFor']>['notes']
   controller: ReturnType<typeof createAttachmentController>
   events: string[]
   added: string[][]
@@ -106,9 +106,12 @@ function harness(): Harness {
     },
   }
 
-  const store = createAnnotationStore({ host: async () => host })
+  const documents = createDocumentStore({ host: async () => host })
+  const { notes: store, withLock } = documents.notesFor(KEY.session, KEY.path, KEY.session)
   const controller = createAttachmentController({
     store,
+    withLock,
+    composeSession: () => KEY.session,
     host: async () => host,
     conversation: () => conversation,
     now: () => new Date('2026-11-17T00:00:00.000Z'),
@@ -158,7 +161,7 @@ async function attachWithInput(
 }
 
 async function ready(harnessValue: Harness): Promise<void> {
-  await harnessValue.store.write(KEY, [annotation()])
+  await harnessValue.store.write([annotation()])
   harnessValue.events.length = 0
 }
 
@@ -176,7 +179,7 @@ test('加入输入框依次 prepare / create / add / save，并冻结待发送�
   assert.equal(result.pending.fileName, `a-review-${result.pending.roundId}.md`)
   assert.match(result.pending.sourceHash, /^[0-9a-f]{64}$/)
   assert.equal(result.pending.annotations.length, 1)
-  assert.equal(value.store.getSnapshot(KEY).pending?.roundId, result.pending.roundId)
+  assert.equal(value.store.getSnapshot().pending?.roundId, result.pending.roundId)
   assert.equal(value.added[0]?.length, 1)
 })
 
@@ -196,7 +199,7 @@ test('addAttachments 拒绝时释放 draft 并清掉 pending 快照', async () =
   assert.deepEqual(result, { status: 'refused', reason: 'composer-busy' })
   assert.deepEqual(value.events, ['prepare', 'create', 'add', 'release', 'detach'])
   assert.equal(value.detaches.length, 1)
-  assert.equal(value.store.getSnapshot(KEY).pending, null)
+  assert.equal(value.store.getSnapshot().pending, null)
 })
 
 test('prepare 失败仍然加入输入框，并标出没有旧版快照', async () => {
@@ -208,7 +211,7 @@ test('prepare 失败仍然加入输入框，并标出没有旧版快照', async 
   if (result.status !== 'attached') return
   assert.equal(result.snapshotSaved, false)
   assert.equal(result.pending.sourceHash.length, 64, '本地补算 sourceHash')
-  assert.equal(value.store.getSnapshot(KEY).pending?.roundId, result.pending.roundId)
+  assert.equal(value.store.getSnapshot().pending?.roundId, result.pending.roundId)
 })
 
 test('保存 pending 失败时移除附件、释放 draft、清 Host pending，批注保留', async () => {
@@ -218,8 +221,8 @@ test('保存 pending 失败时移除附件、释放 draft、清 Host pending，�
   const result = await attachWithInput(value)
   assert.deepEqual(result, { status: 'failed', reason: 'save-failed', message: 'disk full' })
   assert.deepEqual(value.events, ['prepare', 'create', 'add', 'save', 'remove', 'release', 'detach'])
-  assert.equal(value.store.getSnapshot(KEY).pending, null)
-  assert.equal(value.store.getSnapshot(KEY).annotations.length, 1)
+  assert.equal(value.store.getSnapshot().pending, null)
+  assert.equal(value.store.getSnapshot().annotations.length, 1)
 })
 
 test('再次加入被拒绝，已有 pending 时不创建新 draft', async () => {
@@ -265,7 +268,7 @@ test('批注改动后按同一 roundId 重新生成，先加新 id 再移除旧 
   assert.ok(result.pending.feedback.includes('改过的意见'))
   assert.deepEqual(value.events, ['prepare', 'create', 'add', 'save', 'remove'])
   assert.deepEqual(value.removed, [first.pending.draftAttachmentId])
-  assert.equal(value.store.getSnapshot(KEY).pending?.draftAttachmentId, result.pending.draftAttachmentId)
+  assert.equal(value.store.getSnapshot().pending?.draftAttachmentId, result.pending.draftAttachmentId)
 })
 
 test('源文变化后拒绝按旧轮次重新生成', async () => {
@@ -283,7 +286,7 @@ test('源文变化后拒绝按旧轮次重新生成', async () => {
   })
   assert.deepEqual(result, { status: 'refused', reason: 'source-changed' })
   assert.deepEqual(value.events, [])
-  assert.equal(value.store.getSnapshot(KEY).pending?.roundId, first.pending.roundId)
+  assert.equal(value.store.getSnapshot().pending?.roundId, first.pending.roundId)
 })
 
 test('createDrafts 失败时清掉已写的 pending 快照', async () => {
@@ -293,7 +296,7 @@ test('createDrafts 失败时清掉已写的 pending 快照', async () => {
   const result = await attachWithInput(value)
   assert.equal(result.status, 'failed')
   assert.equal(value.detaches.length, 1)
-  assert.equal(value.store.getSnapshot(KEY).pending, null)
+  assert.equal(value.store.getSnapshot().pending, null)
 })
 
 test('compose session 与草稿键不一致时拒绝', async () => {
@@ -334,8 +337,8 @@ test('detach 只清匹配的 roundId，匹配时移除附件并保留批注', as
   })
   assert.deepEqual(detached, { status: 'detached' })
   assert.ok(value.events.includes(`remove:${attached.pending.draftAttachmentId}`))
-  assert.equal(value.store.getSnapshot(KEY).pending, null)
-  assert.equal(value.store.getSnapshot(KEY).annotations.length, 1)
+  assert.equal(value.store.getSnapshot().pending, null)
+  assert.equal(value.store.getSnapshot().annotations.length, 1)
 })
 
 test('verify 需要文件名、字节数与 sha256 全部匹配', async () => {

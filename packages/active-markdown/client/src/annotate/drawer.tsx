@@ -2,7 +2,7 @@
 import * as React from 'react'
 import type { ReactNode } from 'react'
 import type { Annotation } from './model.ts'
-import type { AnnotationPersistence } from './store.ts'
+import type { AnnotationPersistence } from '../store/index.ts'
 
 export interface AnnotationDrawerLabels {
   title: string

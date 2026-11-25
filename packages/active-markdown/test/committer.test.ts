@@ -49,7 +49,7 @@ function entry(roundId: string, id = `d-${roundId}`): PendingEntry {
     feedback: '反馈',
     createdAt: '2026-11-17T00:00:00.000Z',
   }
-  return { key: { sessionId: 's1', path: `/w/${roundId}.md` }, pending }
+  return { key: { session: 's1', path: `/w/${roundId}.md` }, pending }
 }
 
 function observe(
@@ -230,7 +230,7 @@ test('pending hub 按会话广播，set/remove/clear 不串会话', () => {
   hub.set(a)
   hub.set(b)
   assert.deepEqual(hub.list('s1').map(item => item.pending.roundId), ['ra', 'rb'])
-  hub.remove({ sessionId: 's1', path: '/w/ra.md' }, 'ra')
+  hub.remove({ session: 's1', path: '/w/ra.md' }, 'ra')
   assert.deepEqual(hub.list('s1').map(item => item.pending.roundId), ['rb'])
   hub.clear('rb')
   assert.deepEqual(hub.list('s1'), [])

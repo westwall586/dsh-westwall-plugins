@@ -30,8 +30,8 @@ import {
   type JoinedLines,
   type TextLineAtom,
 } from './annotate/selection.ts'
-import type { AnnotationStore, DraftKey } from './annotate/store.ts'
-import { useAnnotationSnapshot } from './annotate/use-store.ts'
+import { EMPTY_SNAPSHOT, refFrom, useNotes } from './store/index.ts'
+import type { DocumentRef, DocumentStore, Notes } from './store/index.ts'
 import type {
   ContextMenuTarget,
   DescribeView,
@@ -116,10 +116,10 @@ export interface BodyInjected {
   /** Open an external address inside the product, or in a new tab when it cannot. */
   openExternal(url: string): void
   host(): Promise<HostBridge>
-  /** The plugin-owned draft store; one instance is shared by every body. */
-  annotations: AnnotationStore
-  /** The feedback-attachment transaction, shared by every body. */
-  attachment: AttachmentController
+  /** The plugin-owned document store; every body looks its own crate up in it. */
+  documents: DocumentStore
+  /** The feedback-attachment transaction of one document's crate. */
+  attachmentFor(session: string, path: string): AttachmentController
   /** Session-level pending records the committer watches. */
   hub: PendingHub
   /** Opens the shared menu; false when the service is absent, so the native menu stays. */
@@ -208,7 +208,8 @@ type ToolbarError =
 
 interface UndoState {
   annotation: Annotation
-  key: DraftKey
+  /** The document and composer the annotation was deleted from. */
+  ref: DocumentRef
   timer: ReturnType<typeof setTimeout>
 }
 
@@ -223,6 +224,19 @@ const EMPTY_PARSED: ParsedDocument = { blocks: [] }
 const EMPTY_DIFF: DocumentDiff = { statuses: [], counts: { updated: 0 } }
 const EMPTY_ANCHORS: ReadonlySet<string> = new Set()
 const ANNOTATION_HIGHLIGHT = 'am-annotation'
+/** The identity used before the document path is known; it never reaches the store. */
+const NO_NOTES: Notes = {
+  subscribe: () => () => {},
+  getSnapshot: () => EMPTY_SNAPSHOT,
+  load: () => {},
+  withLock: job => job(),
+  write: async () => ({ status: 'failed', message: 'annotation draft is not ready' }),
+  attach: async () => ({ status: 'refused', reason: 'not-ready' }),
+  regenerate: async () => ({ status: 'refused', reason: 'not-ready' }),
+  detach: async () => ({ status: 'refused', reason: 'not-ready' }),
+  commit: async () => ({ status: 'refused', reason: 'not-ready' }),
+  clear: async () => ({ status: 'failed', message: 'annotation draft is not ready' }),
+}
 const UNDO_WINDOW_MS = 6000
 const PIN_STEP = 18
 
@@ -457,8 +471,8 @@ export function Body({
   openResource,
   openExternal,
   host,
-  annotations,
-  attachment,
+  documents,
+  attachmentFor,
   hub,
   openMenu,
   t,
@@ -816,12 +830,22 @@ export function Body({
   )
   const absolutePath = state.status === 'ready' ? state.absolutePath : ''
   // The annotation draft belongs to the composer's session, never the
-  // addressed document's session: the attachment is created in the composer.
-  const draftKey = useMemo<DraftKey | null>(
-    () => (!composeSessionId || absolutePath === '' ? null : { sessionId: composeSessionId, path: absolutePath }),
-    [composeSessionId, absolutePath],
+  // addressed document's session; the file operations belong to the latter.
+  const documentRef = useMemo(
+    () => (sessionId === undefined || !composeSessionId || absolutePath === ''
+      ? null
+      : refFrom({ session: sessionId, compose: composeSessionId, path: absolutePath })),
+    [sessionId, composeSessionId, absolutePath],
   )
-  const snapshot = useAnnotationSnapshot(annotations, draftKey)
+  const { writer, snapshot } = useNotes(documents, documentRef)
+  // Bound together: the writer and the transaction of one document's crate.
+  const bound = useMemo(
+    () => (documentRef === null
+      ? null
+      : { ref: documentRef, writer, attachment: attachmentFor(documentRef.compose, documentRef.path) }),
+    [attachmentFor, documentRef, writer],
+  )
+  const annotations = useMemo<Notes>(() => writer?.notes ?? NO_NOTES, [writer])
   const annotationList = snapshot.annotations
   const pendingReview = snapshot.pending
   const attached = pendingReview !== null && inputAttachmentIds.includes(pendingReview.draftAttachmentId)
@@ -835,11 +859,11 @@ export function Body({
   const pendingRoundId = pendingReview?.roundId ?? null
   useEffect(() => {
     const token = (reviewToken.current += 1)
-    if (state.status !== 'ready' || draftKey === null || pendingRoundId !== null) {
+    if (state.status !== 'ready' || documentRef === null || pendingRoundId !== null) {
       setLatest(null)
       return
     }
-    const request = { sessionId: draftKey.sessionId, path: draftKey.path }
+    const request = { sessionId: documentRef.session, path: documentRef.path }
     void (async () => {
       const bridge = await host().catch(() => undefined)
       if (bridge === undefined) return
@@ -847,7 +871,7 @@ export function Body({
       if (token !== reviewToken.current) return
       setLatest(base)
     })()
-  }, [state.status, revision, draftKey, pendingRoundId, host])
+  }, [state.status, revision, documentRef, pendingRoundId, host])
 
   const currentText = state.status === 'ready' ? state.text : ''
   const baselineText = latest?.text ?? null
@@ -1088,8 +1112,8 @@ export function Body({
   }, [errorOpen])
 
   useEffect(() => {
-    if (draftKey !== null) annotations.load(draftKey)
-  }, [annotations, draftKey])
+    if (documentRef !== null) annotations.load()
+  }, [annotations, documentRef])
 
   const showSourceRange = useCallback((lineStart: number, lineEnd: number): void => {
     const root = container.current
@@ -1318,7 +1342,7 @@ export function Body({
     }
     const element = container.current?.querySelector<HTMLElement>(`[data-component][data-block-id="${block.id}"]`)
     const rect = element?.getBoundingClientRect()
-    const latest = draftKey === null ? annotationList : annotations.getSnapshot(draftKey).annotations
+    const latest = documentRef === null ? annotationList : annotations.getSnapshot().annotations
     const existing = blockAnnotationOf(latest, block.id)
     const left = rect === undefined ? window.innerWidth - ANNOTATION_POPOVER_WIDTH - 24 : rect.right - ANNOTATION_POPOVER_WIDTH
     const top = rect === undefined ? 72 : rect.top + 32
@@ -1329,7 +1353,7 @@ export function Body({
       { top, left, height: 0 },
       left,
     )
-  }, [annotationList, annotations, draftKey, composerBusy, t, openEditorAt])
+  }, [annotationList, annotations, documentRef, composerBusy, t, openEditorAt])
 
   useLayoutEffect(() => {
     if (editor === null) return
@@ -1396,20 +1420,18 @@ export function Body({
   }, [located])
 
   const syncAttachment = useCallback(async (annotationsToSend: readonly Annotation[]): Promise<void> => {
-    const target = draftKey
-    if (target === null || state.status !== 'ready' || phase !== 'plain') return
-    const pending = annotations.getSnapshot(target).pending
+    if (bound === null || state.status !== 'ready' || phase !== 'plain') return
+    const pending = annotations.getSnapshot().pending
     if (pending === null) return
     // A manually removed attachment is not rebuilt behind the user's back.
     if (!inputAttachmentIds.includes(pending.draftAttachmentId)) return
     if (annotationsToSend.length === 0) {
-      const detached = await attachment.detach({ key: target, roundId: pending.roundId, input: inputActions, phase })
-      if (detached.status === 'detached') hub.remove(target, pending.roundId)
+      const detached = await bound.attachment.detach({ roundId: pending.roundId, input: inputActions, phase })
+      if (detached.status === 'detached') hub.remove(bound.ref, pending.roundId)
       else if (detached.status === 'failed') setAttachError(t('annotate.attachFailed', { message: detached.message }))
       return
     }
-    const result = await attachment.regenerate({
-      key: target,
+    const result = await bound.attachment.regenerate({
       composeSessionId,
       path: state.absolutePath,
       displayPath: displayPath || state.absolutePath,
@@ -1421,40 +1443,38 @@ export function Body({
       phase,
       roundId: pending.roundId,
     })
-    if (result.status === 'attached') hub.set({ key: target, pending: result.pending })
+    if (result.status === 'attached') hub.set({ key: bound.ref, pending: result.pending })
     else if (result.status === 'failed') setAttachError(t('annotate.attachFailed', { message: result.message }))
     else if (result.reason === 'source-changed') setAttachError(refusalText(result.reason, t))
   }, [
-    draftKey, state, phase, annotations, inputAttachmentIds, attachment, inputActions, hub,
+    bound, state, phase, annotations, inputAttachmentIds, inputActions, hub,
     composeSessionId, path, displayPath, unlocatableNow, editedSinceOpen, t,
   ])
 
   const attachFeedback = useCallback(async (): Promise<void> => {
-    const target = draftKey
-    if (target === null || state.status !== 'ready') return
+    if (bound === null || state.status !== 'ready') return
     if (composerBusy) {
       setAttachError(t('annotate.composerBusy'))
       return
     }
-    const latest = annotations.getSnapshot(target)
+    const latest = annotations.getSnapshot()
     if (latest.status !== 'ready') {
       setAttachError(t('annotate.loading'))
       return
     }
     const current = latest.pending
     if (current !== null && !inputAttachmentIds.includes(current.draftAttachmentId)) {
-      const cleared = await attachment.detach({ key: target, roundId: current.roundId, input: inputActions, phase })
+      const cleared = await bound.attachment.detach({ roundId: current.roundId, input: inputActions, phase })
       if (cleared.status === 'failed') {
         setAttachError(t('annotate.attachFailed', { message: cleared.message }))
         return
       }
-      hub.remove(target, current.roundId)
-      attachment.forget(current.roundId)
+      hub.remove(bound.ref, current.roundId)
+      bound.attachment.forget(current.roundId)
     }
     setAttachBusy(true)
     setAttachError(null)
-    const result = await attachment.attach({
-      key: target,
+    const result = await bound.attachment.attach({
       composeSessionId,
       path: state.absolutePath,
       displayPath: displayPath || state.absolutePath,
@@ -1467,7 +1487,7 @@ export function Body({
     })
     setAttachBusy(false)
     if (result.status === 'attached') {
-      hub.set({ key: target, pending: result.pending })
+      hub.set({ key: bound.ref, pending: result.pending })
       setNotice({ text: result.snapshotSaved ? t('annotate.attachHint') : t('annotate.snapshotMissing'), undo: false })
       return
     }
@@ -1475,42 +1495,40 @@ export function Body({
       ? t('annotate.attachFailed', { message: result.message })
       : refusalText(result.reason, t))
   }, [
-    draftKey, state, composerBusy, annotations, inputAttachmentIds, attachment, inputActions, phase,
+    bound, state, composerBusy, annotations, inputAttachmentIds, inputActions, phase,
     hub, composeSessionId, path, displayPath, unlocatableNow, editedSinceOpen, t,
   ])
 
   const removeAttachment = useCallback(async (): Promise<void> => {
-    const target = draftKey
-    if (target === null) return
+    if (bound === null) return
     if (composerBusy) {
       setAttachError(t('annotate.composerBusy'))
       return
     }
-    const current = annotations.getSnapshot(target).pending
+    const current = annotations.getSnapshot().pending
     if (current === null) return
     setAttachBusy(true)
     setAttachError(null)
-    const result = await attachment.detach({ key: target, roundId: current.roundId, input: inputActions, phase })
+    const result = await bound.attachment.detach({ roundId: current.roundId, input: inputActions, phase })
     setAttachBusy(false)
     if (result.status === 'detached') {
-      hub.remove(target, current.roundId)
-      attachment.forget(current.roundId)
+      hub.remove(bound.ref, current.roundId)
+      bound.attachment.forget(current.roundId)
       setNotice({ text: t('annotate.detached'), undo: false })
       return
     }
     if (result.status === 'failed') setAttachError(t('annotate.attachFailed', { message: result.message }))
-  }, [draftKey, composerBusy, annotations, attachment, inputActions, phase, hub, t])
+  }, [bound, composerBusy, annotations, inputActions, phase, hub, t])
 
   /** Write one block's annotation; the panel drawer and the popover both land here. */
   const writeBlockAnnotation = useCallback((block: Block, body: string): void => {
-    const target = draftKey
     const text = body.trim()
-    if (target === null || text === '') return
+    if (bound === null || text === '') return
     if (composerBusy) {
       setNotice({ text: t('annotate.composerBusy'), undo: false })
       return
     }
-    const latest = annotations.getSnapshot(target)
+    const latest = annotations.getSnapshot()
     if (latest.status !== 'ready') {
       setNotice({ text: t('annotate.loading'), undo: false })
       return
@@ -1521,18 +1539,17 @@ export function Body({
       seq: nextSeq(base, latest.nextSeq),
       createdAt: new Date().toISOString(),
     }, labelOf(block))
-    void annotations.write(target, next).then((result) => {
+    void annotations.write(next).then((result) => {
       if (result.status === 'too-large') setNotice({ text: t('annotate.tooLarge'), undo: false })
       else if (result.status === 'failed') setNotice({ text: result.message, undo: false })
-      else void syncAttachment(annotations.getSnapshot(target).annotations)
+      else void syncAttachment(annotations.getSnapshot().annotations)
     })
-  }, [draftKey, annotations, composerBusy, t, labelOf, syncAttachment])
+  }, [documentRef, annotations, composerBusy, t, labelOf, syncAttachment])
 
   const saveEditor = useCallback((body: string): void => {
-    const target = draftKey
     const current = editor
     const text = body.trim()
-    if (target === null || current === null || text === '') return
+    if (bound === null || current === null || text === '') return
     if (current.mode === 'new-block') {
       setEditor(null)
       writeBlockAnnotation(current.block, text)
@@ -1543,7 +1560,7 @@ export function Body({
       setNotice({ text: t('annotate.composerBusy'), undo: false })
       return
     }
-    const latest = annotations.getSnapshot(target)
+    const latest = annotations.getSnapshot()
     if (latest.status !== 'ready') {
       setEditor(null)
       setNotice({ text: t('annotate.loading'), undo: false })
@@ -1559,41 +1576,39 @@ export function Body({
       ? editAnnotation(base, current.annotation.id, text)
       : addAnnotation(base, { ...current.anchor, kind: 'text', body: text }, options)
     setEditor(null)
-    void annotations.write(target, next).then((result) => {
+    void annotations.write(next).then((result) => {
       if (result.status === 'too-large') setNotice({ text: t('annotate.tooLarge'), undo: false })
       else if (result.status === 'failed') setNotice({ text: result.message, undo: false })
-      else void syncAttachment(annotations.getSnapshot(target).annotations)
+      else void syncAttachment(annotations.getSnapshot().annotations)
     })
-  }, [draftKey, editor, annotations, t, composerBusy, syncAttachment, writeBlockAnnotation])
+  }, [documentRef, editor, annotations, t, composerBusy, syncAttachment, writeBlockAnnotation])
 
   const deleteAnnotation = useCallback((annotation: Annotation): void => {
-    const target = draftKey
-    if (target === null) return
+    if (bound === null) return
     if (composerBusy) {
       setNotice({ text: t('annotate.composerBusy'), undo: false })
       return
     }
     if (undo !== null) clearTimeout(undo.timer)
-    const latest = annotations.getSnapshot(target).annotations
+    const latest = annotations.getSnapshot().annotations
     if (!latest.some(entry => entry.id === annotation.id)) return
-    void annotations.write(target, removeAnnotation(latest, annotation.id)).then((result) => {
+    void annotations.write(removeAnnotation(latest, annotation.id)).then((result) => {
       if (result.status === 'too-large') setNotice({ text: t('annotate.tooLarge'), undo: true })
       else if (result.status === 'failed') setNotice({ text: result.message, undo: true })
-      else void syncAttachment(annotations.getSnapshot(target).annotations)
+      else void syncAttachment(annotations.getSnapshot().annotations)
     })
     const timer = setTimeout(() => setUndo(current => (current?.annotation.id === annotation.id ? null : current)), UNDO_WINDOW_MS)
-    setUndo({ annotation, key: target, timer })
+    setUndo({ annotation, ref: bound.ref, timer })
     setNotice({ text: t('annotate.deleted'), undo: true })
-  }, [draftKey, annotations, undo, t, composerBusy, syncAttachment])
+  }, [documentRef, annotations, undo, t, composerBusy, syncAttachment])
 
   /** Delete a block's annotation from the panel drawer; the undo toast is the same one. */
   const deleteBlockAnnotation = useCallback((block: Block): void => {
-    const target = draftKey
-    if (target === null) return
-    const annotation = blockAnnotationOf(annotations.getSnapshot(target).annotations, block.id)
+    if (bound === null) return
+    const annotation = blockAnnotationOf(annotations.getSnapshot().annotations, block.id)
     if (annotation === undefined) return
     deleteAnnotation(annotation)
-  }, [draftKey, annotations, deleteAnnotation])
+  }, [documentRef, annotations, deleteAnnotation])
 
   const componentContext = useMemo<ComponentContext>(() => ({
     labelOf,
@@ -1624,18 +1639,20 @@ export function Body({
       return
     }
     clearTimeout(undo.timer)
-    const current = annotations.getSnapshot(undo.key).annotations
-    void annotations.write(undo.key, restoreAnnotation(current, undo.annotation)).then((result) => {
+    // The undo can outlive a tab switch; it writes back into the crate it came from.
+    const undoNotes = documents.notesFor(undo.ref.compose, undo.ref.path, undo.ref.session).notes
+    const current = undoNotes.getSnapshot().annotations
+    void undoNotes.write(restoreAnnotation(current, undo.annotation)).then((result) => {
       if (result.status === 'too-large') setNotice({ text: t('annotate.tooLarge'), undo: false })
       else if (result.status === 'failed') setNotice({ text: result.message, undo: false })
-      else void syncAttachment(annotations.getSnapshot(undo.key).annotations)
+      else void syncAttachment(undoNotes.getSnapshot().annotations)
     })
     setUndo(null)
     setNotice(null)
-  }, [undo, annotations, t, composerBusy, syncAttachment])
+  }, [undo, documents, t, composerBusy, syncAttachment])
 
   const clearAnnotations = useCallback(async (): Promise<void> => {
-    if (draftKey === null) return
+    if (bound === null) return
     if (composerBusy) {
       setNotice({ text: t('annotate.composerBusy'), undo: false })
       return
@@ -1643,20 +1660,20 @@ export function Body({
     if (undo !== null) clearTimeout(undo.timer)
     setUndo(null)
     setNotice(null)
-    const pending = annotations.getSnapshot(draftKey).pending
+    const pending = annotations.getSnapshot().pending
     if (pending !== null) {
-      const detached = await attachment.detach({ key: draftKey, roundId: pending.roundId, input: inputActions, phase })
+      const detached = await bound.attachment.detach({ roundId: pending.roundId, input: inputActions, phase })
       if (detached.status === 'failed') {
         setNotice({ text: t('annotate.attachFailed', { message: detached.message }), undo: false })
         return
       }
-      hub.remove(draftKey, pending.roundId)
-      attachment.forget(pending.roundId)
+      hub.remove(bound.ref, pending.roundId)
+      bound.attachment.forget(pending.roundId)
     }
-    void annotations.clear(draftKey).then((result) => {
+    void annotations.clear().then((result) => {
       if (result.status === 'failed') setNotice({ text: result.message, undo: false })
     })
-  }, [draftKey, annotations, undo, composerBusy, attachment, inputActions, phase, hub, t])
+  }, [bound, annotations, undo, composerBusy, inputActions, phase, hub, t])
 
   const locateAnnotation = useCallback((annotation: Annotation): void => {
     const textStart = annotation.kind === 'text'

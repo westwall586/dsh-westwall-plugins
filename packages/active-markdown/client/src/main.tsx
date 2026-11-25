@@ -1,9 +1,8 @@
 /** Browser half: locale, the Markdown renderer registration, and its body. */
 import CSS from './styles.css'
-import { createAttachmentController } from './annotate/attachment.ts'
+import { createAttachmentController, type AttachmentController } from './annotate/attachment.ts'
 import { AnnotationCommitter, type CommitterInjected } from './annotate/committer.tsx'
 import { createPendingHub } from './annotate/committer.ts'
-import { createAnnotationStore } from './annotate/store.ts'
 import { Body, type BodyInjected } from './body.tsx'
 import type { ClientContext, ConversationPort, HostBridge, SidebarRight } from './context.ts'
 import { openExternal } from './external.ts'
@@ -11,6 +10,7 @@ import { mountHostBridge } from './host.ts'
 import { SELECTION_MENU_KIND, selectionActions, type SelectionMenuValue } from './menus.ts'
 import { en, zh } from './locales.ts'
 import { createSettingsPage } from './settings.tsx'
+import { createDocumentStore } from './store/index.ts'
 
 const NS = 'active-markdown'
 const ID = 'active-markdown'
@@ -38,11 +38,11 @@ export default {
 
     const t = ctx.locale.bind(NS)
 
-    // One draft store for the plugin's lifetime; the body and the session
-    // committer share it instead of each opening their own copy.
+    // One document store for the plugin's lifetime; each document's state lives
+    // in its own crate, and the body and the session committer reach the same one.
     let bridge: Promise<HostBridge> | undefined
     const host = (): Promise<HostBridge> => (bridge ??= mountHostBridge(ctx))
-    const annotationStore = createAnnotationStore({ host })
+    const documents = createDocumentStore({ host })
     const pendingHub = createPendingHub()
     const conversationFor = (sessionId: string): ConversationPort | null => {
       const root = ctx.get('conversation') as ConversationPort | null | undefined
@@ -52,7 +52,17 @@ export default {
       if (scoped !== null && scoped !== undefined && typeof scoped.createDrafts === 'function') return scoped
       return null
     }
-    const attachment = createAttachmentController({ store: annotationStore, host, conversation: conversationFor })
+    // 一份文档的批注事务绑它的 crate：锁、快照与写入必须是同一个 composer 维度。
+    const attachmentFor = (sessionId: string, path: string): AttachmentController => {
+      const { notes, withLock } = documents.notesFor(sessionId, path, sessionId)
+      return createAttachmentController({
+        store: notes,
+        withLock,
+        composeSession: () => sessionId,
+        host,
+        conversation: conversationFor,
+      })
+    }
 
     // One contribution for our selection family; the shared menu owns the popup.
     ctx.inject(['contextMenus'], (menus) => {
@@ -113,8 +123,8 @@ export default {
             )
           },
           host,
-          annotations: annotationStore,
-          attachment,
+          documents,
+          attachmentFor,
           hub: pendingHub,
           openMenu: (target, point) => {
             const menus = ctx.get('contextMenus')
@@ -135,9 +145,11 @@ export default {
         order: 40,
         locale: NS,
         inject: (): CommitterInjected => ({
-          annotations: annotationStore,
+          documents,
           hub: pendingHub,
-          attachments: attachment,
+          // The committer's scope is one session, and that session is the
+          // composer that attaches the feedback files it watches.
+          attachments: sessionId => attachmentFor(sessionId, sessionId),
           host,
         }),
       }, AnnotationCommitter)), 'active-markdown annotation committer')

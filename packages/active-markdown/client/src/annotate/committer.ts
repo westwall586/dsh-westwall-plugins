@@ -10,10 +10,10 @@
  */
 import type { ChatMessageView, FileBlockView, InputPhase } from '../context.ts'
 import type { PendingReview } from './model.ts'
-import type { DraftKey } from './store.ts'
 
+/** A document the committer watches: the file's session plus its canonical path. */
 export interface PendingEntry {
-  key: DraftKey
+  key: { session: string, path: string }
   pending: PendingReview
 }
 
@@ -211,7 +211,7 @@ export interface PendingHub {
   subscribe(sessionId: string, listener: () => void): () => void
   list(sessionId: string): readonly PendingEntry[]
   set(entry: PendingEntry): void
-  remove(key: DraftKey, roundId: string): void
+  remove(key: { session: string, path: string }, roundId: string): void
   /** Drop every entry for a round id, whatever key it sits under. */
   clear(roundId: string): void
 }
@@ -244,16 +244,16 @@ export function createPendingHub(): PendingHub {
     },
 
     set(entry) {
-      const sessionId = entry.key.sessionId
+      const sessionId = entry.key.session
       const group = entries.get(sessionId) ?? []
-      const next = group.filter(existing => !(existing.key.sessionId === entry.key.sessionId && existing.key.path === entry.key.path))
+      const next = group.filter(existing => !(existing.key.session === entry.key.session && existing.key.path === entry.key.path))
       next.push(entry)
       entries.set(sessionId, next)
       publish(sessionId)
     },
 
     remove(key, roundId) {
-      const sessionId = key.sessionId
+      const sessionId = key.session
       const group = entries.get(sessionId)
       if (group === undefined) return
       const next = group.filter(entry => !(entry.key.path === key.path && entry.pending.roundId === roundId))

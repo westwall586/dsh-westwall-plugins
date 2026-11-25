@@ -17,14 +17,16 @@ import {
   type PendingHub,
   type TranscriptFile,
 } from './committer.ts'
-import type { AnnotationStore } from './store.ts'
+import type { DocumentStore } from '../store/index.ts'
 
 const RETRY_MS = 2000
 
 export interface CommitterInjected {
-  annotations: AnnotationStore
+  /** The plugin-level document store; a send clears the entries' own crates. */
+  documents: DocumentStore
   hub: PendingHub
-  attachments: AttachmentController
+  /** The controller that owns the entries of one composer session. */
+  attachments(sessionId: string): AttachmentController
   host(): Promise<HostBridge>
 }
 
@@ -38,9 +40,9 @@ export function AnnotationCommitter({
   sessionId,
   useInput,
   useConversation,
-  annotations,
+  documents,
   hub,
-  attachments,
+  attachments: attachmentsFor,
   host,
 }: CommitterProps): ReactNode {
   const phase = useInput(state => state.phase)
@@ -48,6 +50,7 @@ export function AnnotationCommitter({
   const draftText = useInput(state => state.draft)
   const transcript = useTranscript(useConversation)
   const entries = usePendingEntries(hub, sessionId)
+  const attachments = useMemo(() => attachmentsFor(sessionId), [attachmentsFor, sessionId])
   const verified = useVerified(entries, attachmentIds, attachments, sessionId)
   const state = useRef<CommitterState>(initialCommitterState())
   const mounted = useRef(true)
@@ -69,7 +72,7 @@ export function AnnotationCommitter({
         if (pending === undefined || pending.annotations.length === 0) continue
         // A local attach may have won the race with this mount-time read.
         if (hub.list(sessionId).some(entry => entry.key.path === draft.path)) continue
-        hub.set({ key: { sessionId, path: draft.path }, pending })
+        hub.set({ key: { session: sessionId, path: draft.path }, pending })
       }
     }).catch(() => {})
     return () => { live = false }
@@ -90,7 +93,10 @@ export function AnnotationCommitter({
     void runCommitterEffects(outcome.effects, {
       async commit(entry, sentText) {
         const key = entry.key
-        const result = await annotations.withLock(key, () => annotations.commit(key, entry.pending.roundId, sentText))
+        // The entry's session is also the composer's: a pending record only
+        // exists for the composer that attached it.
+        const { notes, withLock } = documents.notesFor(key.session, key.path, key.session)
+        const result = await withLock(() => notes.commit(entry.pending.roundId, sentText))
         if (result.status === 'committed') {
           hub.remove(key, entry.pending.roundId)
           attachments.forget(entry.pending.roundId)
@@ -100,9 +106,10 @@ export function AnnotationCommitter({
       },
       async detach(entry) {
         const key = entry.key
-        const result = await annotations.withLock(key, () => annotations.detach(key, entry.pending.roundId))
+        const { notes, withLock } = documents.notesFor(key.session, key.path, key.session)
+        const result = await withLock(() => notes.detach(entry.pending.roundId))
         if (result.status === 'saved') {
-          attachments.release(key.sessionId, entry.pending.draftAttachmentId)
+          attachments.release(key.session, entry.pending.draftAttachmentId)
           hub.remove(key, entry.pending.roundId)
           attachments.forget(entry.pending.roundId)
           return 'detached'
@@ -116,7 +123,7 @@ export function AnnotationCommitter({
         setTimeout(() => { if (mounted.current) setRetry(value => value + 1) }, RETRY_MS)
       }
     })
-  }, [phase, attachmentIds, draftText, transcript, entries, verified, annotations, hub, attachments, retry])
+  }, [phase, attachmentIds, draftText, transcript, entries, verified, documents, hub, attachments, retry])
 
   return null
 }

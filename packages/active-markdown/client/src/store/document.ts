@@ -57,7 +57,8 @@ export interface DocumentStore {
   touch(live: (session: string, path: string) => void): void
   /** 标记已发现页签消失；之后 `touch` 不再把它交给观察者。 */
   closed(session: string, path: string): void
-  dispose(session: string, path: string, reason: Disposal): void
+  /** close 与 external-change 返回的承诺在磁盘清理完成时结束。 */
+  dispose(session: string, path: string, reason: Disposal): void | Promise<void>
   disposeAll(reason: Disposal): void
 }
 
@@ -70,30 +71,36 @@ interface Entry {
 
 export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
   const entries = new Map<string, Entry>()
+  /** 页签关掉又马上开回同一文件时，上一次关闭的磁盘清理可能还没跑完。 */
+  const pendingCleanup = new Map<string, Promise<void>>()
 
+  /**
+   * 取或建一个 crate。上一次关闭的磁盘清理如果还没跑完，新 crate 会先等它，
+   * 否则它立刻读到的是还没清掉的旧批注。
+   */
   const find = (path: string, session: string): Entry => {
     const id = crateId({ session, path })
-    let entry = entries.get(id)
-    if (entry === undefined) {
-      entry = {
-        crate: createCrate({
-          key: { session, path },
-          host: deps.host,
-          ...(deps.readingDelayMs === undefined ? {} : { readingDelayMs: deps.readingDelayMs }),
-        }),
-        mounts: 0,
-        closed: false,
-      }
-      entries.set(id, entry)
+    const existing = entries.get(id)
+    if (existing !== undefined) return existing
+    const entry: Entry = {
+      crate: createCrate({
+        key: { session, path },
+        host: deps.host,
+        ...(deps.readingDelayMs === undefined ? {} : { readingDelayMs: deps.readingDelayMs }),
+      }),
+      mounts: 0,
+      closed: false,
     }
+    entry.crate.awaitCleanup(pendingCleanup.get(id) ?? Promise.resolve())
+    entries.set(id, entry)
     return entry
   }
 
-  const clear = (id: string, reason: Disposal): void => {
+  const clear = (id: string, reason: Disposal): void | Promise<void> => {
     const entry = entries.get(id)
     if (entry === undefined) return
     entries.delete(id)
-    entry.crate.dispose(reason)
+    return entry.crate.dispose(reason)
   }
 
   return {
@@ -150,7 +157,14 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
     },
 
     dispose(session, path, reason) {
-      clear(crateId({ session, path }), reason)
+      const id = crateId({ session, path })
+      const result = clear(id, reason)
+      if (reason !== 'close' && reason !== 'external-change') return
+      const pending = Promise.resolve(result).then(() => undefined).finally(() => {
+        if (pendingCleanup.get(id) === pending) pendingCleanup.delete(id)
+      })
+      pendingCleanup.set(id, pending)
+      return pending
     },
 
     disposeAll(reason) {

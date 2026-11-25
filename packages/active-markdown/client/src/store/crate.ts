@@ -4,7 +4,14 @@
  */
 import type { HostBridge } from '../context.ts'
 import { createEdit, createEditSlot, type Edit, type EditSlot } from './kernel/edit.ts'
-import { createNotes, createWriteChains, createNotesSlot, type NotesHandle } from './kernel/notes.ts'
+import {
+  clearStored,
+  createNotes,
+  createNotesSlot,
+  createWriteChains,
+  EMPTY_SNAPSHOT,
+  type NotesHandle,
+} from './kernel/notes.ts'
 import { createPreferences, createPreferencesSlot, type ViewPreferences, type ViewPreferencesSlot } from './kernel/preferences.ts'
 import { createReading, createReadingSlot, type Reading, type ReadingSlot } from './kernel/reading.ts'
 import { createTranslationRun, type TranslationRun } from './kernel/translation.ts'
@@ -41,9 +48,15 @@ export interface Crate {
   readonly edit: Edit
   /** 视图偏好：目录折叠与更新游标。 */
   readonly view: ViewPreferences
+  /**
+   * 登记一个要先等完的清理（上一个同键 crate 的关闭）。所有 Host 调用都排在它
+   * 后面：页签关掉又马上开回同一文件时，不能读到还没清掉的旧批注。
+   */
+  awaitCleanup(pending: Promise<void>): void
   /** 没有任何 composer 维度被持有。 */
   readonly empty: boolean
-  dispose(reason: Disposal): void
+  /** close 与 external-change 返回的承诺在磁盘清理完成时结束；其余规则立即返回。 */
+  dispose(reason: Disposal): void | Promise<void>
 }
 
 interface ComposeEntry {
@@ -58,11 +71,43 @@ export function createCrate(deps: CrateDeps): Crate {
   const entries = new Map<string, ComposeEntry>()
   const readingSlot: ReadingSlot = createReadingSlot()
   const reading = createReading({ slot: readingSlot, ...(deps.readingDelayMs === undefined ? {} : { delayMs: deps.readingDelayMs }) })
-  const run = createTranslationRun({ key: deps.key, host: deps.host })
+  /** 先前的关闭清理；Host 调用等它。 */
+  let gate: Promise<void> = Promise.resolve()
+  /** 已经在等门的那一份调用，复用它，免得每次调用多一层出队。 */
+  let gated: Promise<void> | undefined
+  /**
+   * 清理跑完前 `disposed` 对 Host 调用就是“还没建好”，抛错会被各内核当成一次读到
+   * 内存态而继续；所以先等，等过的那份承诺不会再来。
+   */
+  const hostCall = (): Promise<HostBridge> => (gated ??= gate).then(() => {
+    // 门已经放行，之后的调用直接走，不再排队。
+    if (gated !== undefined && gate === gated) gated = undefined
+    return deps.host()
+  })
+  const run = createTranslationRun({ key: deps.key, host: hostCall })
   const editSlot: EditSlot = createEditSlot()
   const edit = createEdit(editSlot)
   const viewSlot: ViewPreferencesSlot = createPreferencesSlot()
   const view = createPreferences(viewSlot)
+
+  /**
+   * close 与 external-change 共用的丢弃：每个 composer 维度的内存快照立刻换成空的
+   * 并通知仍在树上的帧，磁盘上的批注与 pending 记录在后台清掉。
+   *
+   * 读磁盘那一步可能还在飞：它的结果晚到时会按 generation 判定作废，不会把刚清空
+   * 的快照写回来。
+   */
+  const dropAnnotations = (): Promise<void> => {
+    for (const entry of entries.values()) {
+      entry.handle.slot.generation += 1
+      entry.handle.slot.loadPromise = null
+      entry.handle.slot.snapshot = EMPTY_SNAPSHOT
+      for (const listener of [...entry.handle.slot.listeners]) listener()
+    }
+    return clearStored(deps.key, deps.host).catch((error: unknown) => {
+      console.warn('[active-markdown] annotation clear failed', error)
+    })
+  }
 
   const notesFor = (compose: string): NotesHandle => {
     if (disposed) throw new Error('crate is disposed')
@@ -71,7 +116,7 @@ export function createCrate(deps: CrateDeps): Crate {
       existing.refs += 1
       return existing.handle
     }
-    const handle = createNotes({ key: deps.key, compose, host: deps.host }, createNotesSlot(), chains)
+    const handle = createNotes({ key: deps.key, compose, host: hostCall }, createNotesSlot(), chains)
     entries.set(compose, { handle, refs: 1 })
     return handle
   }
@@ -102,6 +147,10 @@ export function createCrate(deps: CrateDeps): Crate {
 
   return {
     key: deps.key,
+    awaitCleanup(pending) {
+      gate = Promise.all([gate, pending]).then(() => undefined, () => undefined)
+      gated = undefined
+    },
     notesFor,
     releaseCompose,
     reading,
@@ -111,6 +160,14 @@ export function createCrate(deps: CrateDeps): Crate {
     get empty() {
       return entries.size === 0
     },
+    /**
+     * 三条规则的唯一实现。close 与 external-change 的处置相同，只差阅读位置：
+     * 页签关掉后重开同一文件是全新的一次打开，位置也不该留；文件被外部改写时
+     * 读者仍在这份文档上，位置要留着。
+     *
+     * 返回值在 close 与 external-change 下是一条“磁盘已清”的承诺，页签关掉又
+     * 马上开回同一文件时，新的挂载可以等它再读磁盘。
+     */
     dispose(reason) {
       switch (reason) {
         case 'leave':
@@ -123,11 +180,18 @@ export function createCrate(deps: CrateDeps): Crate {
           dropEdit()
           return
         case 'close':
-        case 'external-change':
-          // TODO: 两者的处置是同一个 drop()（close 额外清空阅读位置），见
-          // docs/designs/active-markdown/STATE-STORE-SYNTHESIS.md 第 4 节；触发点在第 6 步
-          // 的常驻观察者里。
-          throw new Error(`crate dispose reason '${reason}' is not implemented`)
+        case 'external-change': {
+          const cleared = dropAnnotations()
+          // 先压住挂起的滚动写入，再丢弃槽：否则节流定时器会把位置写回一个已死的 crate。
+          run.dispose()
+          if (reason === 'close') reading.clear()
+          drop()
+          dropEdit()
+          viewSlot.collapsed = null
+          viewSlot.updateCursor = 0
+          viewSlot.listeners.clear()
+          return cleared
+        }
       }
     },
   }

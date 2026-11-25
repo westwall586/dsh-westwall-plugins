@@ -39,7 +39,7 @@ import {
   type TextLineAtom,
 } from './annotate/selection.ts'
 import { EMPTY_SNAPSHOT, refFrom, useEdit, useNotes, useTranslation, useViewPreferences } from './store/index.ts'
-import type { DocumentRef, DocumentStore, Notes, TranslationRun, View } from './store/index.ts'
+import type { DocumentRef, DocumentStore, Notes, Registration, TranslationRun, View } from './store/index.ts'
 import type {
   ContextMenuTarget,
   DescribeView,
@@ -122,6 +122,14 @@ export interface BodyInjected {
   host(): Promise<HostBridge>
   /** The plugin-owned document store; every body looks its own crate up in it. */
   documents: DocumentStore
+  /**
+   * Hold this body alive for the plugin's close observer. A hidden tab's body is
+   * unmounted, so the observer needs to know which documents were ever open to
+   * tell a closed tab from an unmounted one.
+   */
+  register(mount: { ref: DocumentRef, signal: AbortSignal, address: string }): Registration
+  /** The enclosing tab's standard reader; the host binds it through the slot. */
+  useTabInfo?: unknown
   /** The feedback-attachment transaction of one document's crate. */
   attachmentFor(session: string, path: string): AttachmentController
   /** Session-level pending records the committer watches. */
@@ -482,6 +490,8 @@ export function Body({
   openExternal,
   host,
   documents,
+  register,
+  useTabInfo,
   attachmentFor,
   hub,
   openMenu,
@@ -911,6 +921,15 @@ export function Body({
     [sessionId, composeSessionId, absolutePath],
   )
   const { writer, snapshot } = useNotes(documents, documentRef)
+  // 登记靠 `tab.signal` 的生命周期，`useTabInfo()` 读到的就是它；登记项随 body 卸载
+  // 撤销，页签在隐藏状态被关掉时由 apply 层的观察者接手。
+  const tabSignal = typeof useTabInfo === 'function'
+    ? (useTabInfo as () => { tab?: { signal?: AbortSignal } })().tab?.signal
+    : undefined
+  useEffect(() => {
+    if (documentRef === null || tabSignal === undefined) return
+    return register({ ref: documentRef, signal: tabSignal, address: resourceAddress }).release
+  }, [documentRef, tabSignal, resourceAddress, register])
   // Bound together: the writer and the transaction of one document's crate.
   const bound = useMemo(
     () => (documentRef === null

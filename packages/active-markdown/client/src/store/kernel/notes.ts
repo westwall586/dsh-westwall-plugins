@@ -95,6 +95,14 @@ export const EMPTY_SNAPSHOT: AnnotationSnapshot = Object.freeze({
   persistence: 'unknown',
 })
 
+/**
+ * 清掉一份文档的磁盘批注与 pending 记录。清理发生在 crate 被丢弃之后，此时没有
+ * 任何一个 composer 维度还活着，所以它不属于某个 slot，只借 Host 的入口。
+ */
+export function clearStored(key: DocumentKey, host: () => Promise<HostBridge>): Promise<void> {
+  return host().then(bridge => bridge.annotationClear({ sessionId: key.session, path: key.path }))
+}
+
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }

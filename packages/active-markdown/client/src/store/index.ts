@@ -2,6 +2,13 @@
 export { composeId, crateId, refFrom, type DocumentIdentity, type DocumentKey, type DocumentRef } from './ref.ts'
 export { createCrate, type Crate, type CrateDeps, type Disposal } from './crate.ts'
 export { createDocumentStore, type DocumentStore, type DocumentStoreDeps, type NotesWriter } from './document.ts'
+export {
+  createCloseObserver,
+  type CloseObserver,
+  type CloseObserverDeps,
+  type DocumentMount,
+  type Registration,
+} from './observer.ts'
 export { useEdit, useNotes, useTranslation, useViewPreferences } from './binding.ts'
 export { type Edit, type EditRestoreLine, type EditSlot } from './kernel/edit.ts'
 export {

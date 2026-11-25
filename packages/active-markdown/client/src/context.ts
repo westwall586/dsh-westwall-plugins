@@ -373,9 +373,26 @@ export interface ContextMenusService {
   }): () => void
 }
 
+/** One open tab's metadata, independent of which one is on screen. */
+export interface OpenTabView {
+  readonly sessionId: string
+  readonly tabId: string
+  readonly kind: string
+  /** The address opened; a file resource's address is the document's. */
+  readonly contentId: string
+}
+
 /** The sidebar service used to open an addressed file or one of its page types. */
 export interface SidebarRight {
   openResource(address: string): void
+  /**
+   * Every open tab across sessions. The close observer needs it while this
+   * document's body is unmounted; optional because a host may predate it.
+   */
+  openTabs?: {
+    getSnapshot(): readonly OpenTabView[]
+    subscribe(listener: () => void): () => void
+  }
   /**
    * Open one registered page type, such as the browser. Optional because a host
    * may predate the method, or never register the page type; callers fall back

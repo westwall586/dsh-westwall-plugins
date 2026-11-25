@@ -11,6 +11,7 @@ import { SELECTION_MENU_KIND, selectionActions, type SelectionMenuValue } from '
 import { en, zh } from './locales.ts'
 import { createSettingsPage } from './settings.tsx'
 import { createDocumentStore } from './store/index.ts'
+import { createCloseObserver, type Registration } from './store/observer.ts'
 
 const NS = 'active-markdown'
 const ID = 'active-markdown'
@@ -44,6 +45,34 @@ export default {
     const host = (): Promise<HostBridge> => (bridge ??= mountHostBridge(ctx))
     const documents = createDocumentStore({ host })
     const pendingHub = createPendingHub()
+
+    // The body unmounts whenever the tab is hidden, so a close that happens
+    // then has no listener in the body; the host aborts `tab.signal` for both a
+    // vanished record and this plugin unloading, so the observer discovers a
+    // close from `openTabs` alone and turns `unload` into memory-only disposal.
+    const sidebar = ctx.get('sidebarRight') as SidebarRight | null | undefined
+    const openTabs = sidebar?.openTabs
+    const observer = createCloseObserver({
+      documents,
+      openAddresses: () => new Set((openTabs?.getSnapshot() ?? []).map(tab => tab.contentId)),
+      dispose: (session, path) => {
+        // Closing has already happened from the reader's point of view; the disk
+        // cleanup only needs a log if it fails.
+        void Promise.resolve(documents.dispose(session, path, 'close')).catch((error: unknown) => {
+          console.error('[active-markdown] close cleanup failed', error)
+        })
+      },
+    })
+    // The flag and the teardown live in one effect: its cleanup runs before the
+    // host aborts every tab signal, which is what separates unload from close.
+    ctx.effect(() => {
+      if (openTabs === undefined) return
+      const unsubscribe = openTabs.subscribe(() => observer.check())
+      return () => {
+        observer.dispose()
+        unsubscribe()
+      }
+    }, 'active-markdown close observer')
     const conversationFor = (sessionId: string): ConversationPort | null => {
       const root = ctx.get('conversation') as ConversationPort | null | undefined
       if (root !== null && root !== undefined && typeof root.createDrafts === 'function') return root
@@ -124,6 +153,12 @@ export default {
           },
           host,
           documents,
+          register: (mount): Registration => {
+            // 挂载这一刻先对一次表：页签在 body 挂上来之前就关掉了。
+            const registration = observer.register(mount)
+            observer.check()
+            return registration
+          },
           attachmentFor,
           hub: pendingHub,
           openMenu: (target, point) => {

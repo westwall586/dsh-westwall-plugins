@@ -12,6 +12,7 @@ import { en, zh } from './locales.ts'
 import { createSettingsPage } from './settings.tsx'
 import { createDocumentStore } from './store/index.ts'
 import { createCloseObserver, type Registration } from './store/observer.ts'
+import { installTraceHelpers, trace } from './store/trace.ts'
 
 const NS = 'active-markdown'
 const ID = 'active-markdown'
@@ -38,6 +39,9 @@ export default {
     }, 'active-markdown styles')
 
     const t = ctx.locale.bind(NS)
+    // The dump must exist before any document opens; a closed tab is exactly the
+    // case that has no body to install it.
+    installTraceHelpers()
 
     // One document store for the plugin's lifetime; each document's state lives
     // in its own crate, and the body and the session committer reach the same one.
@@ -50,11 +54,14 @@ export default {
     // then has no listener in the body; the host aborts `tab.signal` for both a
     // vanished record and this plugin unloading, so the observer discovers a
     // close from `openTabs` alone and turns `unload` into memory-only disposal.
-    const sidebar = ctx.get('sidebarRight') as SidebarRight | null | undefined
-    const openTabs = sidebar?.openTabs
+    //
+    // `ctx.get('sidebarRight')` is null in apply scope: the service is only
+    // reachable after injection, so the observer is wired from `ctx.inject`
+    // below and this late-bound lookup finds it from then on.
+    let sidebarService: SidebarRight | null | undefined
     const observer = createCloseObserver({
       documents,
-      openAddresses: () => new Set((openTabs?.getSnapshot() ?? []).map(tab => tab.contentId)),
+      openAddresses: () => new Set((sidebarService?.openTabs?.getSnapshot() ?? []).map(tab => tab.contentId)),
       dispose: (session, path) => {
         // Closing has already happened from the reader's point of view; the disk
         // cleanup only needs a log if it fails.
@@ -63,16 +70,7 @@ export default {
         })
       },
     })
-    // The flag and the teardown live in one effect: its cleanup runs before the
-    // host aborts every tab signal, which is what separates unload from close.
-    ctx.effect(() => {
-      if (openTabs === undefined) return
-      const unsubscribe = openTabs.subscribe(() => observer.check())
-      return () => {
-        observer.dispose()
-        unsubscribe()
-      }
-    }, 'active-markdown close observer')
+
     const conversationFor = (sessionId: string): ConversationPort | null => {
       const root = ctx.get('conversation') as ConversationPort | null | undefined
       if (root !== null && root !== undefined && typeof root.createDrafts === 'function') return root
@@ -126,6 +124,32 @@ export default {
     })
 
     ctx.inject(['documentPreviews', 'remote.workspaceFiles'], (scoped) => {
+      // The close observer must live at plugin scope, but `sidebarRight` is only
+      // reachable through an injected scope: `ctx.get('sidebarRight')` in apply
+      // returns null, which left the observer permanently unsubscribed and every
+      // close (and every tab switch) invisible to it.
+      scoped.effect(() => {
+        const sidebar = scoped.get('sidebarRight') as SidebarRight | null | undefined
+        sidebarService = sidebar
+        const openTabs = sidebar?.openTabs
+        trace('main.wire', {
+          hasSidebar: sidebar !== null && sidebar !== undefined,
+          hasOpenTabs: openTabs !== undefined,
+          snapshotSize: openTabs?.getSnapshot()?.length ?? -1,
+        })
+        if (openTabs === undefined) return
+        const unsubscribe = openTabs.subscribe(() => {
+          trace('main.openTabs-publish', { size: openTabs.getSnapshot().length })
+          observer.check()
+        })
+        // Only the subscription is undone here. `observer.dispose()` is a one-way
+        // latch that stops every later check, so calling it from an effect cleanup
+        // would kill the observer the first time this effect re-runs — which is
+        // what left it silent. The plugin teardown is the unload path, and that is
+        // handled by the tab signals themselves.
+        return unsubscribe
+      }, 'active-markdown close observer')
+
       scoped.effect(() => scoped.documentPreviews.register({
         id: ID,
         extensions: ['md', 'markdown'],

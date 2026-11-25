@@ -230,3 +230,4 @@ test('正文路径是相对路径时，快照用绝对路径，仍在开着的�
   assert.deepEqual(h.clears, [], 'A 的页签还在，不能清')
   assert.equal(h.documents.has(SESSION, PATH), true)
 })
+

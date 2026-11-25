@@ -32,6 +32,11 @@ function IconShell({ size = 14, children }: IconShellProps): ReactElement {
   )
 }
 
+/** Leave the current view for the one it came from: the toolbar's leading button. */
+export function BackIcon({ size }: IconProps = {}): ReactElement {
+  return <IconShell size={size}><path d="M9.5 3.5 5 8l4.5 4.5" /></IconShell>
+}
+
 /** Open the expanded panel: four outward corners. */
 export function ExpandIcon({ size }: IconProps = {}): ReactElement {
   return <IconShell size={size}><path d="M6 2H2v4M10 2h4v4M14 10v4h-4M6 14H2v-4" /></IconShell>

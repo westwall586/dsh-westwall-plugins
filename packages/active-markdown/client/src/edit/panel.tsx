@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import type { HostBridge } from '../context.ts'
 import type { EditCheckResult, WriteIntent, WriteTextResult } from './model.ts'
 import type { EditEvent } from './state.ts'
+import { BackIcon } from '../rich/icons.tsx'
 
 export interface EditCommandDeps {
   host(): Promise<HostBridge>
@@ -57,7 +58,8 @@ export function useEditCommand(deps: EditCommandDeps): EditCommand {
 export interface EditToolbarLabels {
   save: string
   saving: string
-  exit: string
+  /** The leading back button; the same word the reading toolbar's leading button uses. */
+  back: string
   lines: string
   dirty: string
 }
@@ -71,23 +73,33 @@ export interface EditToolbarProps {
   onExit(): void
 }
 
+/**
+ * The editing toolbar: the same four zones as every other toolbar.
+ *
+ * Leaving is the leading button, icon and label, exactly where the reading
+ * toolbar puts its way back; the status zone sits next to the confirming action,
+ * so the line count reads as state rather than as a control.
+ * @param props - dirty and saving state, the line count, copy, and the two actions.
+ * @returns the toolbar's contents.
+ */
 export function EditToolbar(props: EditToolbarProps): ReactNode {
   const { dirty, saving, lineCount, labels } = props
   return (
     <>
-      <span className="am-edit-status">
-        {dirty ? <span className="am-edit-dirty">{labels.dirty}</span> : null}
-        <span className="am-edit-lines">{labels.lines} {lineCount}</span>
-      </span>
-      <span className="am-toolbar-spacer" />
       <button
         type="button"
         className="am-toolbar-button am-toolbar-button--quiet"
         disabled={saving}
         onClick={props.onExit}
       >
-        {labels.exit}
+        <BackIcon />
+        {labels.back}
       </button>
+      <span className="am-toolbar-spacer" />
+      <span className="am-edit-status">
+        {dirty ? <span className="am-edit-dirty">{labels.dirty}</span> : null}
+        <span className="am-edit-lines">{labels.lines} {lineCount}</span>
+      </span>
       <button
         type="button"
         className="am-primary"

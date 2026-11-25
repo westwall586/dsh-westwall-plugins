@@ -14,7 +14,11 @@
   /* A remembered offset is a pixel distance; anchoring would move it when content
      above it reflows after a remount. */
   overflow-anchor: none;
-  padding: 20px var(--am-pad-x) 72px;
+  /* No top padding: the toolbar is the first thing the pane shows and sticks to
+     the very top, so a gap here would sit above the sticky bar on the first
+     screen and again on every scrolled one. The toolbar carries the space below
+     itself through its own bottom margin. */
+  padding: 0 var(--am-pad-x) 72px;
   color: var(--dsw-alias-label-primary);
   /* The theme's markdown scale is the single source for size, leading, and family. */
   font: var(--dsw-font-markdown-base);
@@ -1038,7 +1042,9 @@ svg.am-markmap-canvas .markmap-foreign > div {
   align-items: center;
   gap: 8px;
   height: 44px;
-  margin: -20px calc(-1 * var(--am-pad-x)) 20px;
+  /* Full-bleed horizontally to read as chrome; the bottom margin is the gap the
+     first block gets, now that the pane itself has no top padding. */
+  margin: 0 calc(-1 * var(--am-pad-x)) 20px;
   padding: 0 12px;
   background: var(--dsw-alias-bg-layer-1);
   border-bottom: 0.5px solid var(--dsw-alias-border-l1);

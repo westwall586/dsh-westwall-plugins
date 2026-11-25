@@ -2327,7 +2327,7 @@ export function Body({
                 labels={{
                   save: t('edit.save'),
                   saving: t('edit.saving'),
-                  exit: t('edit.exit'),
+                  back: t('edit.back'),
                   lines: t('edit.lines'),
                   dirty: t('edit.dirty'),
                 }}

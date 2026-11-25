@@ -4,10 +4,13 @@
  */
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
 import { EMPTY_SNAPSHOT, type AnnotationSnapshot } from './kernel/notes.ts'
+import type { TranslationRun } from './kernel/translation.ts'
+import type { TranslationState } from '../translate/state.ts'
 import type { DocumentStore, NotesWriter } from './document.ts'
 import type { DocumentRef } from './ref.ts'
 
 const NO_SUBSCRIBE = (): void => {}
+const NO_TRANSLATION: TranslationState = { status: 'idle' }
 
 /**
  * 订阅一个 composer 维度的批注快照。挂载只登记引用、卸载只归还引用：切页签时
@@ -39,4 +42,25 @@ export function useNotes(
   )
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
   return { writer, snapshot }
+}
+
+/**
+ * Subscribe the body to its file's translation run. Unmounting only drops the
+ * subscription: the run belongs to the file, so a tab switch must not end it.
+ */
+export function useTranslation(
+  store: DocumentStore,
+  session: string | undefined,
+  path: string | undefined,
+): { run: TranslationRun | null, state: TranslationState } {
+  const run = useMemo(
+    () => (session === undefined || path === undefined ? null : store.runFor(session, path)),
+    [store, session, path],
+  )
+  const subscribe = useCallback(
+    (listener: () => void) => (run === null ? NO_SUBSCRIBE : run.subscribe(listener)),
+    [run],
+  )
+  const getSnapshot = useCallback(() => (run === null ? NO_TRANSLATION : run.getState()), [run])
+  return { run, state: useSyncExternalStore(subscribe, getSnapshot, getSnapshot) }
 }

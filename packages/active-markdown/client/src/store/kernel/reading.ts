@@ -20,6 +20,7 @@ export interface Reading {
   /** 立刻写出挂起的值，让下一次 get 读到它。 */
   flush(): void
   clear(): void
+  /** 停止节流定时器；不碰订阅者，那是 crate 的事。 */
   dispose(): void
 }
 
@@ -95,12 +96,12 @@ export function createReading(deps: ReadingDeps): Reading {
       notify()
     },
     dispose() {
+      // 订阅者归 crate 清；crate 被丢弃时监听集合还要能被读到，所以这里只停定时器。
       if (timer !== null) {
         clearTimeout(timer)
         timer = null
       }
       pending = null
-      slot.listeners.clear()
     },
   }
 }

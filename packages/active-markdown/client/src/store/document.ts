@@ -9,6 +9,7 @@
 import type { HostBridge } from '../context.ts'
 import type { Notes } from './kernel/notes.ts'
 import type { Reading } from './kernel/reading.ts'
+import type { TranslationRun } from './kernel/translation.ts'
 import { createCrate, type Crate, type Disposal } from './crate.ts'
 import { crateId, type DocumentRef } from './ref.ts'
 
@@ -30,6 +31,11 @@ export interface DocumentStore {
   notesFor(compose: string, path: string, session: string): NotesWriter
   /** 归还一次 notesFor 的引用；不销毁状态。 */
   release(compose: string, path: string, session: string): void
+  /**
+   * 取该文件的翻译运行。同一文件被两个 compose 会话打开时拿到的是同一个对象，
+   * 所以谁都不需要引用计数：结束运行只走 crate 的 abort 或 dispose。
+   */
+  runFor(session: string, path: string): TranslationRun
   /** 取该文档的阅读位置；文档不存在时为 null。 */
   readingFor(session: string, path: string): Reading | null
   /** 登记一次 body 挂载。 */
@@ -82,6 +88,10 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
 
     release(compose, path, session) {
       entries.get(crateId({ session, path }))?.crate.releaseCompose(compose)
+    },
+
+    runFor(session, path) {
+      return find(path, session).crate.run
     },
 
     readingFor(session, path) {

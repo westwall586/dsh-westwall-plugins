@@ -38,8 +38,8 @@ import {
   type JoinedLines,
   type TextLineAtom,
 } from './annotate/selection.ts'
-import type { DocumentRef, DocumentStore, Notes, View } from './store/index.ts'
-import { EMPTY_SNAPSHOT, refFrom, useNotes } from './store/index.ts'
+import { EMPTY_SNAPSHOT, refFrom, useNotes, useTranslation } from './store/index.ts'
+import type { DocumentRef, DocumentStore, Notes, TranslationRun, View } from './store/index.ts'
 import type {
   ContextMenuTarget,
   DescribeView,
@@ -85,12 +85,9 @@ import {
 import { CheckIcon, CopyIcon } from './rich/icons.tsx'
 import { READ_CAP, loadDocument, sessionFileOf } from './source.ts'
 import { InstructionAsk } from './translate/ask.tsx'
-import { assembleTranslation, normalize, planTranslation } from './translate/plan.ts'
+import { normalize } from './translate/plan.ts'
 import {
   lineAligned,
-  markSaveFailed,
-  markSaved,
-  markSaving,
   needsSave,
   readyState,
   saveFlagOf,
@@ -100,7 +97,6 @@ import {
   type ReadyTranslation,
   type TranslationState,
 } from './translate/state.ts'
-import { aligned } from './translate/verify.ts'
 
 /** The renderer branch of the owner's content union. */
 export interface RendererContent {
@@ -140,8 +136,8 @@ export interface BodyProps extends BodyInjected {
   /**
    * The host's scrollport report. The document body is its own scroller now, so
    * this is only ever handed a real node, never `null`: a `null` would make the
-   * host fall back to its own body and rewrite `scrollTop` over the position
-   * restored here.
+   * host fall back to its own body and rewrite `scrollTop` over the restored
+   * position.
    */
   scrollportRef?: (node: HTMLElement) => void
   t: Translate
@@ -498,7 +494,6 @@ export function Body({
   const [state, setState] = useState<BodyState>({ status: 'loading' })
   const container = useRef<HTMLDivElement | null>(null)
   const [view, setView] = useState<View>('source')
-  const [translation, setTranslation] = useState<TranslationState>({ status: 'idle' })
   const [peek, setPeek] = useState<Peek | null>(null)
   /** The instruction the last re-translate ran with; the popover reopens with it. */
   const [instruction, setInstruction] = useState('')
@@ -544,7 +539,6 @@ export function Body({
   /** The in-flight probe for a stored translation; a click waits for it. */
   const probeRef = useRef<Promise<void> | null>(null)
   const reviewToken = useRef(0)
-  const runController = useRef<AbortController | null>(null)
   const editCheckToken = useRef(0)
   const adoptToken = useRef(0)
   const restoreLine = useRef<number | undefined>(undefined)
@@ -557,14 +551,9 @@ export function Body({
   const viewRef = useRef<View>(view)
   // Reading the view from this ref keeps the scroll listener out of a resubscribe.
   viewRef.current = view
-  const translationRef = useRef(translation)
-  translationRef.current = translation
+  const currentTextRef = useRef('')
+  if (state.status === 'ready') currentTextRef.current = state.text
 
-  const stopRun = useCallback((): void => {
-    runController.current?.abort()
-    runController.current = null
-    requestToken.current += 1
-  }, [])
   const renderer = content.kind === 'renderer' ? content : undefined
   const rendererRef = useRef(renderer)
   rendererRef.current = renderer
@@ -580,23 +569,25 @@ export function Body({
   const inputAttachmentIds = useInput(state => state.attachmentIds)
   const composerBusy = phase === 'sending' || phase === 'submitting'
 
-  // The position belongs to the document, not to this body: an unmount keeps it.
+  // The run belongs to the file, not to this body: an unmount leaves it running, and
+  // a second tab on the same file reaches the same run.
+  const { run, state: translation } = useTranslation(documents, sessionId, path)
   const reading = useMemo(
     () => (sessionId === undefined || path === undefined ? null : documents.readingFor(sessionId, path)),
     [documents, sessionId, path],
   )
-  /** The element that owns this document's scrolling; it restores once it has a height. */
+  /** The element that owns this document's scrolling; restored once content has a height. */
   const scrolling = useCallback((node: HTMLDivElement | null): void => {
     container.current = node
     if (node === null) return
-    // Order matters: the host writes its own remembered offset when it binds, so
-    // this document's position has to be applied after that callback has run.
+    // Order matters: the host writes its own remembered offset when it binds, so the
+    // document's position has to be applied after that callback has run.
     scrollportRef?.(node)
     if (reading !== null) node.scrollTop = reading.get(viewRef.current)
   }, [reading, scrollportRef])
 
-  // Scroll events feed the crate. The last one before a tab switch is flushed on
-  // unmount, so the throttle window cannot swallow it.
+  // Scroll events feed the crate; the position is flushed on unmount so the last
+  // movement before a tab switch is not lost to the throttle.
   useEffect(() => {
     const node = container.current
     if (node === null || reading === null) return
@@ -608,8 +599,8 @@ export function Body({
     }
   }, [reading])
 
-  // A view switch is a jump within the same scroller, so the incoming view takes
-  // its own position and the outgoing one keeps its own.
+  // A view switch is a jump within the same scroller, so the incoming view gets its
+  // own position and the outgoing one keeps its own.
   useLayoutEffect(() => {
     const previous = viewRef.current
     if (previous === view) return
@@ -683,11 +674,13 @@ export function Body({
           })
         }
       }
-      if (restored === undefined) return
-      setTranslation(current => (current.status === 'idle' ? restored : current))
+      if (restored === undefined || run === null) return
+      // 已经在跑的翻译不能被磁盘上那份旧结果顶掉。
+      if (run.getState().status !== 'idle') return
+      run.restore(restored)
     })()
     probeRef.current = probe
-  }, [host, sessionId, path])
+  }, [host, sessionId, path, run])
 
   useEffect(() => {
     if (sessionId === undefined || path === undefined) {
@@ -696,11 +689,10 @@ export function Body({
     }
     const controller = new AbortController()
     requestToken.current += 1
-    const documentChanged = docKeyRef.current !== documentKey
-    if (documentChanged) {
+    const changedDocument = docKeyRef.current !== documentKey
+    if (changedDocument) {
       docKeyRef.current = documentKey
       setView('source')
-      setTranslation({ status: 'idle' })
       setInstruction('')
       setAsk(null)
       setStored({ status: 'probing' })
@@ -720,11 +712,15 @@ export function Body({
       setEditedSinceOpen(false)
     } else if (stateRef.current.status !== 'ready') {
       setState({ status: 'loading' })
+    } else if (stateRef.current.text !== currentTextRef.current) {
+      // 文件被外部改写（宿主刷新）：译文与批注都不再属于这份正文，但阅读位置
+      // 在 close/external-change 的差别里属于要保留的那一半。
+      run?.abort()
     }
     void loadDocument(readBytes, { sessionId, path }, controller.signal).then((result) => {
       if (controller.signal.aborted) return
       if (result.status !== 'ready') {
-        if (documentChanged || editRef.current.status === 'reading') {
+        if (changedDocument || editRef.current.status === 'reading') {
           setState(result)
           rendererRef.current?.failed()
         }
@@ -738,14 +734,14 @@ export function Body({
         bytes: result.bytes,
       }
       const current = stateRef.current
-      if (!documentChanged && current.status === 'ready' && current.version === result.version && sameText(current.text, result.text)) {
+      if (!changedDocument && current.status === 'ready' && current.version === result.version && sameText(current.text, result.text)) {
         setState(ready)
         return
       }
       const phase = editRef.current
       if (phase.status !== 'reading') {
         setState(ready)
-        setTranslation({ status: 'idle' })
+        run?.abort()
         setInstruction('')
         if (phase.status === 'editing') {
           if (!draftDirty(phase.session)) {
@@ -757,8 +753,8 @@ export function Body({
         setEditability({ status: 'ok', absolutePath: result.absolutePath, version: result.version })
         return
       }
+      run?.abort()
       setView('source')
-      setTranslation({ status: 'idle' })
       setInstruction('')
       setAsk(null)
       setStored({ status: 'probing' })
@@ -775,11 +771,11 @@ export function Body({
       restoreTranslation(result.text, requestToken.current)
     })
     return () => {
+      // 只取消这次读取。翻译运行归 crate，卸载与换 revision 都不能把它 abort：
+      // 切页签会让 body 卸载，而翻译必须继续。
       controller.abort()
-      // A new revision or an unmount also ends any chunk loop still in flight.
-      stopRun()
     }
-  }, [sessionId, path, revision, readBytes, t, restoreTranslation, stopRun, documentKey, applyEdit])
+  }, [sessionId, path, revision, readBytes, t, restoreTranslation, run, documentKey, applyEdit])
 
   // Report the version only once the content is committed: the owner restores
   // the tab's scroll offset as soon as it has a version, and it needs the
@@ -1817,151 +1813,15 @@ export function Body({
 
   /**
    * Write a finished translation into the workspace mirror. Every successful
-   * translation lands here on its own: 保存 is not an action the reader takes,
-   * so the only manual path left is retrying a failed write. A save that lands
-   * after the document moved on is dropped by the token check.
+   * translation lands there on its own: 保存 is not an action the reader takes,
+   * so the only manual path left is retrying a failed write, and a cache hit the
+   * reader just asked for.
    */
-  const persistTranslation = useCallback((ready: ReadyTranslation): void => {
-    if (sessionId === undefined || path === undefined) return
-    const token = requestToken.current
-    setTranslation(current => (current.status === 'ready' && current.text === ready.text ? markSaving(current) : current))
-    void (async () => {
-      try {
-        const bridge = await host()
-        const saved = await bridge.save({
-          sessionId,
-          path,
-          text: ready.source,
-          translated: ready.text,
-          lang: ready.run.lang,
-          ...(ready.run.provider === undefined ? {} : { provider: ready.run.provider }),
-          ...(ready.run.model === undefined ? {} : { model: ready.run.model }),
-          promptVersion: ready.run.promptVersion,
-          extraInstruction: ready.run.extraInstruction,
-          aligned: aligned(ready.alignment),
-        })
-        setTranslation(current => (current.status === 'ready' && current.text === ready.text ? markSaved(current, saved.file) : current))
-        if (token === requestToken.current) setStored({ status: 'saved', stale: false })
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        setTranslation(current => (current.status === 'ready' && current.text === ready.text ? markSaveFailed(current, message) : current))
-      }
-    })()
-  }, [host, sessionId, path])
-
-  /** The status label's failure face doubles as the retry. */
   const retrySave = useCallback(() => {
     const ready = needsSave(translation)
-    if (ready !== undefined) persistTranslation(ready)
-  }, [translation, persistTranslation])
-
-  const translateDocument = useCallback((
-    document: { text: string, absolutePath: string },
-    extraInstruction: string,
-    reuseStored: boolean,
-  ): void => {
-    stopRun()
-    setPeek(null)
-    const sourceLines = normalize(document.text).split('\n')
-    const plan = planTranslation(document.text, parseDocument(document.text).blocks)
-    if (plan.kind === 'too-large') {
-      setTranslation({ status: 'too-large', lineCount: plan.lineCount })
-      return
-    }
-    const token = ++requestToken.current
-    const controller = new AbortController()
-    runController.current = controller
-    const chunks = plan.ranges.length
-    setTranslation({ status: 'running', chunk: 1, chunks })
-    void (async () => {
-      try {
-        const bridge = await host()
-        const described = await bridge.describe().catch(() => FALLBACK_DESCRIBE)
-        const settings = described.settings
-        const run: PromptRun = {
-          promptVersion: described.promptVersion,
-          extraInstruction,
-          lang: settings.lang,
-          ...(settings.model === null ? {} : settings.model),
-          translateComments: settings.translateComments,
-        }
-        // The reader asked for a translation that may already exist, so a stored
-        // result answers with no model call. An explicit re-translate must produce
-        // a new one, so it never takes this branch.
-        if (reuseStored) {
-          const cached = await bridge.cacheGet({
-            text: document.text,
-            lang: settings.lang,
-            ...(settings.model === null ? {} : settings.model),
-            promptVersion: described.promptVersion,
-            translateComments: settings.translateComments,
-            extraInstruction,
-          }).catch(() => null)
-          if (token !== requestToken.current) return
-          if (cached !== null) {
-            // A cache hit answers a click, so it still has to reach the
-            // workspace: the reader asked for a translation, not for a preview.
-            const restored = readyState({
-              text: cached.text,
-              sourceText: document.text,
-              persistence: { kind: 'unsaved' },
-              run: storedRun(cached.meta, described.promptVersion, settings.translateComments, extraInstruction),
-            })
-            setTranslation(restored)
-            persistTranslation(restored)
-            return
-          }
-        }
-        const replies: string[] = []
-        let partial: string | undefined
-        for (const [index, range] of plan.ranges.entries()) {
-          if (token !== requestToken.current) return
-          // Keep the chunks that already landed visible while this one runs.
-          setTranslation({ status: 'running', chunk: index + 1, chunks, ...(partial === undefined ? {} : { partial }) })
-          replies.push(await bridge.translate({
-            sessionId: sessionId ?? '',
-            path: path ?? '',
-            text: sourceLines.slice(range.start, range.end).join('\n'),
-            lang: settings.lang,
-            ...(settings.model === null ? {} : settings.model),
-            promptVersion: described.promptVersion,
-            extraInstruction,
-            translateComments: settings.translateComments,
-          }, controller.signal))
-          if (token !== requestToken.current) return
-          // Land every finished chunk at once: the unfinished ones keep their source lines,
-          // so the page shows a growing Chinese document at constant line count.
-          const pending = plan.ranges.slice(index + 1).map(next => sourceLines.slice(next.start, next.end).join('\n'))
-          partial = assembleTranslation(plan.ranges, sourceLines, [...replies, ...pending])
-          setTranslation({ status: 'running', chunk: index + 2 > chunks ? chunks : index + 2, chunks, partial })
-        }
-        const text = assembleTranslation(plan.ranges, sourceLines, replies)
-        const ready = readyState({ text, sourceText: document.text, persistence: { kind: 'unsaved' }, run })
-        setTranslation(ready)
-        persistTranslation(ready)
-        // Fire and forget: a lost cache write costs one re-translation later, and
-        // must never change what the reader is looking at.
-        void bridge.cachePut({
-          text: document.text,
-          translated: text,
-          lang: run.lang,
-          ...(run.provider === undefined ? {} : { provider: run.provider }),
-          ...(run.model === undefined ? {} : { model: run.model }),
-          promptVersion: run.promptVersion,
-          translateComments: run.translateComments,
-          extraInstruction: run.extraInstruction,
-          aligned: aligned(ready.alignment),
-          sourceLines: ready.alignment.sourceLines,
-          translatedLines: ready.alignment.translatedLines,
-        }).catch((error: unknown) => console.warn('[active-markdown] cache write failed', error))
-      } catch (error) {
-        if (token !== requestToken.current) return
-        setTranslation({ status: 'failed', message: error instanceof Error ? error.message : String(error) })
-      } finally {
-        if (runController.current === controller) runController.current = null
-      }
-    })()
-  }, [host, sessionId, path, persistTranslation, stopRun])
+    if (ready === undefined) return
+    run?.start({ text: ready.source, absolutePath }, instruction, false)
+  }, [translation, run, absolutePath, instruction])
 
   const chooseView = useCallback((next: View) => {
     if (next === 'translated') {
@@ -1973,23 +1833,30 @@ export function Body({
     }
     setView(next)
     if (next !== 'translated' || state.status !== 'ready') return
-    const open = (): void => {
-      const current = translationRef.current
-      if (current.status === 'ready') {
-        // A cache hit has not reached the workspace yet; showing it is the
-        // moment it becomes worth writing.
-        if (current.persistence.kind === 'unsaved') persistTranslation(current)
-        return
-      }
-      if (current.status === 'running' || current.status === 'too-large') return
-      translateDocument({ text: state.text, absolutePath: state.absolutePath }, instruction, true)
-    }
     // The probe decides between showing the stored translation and calling the
     // model; waiting for it keeps a quick click from paying for a second one.
+    const source = { text: state.text, absolutePath: state.absolutePath }
+    const open = (): void => {
+      if (run === null) return
+      const current = run.getState()
+      switch (current.status) {
+        case 'ready':
+          // A cache hit has not reached the workspace yet; showing it is the
+          // moment it becomes worth writing.
+          if (current.persistence.kind === 'unsaved' || current.persistence.kind === 'failed') run.save(current)
+          return
+        case 'running':
+        case 'too-large':
+          return
+        case 'idle':
+        case 'failed':
+          run.start(source, instruction, true)
+      }
+    }
     const probe = probeRef.current
     if (probe === null) open()
     else void probe.then(open)
-  }, [state, persistTranslation, translateDocument, instruction])
+  }, [state, run, instruction])
 
   /** Hang the instruction popover under whichever button opened it. */
   const openAsk = useCallback((anchor: HTMLElement) => {
@@ -2005,27 +1872,23 @@ export function Body({
     setAsk(null)
     setInstruction(nextInstruction)
     setView('translated')
-    translateDocument({ text: state.text, absolutePath: state.absolutePath }, nextInstruction, false)
-  }, [state, translateDocument])
+    run?.start({ text: state.text, absolutePath: state.absolutePath }, nextInstruction, false)
+  }, [state, run])
 
   const cancelTranslation = useCallback(() => {
-    stopRun()
-    setTranslation({ status: 'idle' })
+    run?.abort()
     setView('source')
     setPeek(null)
-  }, [stopRun])
+  }, [run])
 
   /** Leaving translation keeps a finished result in memory, but a run in flight is cancelled. */
   const exitTranslation = useCallback(() => {
-    if (translation.status === 'running') {
-      stopRun()
-      setTranslation({ status: 'idle' })
-    }
+    if (translation.status === 'running') run?.abort()
     setView('source')
     setTocOpen(false)
     setErrorOpen(false)
     setPeek(null)
-  }, [translation.status, stopRun])
+  }, [translation.status, run])
 
   const retryToolbarError = useCallback((): void => {
     setErrorOpen(false)
@@ -2062,17 +1925,17 @@ export function Body({
     text: string,
     result: Extract<WriteTextResult, { status: 'saved' }>,
   ): void => {
-    stopRun()
     setState({ status: 'ready', text, absolutePath: result.absolutePath, version: result.version, bytes: result.bytes })
     setEditability({ status: 'ok', absolutePath: result.absolutePath, version: result.version })
     setEditedSinceOpen(true)
     setExitConfirm(false)
     setEditError(null)
-    if (translationRef.current.status !== 'idle') {
-      setTranslation({ status: 'idle' })
+    if (run !== null) {
+      // 保存后的原文已经是新的，正在跑的分段目标对不上了。
+      run.abort()
       setNotice({ text: t('edit.translationStale'), undo: false })
     }
-  }, [t, stopRun])
+  }, [t, run])
 
   const enterEdit = useCallback(async (): Promise<void> => {
     const ready = stateRef.current

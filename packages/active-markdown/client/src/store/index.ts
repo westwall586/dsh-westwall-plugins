@@ -2,8 +2,16 @@
 export { composeId, crateId, refFrom, type DocumentIdentity, type DocumentKey, type DocumentRef } from './ref.ts'
 export { createCrate, type Crate, type CrateDeps, type Disposal } from './crate.ts'
 export { createDocumentStore, type DocumentStore, type DocumentStoreDeps, type NotesWriter } from './document.ts'
-export { useNotes } from './binding.ts'
-export { createReading, createReadingSlot, type Reading, type ReadingSlot } from './kernel/reading.ts'
+export { useNotes, useTranslation } from './binding.ts'
+export {
+  FALLBACK_DESCRIBE,
+  createTranslationRun,
+  type RunKey,
+  type RunSource,
+  type TranslationRun,
+  type TranslationRunDeps,
+} from './kernel/translation.ts'
+export { type Reading, type ReadingSlot } from './kernel/reading.ts'
 export { type View } from './kernel/view.ts'
 export {
   EMPTY_SNAPSHOT,

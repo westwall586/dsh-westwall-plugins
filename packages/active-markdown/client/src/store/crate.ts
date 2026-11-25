@@ -3,6 +3,7 @@
  * 所以生命周期收敛到一处 `dispose(reason)` 的 switch 里，而不是散在调用方。
  */
 import type { HostBridge } from '../context.ts'
+import { createEdit, createEditSlot, type Edit, type EditSlot } from './kernel/edit.ts'
 import { createNotes, createWriteChains, createNotesSlot, type NotesHandle } from './kernel/notes.ts'
 import { createReading, createReadingSlot, type Reading, type ReadingSlot } from './kernel/reading.ts'
 import { createTranslationRun, type TranslationRun } from './kernel/translation.ts'
@@ -35,6 +36,8 @@ export interface Crate {
   readonly reading: Reading
   /** 本文件的翻译运行；同一文件被两个 compose 会话打开时共用这一个。 */
   readonly run: TranslationRun
+  /** 编辑草稿：切走再切回要完整保留，关闭页签或文件被外部改写时丢弃。 */
+  readonly edit: Edit
   /** 没有任何 composer 维度被持有。 */
   readonly empty: boolean
   dispose(reason: Disposal): void
@@ -53,6 +56,8 @@ export function createCrate(deps: CrateDeps): Crate {
   const readingSlot: ReadingSlot = createReadingSlot()
   const reading = createReading({ slot: readingSlot, ...(deps.readingDelayMs === undefined ? {} : { delayMs: deps.readingDelayMs }) })
   const run = createTranslationRun({ key: deps.key, host: deps.host })
+  const editSlot: EditSlot = createEditSlot()
+  const edit = createEdit(editSlot)
 
   const notesFor = (compose: string): NotesHandle => {
     if (disposed) throw new Error('crate is disposed')
@@ -83,12 +88,20 @@ export function createCrate(deps: CrateDeps): Crate {
     disposed = true
   }
 
+  // 只有 edit 的监听者归 crate 直接清：它在 drop 里仍然能被读到。
+  const dropEdit = (): void => {
+    editSlot.state = { status: 'reading' }
+    editSlot.restoreLine = 0
+    editSlot.listeners.clear()
+  }
+
   return {
     key: deps.key,
     notesFor,
     releaseCompose,
     reading,
     run,
+    edit,
     get empty() {
       return entries.size === 0
     },
@@ -101,6 +114,7 @@ export function createCrate(deps: CrateDeps): Crate {
           run.dispose()
           reading.clear()
           drop()
+          dropEdit()
           return
         case 'close':
         case 'external-change':

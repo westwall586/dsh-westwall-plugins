@@ -38,7 +38,7 @@ import {
   type JoinedLines,
   type TextLineAtom,
 } from './annotate/selection.ts'
-import { EMPTY_SNAPSHOT, refFrom, useNotes, useTranslation } from './store/index.ts'
+import { EMPTY_SNAPSHOT, refFrom, useEdit, useNotes, useTranslation } from './store/index.ts'
 import type { DocumentRef, DocumentStore, Notes, TranslationRun, View } from './store/index.ts'
 import type {
   ContextMenuTarget,
@@ -65,7 +65,7 @@ import {
 } from './edit/model.ts'
 import { ConflictPanel, EditBanner, EditToolbar, useEditCommand } from './edit/panel.tsx'
 import { scrollportOf } from './scroll.ts'
-import { dirty as draftDirty, editReduce, sessionOf, type EditEvent, type EditState } from './edit/state.ts'
+import { dirty as draftDirty, sessionOf, type EditEvent } from './edit/state.ts'
 import { createImageResolver, type ImageResolver } from './images.ts'
 import { classifyLink } from './links.ts'
 import { parseDocument, type ParsedDocument } from './markdown/blocks.ts'
@@ -518,11 +518,9 @@ export function Body({
   const [errorOpen, setErrorOpen] = useState(false)
   const [errorPlacement, setErrorPlacement] = useState<{ left: number, top: number } | null>(null)
   const [described, setDescribed] = useState<DescribeView | null>(null)
-  const [edit, setEdit] = useState<EditState>({ status: 'reading' })
   const [editability, setEditability] = useState<EditCheckResult | null>(null)
   const [editError, setEditError] = useState<string | null>(null)
   const [editErrorSaveAs, setEditErrorSaveAs] = useState(true)
-  const [editSeq, setEditSeq] = useState(0)
   const [adopt, setAdopt] = useState<{ text: string, token: number }>({ text: '', token: 0 })
   const [exitConfirm, setExitConfirm] = useState(false)
   const [editedSinceOpen, setEditedSinceOpen] = useState(false)
@@ -540,14 +538,10 @@ export function Body({
   const probeRef = useRef<Promise<void> | null>(null)
   const reviewToken = useRef(0)
   const editCheckToken = useRef(0)
-  const adoptToken = useRef(0)
-  const restoreLine = useRef<number | undefined>(undefined)
   const docKeyRef = useRef<string | null>(null)
   const editHost = useRef<HTMLDivElement | null>(null)
   const stateRef = useRef(state)
   stateRef.current = state
-  const editRef = useRef(edit)
-  editRef.current = edit
   const viewRef = useRef<View>(view)
   // Reading the view from this ref keeps the scroll listener out of a resubscribe.
   viewRef.current = view
@@ -573,6 +567,11 @@ export function Body({
   // The run belongs to the file, not to this body: an unmount leaves it running, and
   // a second tab on the same file reaches the same run.
   const { run, state: translation } = useTranslation(documents, sessionId, path)
+  // The draft belongs to the file, not to this body: a tab switch keeps it, only a
+  // close or an external rewrite drops it (the crate decides that).
+  const { edit: draft, state: edit } = useEdit(documents, sessionId, path)
+  const editRef = useRef(edit)
+  editRef.current = edit
   const reading = useMemo(
     () => (sessionId === undefined || path === undefined ? null : documents.readingFor(sessionId, path)),
     [documents, sessionId, path],
@@ -631,12 +630,12 @@ export function Body({
     node.scrollTop = reading === null ? 0 : reading.get(view)
   }, [view, reading])
 
-  const applyEdit = useCallback((event: EditEvent): EditState => {
-    const next = editReduce(editRef.current, event)
+  const applyEdit = useCallback((event: EditEvent) => {
+    if (draft === null) return editRef.current
+    const next = draft.reduce(event)
     editRef.current = next
-    setEdit(next)
     return next
-  }, [])
+  }, [draft])
 
   const handleEditError = useCallback((message: string): void => {
     setEditErrorSaveAs(true)
@@ -733,8 +732,8 @@ export function Body({
     } else if (stateRef.current.status !== 'ready') {
       setState({ status: 'loading' })
     } else if (stateRef.current.text !== currentTextRef.current) {
-      // 文件被外部改写（宿主刷新）：译文与批注都不再属于这份正文，但阅读位置
-      // 在 close/external-change 的差别里属于要保留的那一半。
+      // 文件被外部改写（宿主刷新）：旧正文的译文、批注与编辑草稿都不再属于它，
+      // 阅读位置按 external-change 的规则保留。
       run?.abort()
     }
     void loadDocument(readBytes, { sessionId, path }, controller.signal).then((result) => {
@@ -760,17 +759,17 @@ export function Body({
       }
       const phase = editRef.current
       if (phase.status !== 'reading') {
+        // 文件被外部改写：草稿与正在跑的翻译都不再对得上正文，直接退出编辑态并
+        // 告知；让用户在三方内容之间选一版只会更容易留下写错的稿。
         setState(ready)
         run?.abort()
         setInstruction('')
-        if (phase.status === 'editing') {
-          if (!draftDirty(phase.session)) {
-            adoptToken.current += 1
-            setAdopt({ text: result.text, token: adoptToken.current })
-          }
-          applyEdit({ type: 'external', text: result.text, version: result.version })
-        }
         setEditability({ status: 'ok', absolutePath: result.absolutePath, version: result.version })
+        applyEdit({ type: 'exit' })
+        setExitConfirm(false)
+        setEditError(null)
+        // 换文档时这次读取本来就会重置 body，只有同一个文档被改写才需要告知。
+        if (!changedDocument) setNotice({ text: t('edit.externalDiscarded'), undo: false })
         return
       }
       run?.abort()
@@ -2001,9 +2000,10 @@ export function Body({
     setEditError(null)
     setExitConfirm(false)
     setAdopt({ text: ready.text, token: 0 })
+    // 新序列号让 CodeMirror 以新草稿重建，而不是沿用上一个实例的内容。
+    draft?.nextSeq()
     applyEdit({ type: 'enter', text: ready.text, version: ready.version, line: visibleSourceLine() })
-    setEditSeq(sequence => sequence + 1)
-  }, [sessionId, path, view, annotationList, editCommand, t, visibleSourceLine, applyEdit])
+  }, [sessionId, path, view, annotationList, editCommand, t, visibleSourceLine, applyEdit, draft])
 
   const requestSave = useCallback((): void => {
     const current = editRef.current
@@ -2012,7 +2012,7 @@ export function Body({
     if (ready.status !== 'ready' || sessionId === undefined || path === undefined) return
     const fromConflict = current.status === 'conflict'
     const text = current.session.draft
-    restoreLine.current = current.session.cursorLine
+    draft?.restoreLine.set(current.session.cursorLine)
     setEditError(null)
     setExitConfirm(false)
     const intent: WriteIntent = { kind: 'replace', version: current.session.version }
@@ -2036,7 +2036,7 @@ export function Body({
   const leaveEdit = useCallback((): void => {
     const current = editRef.current
     if (current.status === 'reading') return
-    restoreLine.current = current.session.cursorLine
+    draft?.restoreLine.set(current.session.cursorLine)
     setExitConfirm(false)
     setEditError(null)
     applyEdit({ type: 'exit' })
@@ -2058,7 +2058,7 @@ export function Body({
   }, [applyEdit, leaveEdit])
 
   const reloadFromConflict = useCallback((): void => {
-    restoreLine.current = undefined
+    draft?.restoreLine.set(undefined)
     setExitConfirm(false)
     setEditError(null)
     applyEdit({ type: 'exit' })
@@ -2069,7 +2069,7 @@ export function Body({
     const current = editRef.current
     if (current.status !== 'conflict' || sessionId === undefined || path === undefined) return
     const text = current.session.draft
-    restoreLine.current = current.session.cursorLine
+    draft?.restoreLine.set(current.session.cursorLine)
     setEditError(null)
     void (async () => {
       const result = await editCommand.save(sessionId, path, text, { kind: 'overwrite' })
@@ -2094,7 +2094,7 @@ export function Body({
     if (ready.status !== 'ready' || sessionId === undefined) return
     const fromConflict = current.status === 'conflict'
     const text = current.session.draft
-    restoreLine.current = current.session.cursorLine
+    draft?.restoreLine.set(current.session.cursorLine)
     setEditError(null)
     void (async () => {
       const stamp = new Date()
@@ -2156,9 +2156,8 @@ export function Body({
 
   useLayoutEffect(() => {
     if (edit.status !== 'reading') return
-    const line = restoreLine.current
+    const line = draft?.restoreLine.take()
     if (line === undefined) return
-    restoreLine.current = undefined
     const target = lineTarget(parsed.blocks, line)
     if (target === undefined) return
     const root = container.current
@@ -2172,6 +2171,8 @@ export function Body({
     port.scrollTop += element.getBoundingClientRect().top - port.getBoundingClientRect().top - 52
   }, [edit.status, parsed])
 
+  // 每次重新进入编辑态 CodeMirror 是新的实例，把它自己的滚动对回容器顶部附近。
+  const editSeq = draft?.seq ?? 0
   useLayoutEffect(() => {
     if (editSeq === 0) return
     const host = editHost.current
@@ -2207,7 +2208,6 @@ export function Body({
   const editFileName = state.status === 'ready'
     ? (state.absolutePath.replace(/\\/g, '/').split('/').pop() ?? '')
     : (path ?? '')
-  const editExternal = editSessionValue?.external === true
 
   return (
     <div className="am-root" ref={scrolling} data-active-markdown data-editing={editPhase ? 'true' : undefined}>
@@ -2474,15 +2474,6 @@ export function Body({
                   secondary={{ label: t('diff.dismiss'), run: () => setEditError(null) }}
                 />
               )}
-              {editExternal && !exitConfirm && edit.status !== 'conflict' ? (
-                <EditBanner
-                  text={t('edit.external')}
-                  secondary={{
-                    label: t('edit.conflict.close'),
-                    run: () => applyEdit({ type: 'external-dismiss' }),
-                  }}
-                />
-              ) : null}
               <div className="am-edit-shell" ref={editHost}>
                 <SourceEditor
                   key={editSeq}

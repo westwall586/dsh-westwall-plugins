@@ -7,6 +7,7 @@
  * 的常驻观察者在页签记录真的消失时调用。
  */
 import type { HostBridge } from '../context.ts'
+import type { Edit } from './kernel/edit.ts'
 import type { Notes } from './kernel/notes.ts'
 import type { Reading } from './kernel/reading.ts'
 import type { TranslationRun } from './kernel/translation.ts'
@@ -38,6 +39,8 @@ export interface DocumentStore {
   runFor(session: string, path: string): TranslationRun
   /** 取该文档的阅读位置；文档不存在时为 null。 */
   readingFor(session: string, path: string): Reading | null
+  /** 取该文档的编辑草稿；文档不存在时为 null。 */
+  editFor(session: string, path: string): Edit | null
   /** 登记一次 body 挂载。 */
   mount(ref: DocumentRef): void
   /** 撤销一次挂载；crate 与快照都保留。 */
@@ -96,6 +99,10 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
 
     readingFor(session, path) {
       return entries.get(crateId({ session, path }))?.crate.reading ?? null
+    },
+
+    editFor(session, path) {
+      return entries.get(crateId({ session, path }))?.crate.edit ?? null
     },
 
     mount(ref) {

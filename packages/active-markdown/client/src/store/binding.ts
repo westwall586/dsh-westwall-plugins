@@ -1,16 +1,19 @@
 /**
  * React 绑定。body 用 useNotes 读一个 composer 的批注快照；文档级槽位（阅读位置、
- * 翻译运行、编辑草稿、视图偏好）归 crate，后续步骤按真实需要在这里加读取点。
+ * 翻译运行、编辑草稿）归 crate，各自有一个读取点。
  */
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
 import { EMPTY_SNAPSHOT, type AnnotationSnapshot } from './kernel/notes.ts'
+import type { Edit } from './kernel/edit.ts'
 import type { TranslationRun } from './kernel/translation.ts'
 import type { TranslationState } from '../translate/state.ts'
+import type { EditState } from '../edit/state.ts'
 import type { DocumentStore, NotesWriter } from './document.ts'
 import type { DocumentRef } from './ref.ts'
 
 const NO_SUBSCRIBE = (): void => {}
 const NO_TRANSLATION: TranslationState = { status: 'idle' }
+const NO_EDIT: EditState = { status: 'reading' }
 
 /**
  * 订阅一个 composer 维度的批注快照。挂载只登记引用、卸载只归还引用：切页签时
@@ -63,4 +66,25 @@ export function useTranslation(
   )
   const getSnapshot = useCallback(() => (run === null ? NO_TRANSLATION : run.getState()), [run])
   return { run, state: useSyncExternalStore(subscribe, getSnapshot, getSnapshot) }
+}
+
+/**
+ * Subscribe the body to its file's edit draft. Unmounting only drops the
+ * subscription: the draft belongs to the document, so a tab switch must keep it.
+ */
+export function useEdit(
+  store: DocumentStore,
+  session: string | undefined,
+  path: string | undefined,
+): { edit: Edit | null, state: EditState } {
+  const edit = useMemo(
+    () => (session === undefined || path === undefined ? null : store.editFor(session, path)),
+    [store, session, path],
+  )
+  const subscribe = useCallback(
+    (listener: () => void) => (edit === null ? NO_SUBSCRIBE : edit.subscribe(listener)),
+    [edit],
+  )
+  const getSnapshot = useCallback(() => (edit === null ? NO_EDIT : edit.getState()), [edit])
+  return { edit, state: useSyncExternalStore(subscribe, getSnapshot, getSnapshot) }
 }

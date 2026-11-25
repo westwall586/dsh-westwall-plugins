@@ -515,7 +515,12 @@ test('a verified result that arrives after the deadline is kept', async (t) => {
     },
   };
 
-  const result = await runTranslate({ l, day: DAY, today: DAY, items, llm: late, budgetMs: 5 });
+  // Expire the deadline from inside the exchange, after the reply is fully assembled:
+  // a wall-clock budget shorter than the call can fire before the call even starts,
+  // which turns this into "the turn check saw a deadline" rather than "a late reply is kept".
+  const budget = startBudget(10_000);
+  t.after(() => budget.dispose());
+  const result = await runTranslate({ l, day: DAY, today: DAY, items, llm: late, budget });
 
   assert.equal(result.outcome.translated, 1);
   assert.equal(result.outcome.failed, 0);

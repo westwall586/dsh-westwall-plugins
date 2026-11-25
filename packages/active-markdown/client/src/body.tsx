@@ -551,6 +551,7 @@ export function Body({
   const viewRef = useRef<View>(view)
   // Reading the view from this ref keeps the scroll listener out of a resubscribe.
   viewRef.current = view
+  const restored = useRef(false)
   const currentTextRef = useRef('')
   if (state.status === 'ready') currentTextRef.current = state.text
 
@@ -576,15 +577,19 @@ export function Body({
     () => (sessionId === undefined || path === undefined ? null : documents.readingFor(sessionId, path)),
     [documents, sessionId, path],
   )
-  /** The element that owns this document's scrolling; restored once content has a height. */
+  /**
+   * The element that owns this document's scrolling. It binds before the content
+   * renders, so a restored offset would clamp to 0 there; the restored flag lets
+   * the effect below apply it once the document has its height.
+   */
   const scrolling = useCallback((node: HTMLDivElement | null): void => {
     container.current = node
     if (node === null) return
-    // Order matters: the host writes its own remembered offset when it binds, so the
-    // document's position has to be applied after that callback has run.
+    restored.current = false
+    // Only a real node goes to the host: `null` would make it fall back to its own
+    // body and rewrite `scrollTop` over the position restored here.
     scrollportRef?.(node)
-    if (reading !== null) node.scrollTop = reading.get(viewRef.current)
-  }, [reading, scrollportRef])
+  }, [scrollportRef])
 
   // Scroll events feed the crate; the position is flushed on unmount so the last
   // movement before a tab switch is not lost to the throttle.
@@ -598,6 +603,21 @@ export function Body({
       reading.flush()
     }
   }, [reading])
+
+  // Content has its height here, so the remembered offset can land instead of
+  // clamping to 0, and the host's late write of a clamped offset is overridden.
+  useLayoutEffect(() => {
+    const node = container.current
+    if (node === null || reading === null || state.status !== 'ready') return
+    const target = reading.get(view)
+    if (restored.current) {
+      // The host rewrote the offset when this document's version was reported.
+      if (node.scrollTop !== target) node.scrollTop = target
+      return
+    }
+    restored.current = true
+    node.scrollTop = target
+  }, [state.status, state.status === 'ready' ? state.version : undefined, view, reading])
 
   // A view switch is a jump within the same scroller, so the incoming view gets its
   // own position and the outgoing one keeps its own.

@@ -1,13 +1,14 @@
 /* The body owns its scrolling: the host's own body scroller above it stays at
    rest, so a reading position has exactly one owner and one coordinate space.
-   Height is definite through the host's flex chain (`.preview` → `.content` →
-   the body), which is also what lets the sticky toolbar stick. */
+   The slot anchor between the two is `display: contents`, so this element's
+   parent for layout is the host body itself and a percentage height resolves
+   against the pane. `flex` would not: a block in a block parent ignores it. */
 [data-active-markdown] {
   --am-pad-x: clamp(16px, 4%, 56px);
   position: relative;
   container-type: inline-size;
   box-sizing: border-box;
-  flex: 1 1 auto;
+  height: 100%;
   min-height: 0;
   overflow-y: auto;
   /* A remembered offset is a pixel distance; anchoring would move it when content

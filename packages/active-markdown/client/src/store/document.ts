@@ -65,7 +65,7 @@ export interface DocumentStore {
    * 为当前存活的 crate 各发一次信号。观察者拿它判断某个已不在任何登记里的 crate
    * 有没有人还开着（比如来自已不存在的会话）；标记为 closed 的 crate 被跳过。
    */
-  touch(live: (session: string, path: string) => void): void
+  touch(live: (session: string, path: string, absolutePath: string | undefined) => void): void
   /** 标记已发现页签消失；之后 `touch` 不再把它交给观察者。 */
   closed(session: string, path: string): void
   /** close 与 external-change 返回的承诺在磁盘清理完成时结束。 */
@@ -178,7 +178,7 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
     touch(live) {
       for (const entry of entries.values()) {
         if (entry.closed) continue
-        live(entry.crate.key.session, entry.crate.key.path)
+        live(entry.crate.key.session, entry.crate.key.path, entry.crate.absolutePath())
       }
     },
 

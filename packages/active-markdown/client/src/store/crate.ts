@@ -39,6 +39,8 @@ export interface Crate {
    * 路径，之后的访问都用它。
    */
   rememberPath(path: string): void
+  /** 读完正文后记住的绝对路径；还没读到过时是 undefined。 */
+  absolutePath(): string | undefined
   /**
    * 某 composer 维度的批注面。槽归 crate，所以 body 卸载再挂回拿到的是同一个快照；
    * 每次调用累加引用计数，与 releaseCompose 配对。
@@ -161,6 +163,7 @@ export function createCrate(deps: CrateDeps): Crate {
     rememberPath(path) {
       if (resolvedPath === undefined) resolvedPath = path
     },
+    absolutePath: documentPath,
     awaitCleanup(pending) {
       gate = Promise.all([gate, pending]).then(() => undefined, () => undefined)
       gated = undefined

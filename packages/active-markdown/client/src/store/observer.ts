@@ -105,10 +105,19 @@ export function createCloseObserver(deps: CloseObserverDeps): CloseObserver {
       // 的时候，那时页签还开着、只是暂时没有登记。所以一个 crate 没有登记时只有在它
       // 的地址确实不在快照里才算关闭：按地址判，不能按“还有没有别的登记”判，否则
       // 还开着的文档会被清掉。
-      deps.documents.touch((session, path) => {
+      deps.documents.touch((session, path, absolutePath) => {
         const id = crateId({ session, path })
         if (held.has(id)) return
-        const address = fileAddressOf(session, path)
+        // The snapshot holds the address the host minted, which is built from the
+        // ABSOLUTE path. Rebuilding it from the crate's key is not the same thing:
+        // that key may hold the workspace-relative path, and the two addresses
+        // differ, which would read "still open" as "closed" and wipe the document
+        // whenever the snapshot publishes for some other document. So the crate's
+        // absolute path is used when it is known, and the key is only the fallback
+        // for a document whose text has not been read yet (nothing is stored then).
+        const address = absolutePath === undefined
+          ? fileAddressOf(session, path)
+          : fileAddressOf(session, absolutePath)
         if (address !== undefined && open.has(address)) return
         gone.add(id)
       })

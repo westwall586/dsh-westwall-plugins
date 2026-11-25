@@ -209,3 +209,24 @@ test('快照非空时，没有登记的 crate 也算关闭', async () => {
   await h.flush()
   assert.equal(h.documents.has(SESSION, PATH), false)
 })
+
+test('正文路径是相对路径时，快照用绝对路径，仍在开着的文档不会被当成关闭', async () => {
+  const h = harness()
+  // A 文档：crate 键是相对路径，但宿主给页签的地址按绝对路径拼，所以快照里
+  // 只有绝对路径那一条，相对路径拼出来的那条并不在快照里。
+  const ABSOLUTE = '/Users/me/w/a.md'
+  const absoluteAddress = fileAddressOf(SESSION, ABSOLUTE)
+  h.open.clear()
+  h.open.add(absoluteAddress)
+  h.documents.rememberPath(SESSION, PATH, ABSOLUTE)
+  h.documents.mount({ session: SESSION, compose: SESSION, path: PATH })
+
+  // B 文档出现在快照里，触发一次发布；A 此刻没有登记（body 被卸载）。
+  h.open.add(fileAddressOf(SESSION, '/Users/me/w/b.md'))
+  h.documents.unmount({ session: SESSION, compose: SESSION, path: PATH })
+  h.publish()
+  await h.flush()
+
+  assert.deepEqual(h.clears, [], 'A 的页签还在，不能清')
+  assert.equal(h.documents.has(SESSION, PATH), true)
+})

@@ -117,17 +117,17 @@ export function createCloseObserver(deps: CloseObserverDeps): CloseObserver {
       deps.documents.touch((session, path, absolutePath) => {
         const id = crateId({ session, path })
         if (held.has(id)) return
-        // The snapshot holds the address the host minted, which is built from the
-        // ABSOLUTE path. Rebuilding it from the crate's key is not the same thing:
-        // that key may hold the workspace-relative path, and the two addresses
-        // differ, which would read "still open" as "closed" and wipe the document
-        // whenever the snapshot publishes for some other document. So the crate's
-        // absolute path is used when it is known, and the key is only the fallback
-        // for a document whose text has not been read yet (nothing is stored then).
-        const address = absolutePath === undefined
-          ? fileAddressOf(session, path)
-          : fileAddressOf(session, absolutePath)
-        const stillOpen = address !== undefined && open.has(address)
+        // The host minted each tab's address from whatever path form it was opened
+        // with, and both forms occur in one snapshot: `.../README.md` for a file
+        // opened from the sidebar, `...//Users/me/README.md` for one opened from an
+        // absolute path. Rebuilding from a single form therefore reads a live tab
+        // as closed and wipes the document. Both forms are tried, because the
+        // question is only "is this document still open somewhere".
+        const fromKey = fileAddressOf(session, path)
+        const fromAbsolute = absolutePath === undefined ? undefined : fileAddressOf(session, absolutePath)
+        const matched = [fromKey, fromAbsolute].find(candidate => candidate !== undefined && open.has(candidate))
+        const stillOpen = matched !== undefined
+        const address = matched ?? fromAbsolute ?? fromKey
         trace('check.touch', { id, keyPath: path, absolutePath, address, stillOpen })
         if (stillOpen) return
         gone.add(id)

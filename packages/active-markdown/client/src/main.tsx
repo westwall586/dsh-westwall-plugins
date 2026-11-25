@@ -81,6 +81,11 @@ export default {
     }
     // 一份文档的批注事务绑它的 crate：锁、快照与写入必须是同一个 composer 维度。
     const attachmentFor = (sessionId: string, path: string): AttachmentController => {
+      // Arguments follow `notesFor(compose, path, session)`: the composer here is the
+      // session that will receive the feedback, the path is the file. Passing the
+      // session id as the path built a crate keyed `(session, sessionId)`, which no
+      // tab address can ever match — the close observer then read it as a closed
+      // document on every snapshot publish and wiped it.
       const { notes, withLock } = documents.notesFor(sessionId, path, sessionId)
       return createAttachmentController({
         store: notes,

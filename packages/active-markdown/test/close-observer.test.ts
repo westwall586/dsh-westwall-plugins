@@ -231,3 +231,36 @@ test('正文路径是相对路径时，快照用绝对路径，仍在开着的�
   assert.equal(h.documents.has(SESSION, PATH), true)
 })
 
+
+test('页签地址是相对路径形式时，用绝对路径重建也不能把它读成已关闭', async () => {
+  const h = harness()
+  // 宿主给这个页签的地址是相对路径形式，快照里就是它。
+  const registration = h.observer.register(mount(h))
+  h.documents.rememberPath(SESSION, PATH, '/Users/me/w/a.md')
+  h.documents.readingFor(SESSION, PATH).record('source', 800)
+  h.documents.readingFor(SESSION, PATH).flush()
+  // 切走：body 卸载，页签还在。
+  registration.release()
+  h.documents.unmount({ session: SESSION, compose: SESSION, path: PATH })
+  // 另一个文档出现，触发一次发布。
+  h.open.add(fileAddressOf(SESSION, 'b.md'))
+  h.publish()
+  await h.flush()
+
+  assert.deepEqual(h.clears, [], '页签还在，不能被清')
+  assert.equal(h.documents.readingFor(SESSION, PATH).get('source'), 800)
+})
+
+test('没有 body 挂过的 crate 不参与关闭判定', async () => {
+  const h = harness()
+  // 会话级批注提交器用会话 id 当路径建过一个 crate；它不是任何页签。
+  const orphan = h.documents.notesFor(SESSION, SESSION, SESSION)
+  orphan.notes.load()
+  h.open.clear()
+  h.open.add(ADDRESS)
+  h.publish()
+  await h.flush()
+
+  const cleared = h.clears.filter(entry => entry === `${SESSION}:${SESSION}`)
+  assert.deepEqual(cleared, [], '没有页签的 crate 不该被判成关闭')
+})

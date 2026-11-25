@@ -77,6 +77,8 @@ export interface DocumentStore {
 interface Entry {
   readonly crate: Crate
   mounts: number
+  /** 曾经有 body 挂载过它；只有这样的 crate 才对应一个页签。 */
+  everMounted: boolean
   /** 观察者已确认页签消失；它之后可能还在等 `dispose` 完成落盘。 */
   closed: boolean
 }
@@ -101,6 +103,7 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
         ...(deps.readingDelayMs === undefined ? {} : { readingDelayMs: deps.readingDelayMs }),
       }),
       mounts: 0,
+      everMounted: false,
       closed: false,
     }
     entry.crate.awaitCleanup(pendingCleanup.get(id) ?? Promise.resolve())
@@ -164,7 +167,9 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
     },
 
     mount(ref) {
-      find(ref.path, ref.session).mounts += 1
+      const entry = find(ref.path, ref.session)
+      entry.mounts += 1
+      entry.everMounted = true
       trace('store.mount', { session: ref.session, path: ref.path, compose: ref.compose })
     },
 
@@ -183,6 +188,12 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
     touch(live) {
       for (const entry of entries.values()) {
         if (entry.closed) continue
+        // A crate that a body never mounted was never a tab: the session-level
+        // annotation committer reaches notes through a crate keyed by the session
+        // itself, and there is no address that could ever match it. Handing it to
+        // the close observer makes it look like a document whose tab vanished, so
+        // it is cleared on every publish and drags every check down with it.
+        if (entry.everMounted !== true) continue
         live(entry.crate.key.session, entry.crate.key.path, entry.crate.absolutePath())
       }
     },

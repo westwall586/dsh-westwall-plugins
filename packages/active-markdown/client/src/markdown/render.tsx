@@ -3,7 +3,7 @@ import * as React from 'react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { CodeBlock, ImageLightbox } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { Inline, Block, ListItem } from './model.ts'
-import { componentOf } from './model.ts'
+import { componentOf, COMPONENT_BLOCKS } from './model.ts'
 import type { DiffStatus, DocumentDiff } from './diff.ts'
 import { ComponentFrame, type AnnotateHooks, type ComponentFrameLabels } from './component-frame.tsx'
 import { calloutHeadTitle, resolveCallout } from './callout.ts'
@@ -89,7 +89,39 @@ export function MarkdownView({ blocks, labels, actions, components, diff }: Mark
   )
 }
 
+/**
+ * Render one block, giving prose blocks the shared reading column.
+ *
+ * The column is a row element rather than a `max-width` on the block itself:
+ * `em` on the block would resolve against the block's own font size, so a
+ * heading would take a wider column than the paragraph under it. The row
+ * inherits the plugin root's size, so `em` there is the body's size for every
+ * block, and the boxes line up. A component is not wrapped — it carries its own
+ * `data-measure` — so a `wide` one still fills the pane.
+ * @param block - the block to render.
+ * @param key - stable React key within the document.
+ * @param labels - localized copy.
+ * @param actions - link and image behaviour.
+ * @param components - annotation and component hooks.
+ * @param status - the block's change mark, when it changed.
+ * @returns the row, or the component slot.
+ */
 function renderBlock(
+  block: Block,
+  key: string,
+  labels: RenderLabels,
+  actions: RenderActions,
+  components: ComponentContext,
+  status?: DiffStatus,
+): ReactNode {
+  if (COMPONENT_BLOCKS.has(block.type)) {
+    return renderBlockInner(block, key, labels, actions, components, status)
+  }
+  // The row is the list item; the block keeps its key for inline ids and marks.
+  return <div key={key} className="am-prose-row">{renderBlockInner(block, key, labels, actions, components, status)}</div>
+}
+
+function renderBlockInner(
   block: Block,
   key: string,
   labels: RenderLabels,

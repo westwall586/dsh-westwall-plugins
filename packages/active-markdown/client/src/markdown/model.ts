@@ -30,38 +30,72 @@ export interface ComponentCapabilities {
   annotate: boolean
 }
 
+/**
+ * How much of the pane a component's body may take.
+ *
+ * This is the component's editorial classification, not a measurement: it says
+ * what the content should look like when the pane is wide, and every value is
+ * capped by the pane itself, so a classification never changes what fits in a
+ * narrow sidebar. The CSS side lives in one place — the `data-measure` rule
+ * block in `styles.css` — and a new component only picks a value here.
+ *
+ * - `prose`: reads like a paragraph, so it holds the reading measure. A callout
+ *   is prose in a box, and holding the measure is what keeps it aligned with
+ *   the text above and below it.
+ * - `wide`: must not waste the pane's width. Text that scrolls sideways, or
+ *   cells that would otherwise squeeze to one character, need the room.
+ * - `graphic`: a picture needs to stay inspectable at a glance. Given the whole
+ *   pane it stretches until its nodes drift apart and only the expanded panel
+ *   is legible; given the reading measure it is too small to read at all. It
+ *   gets its own, larger cap between the two.
+ */
+export type ComponentMeasure = 'prose' | 'wide' | 'graphic'
+
 /** One non-text block family; new rich blocks register here instead of a new frame. */
 export interface ComponentDefinition {
   kind: ComponentKind
   capabilities: ComponentCapabilities
+  measure: ComponentMeasure
 }
 
 export const COMPONENT_REGISTRY: Record<ComponentKind, ComponentDefinition> = {
   table: {
     kind: 'table',
+    measure: 'wide',
     capabilities: { fullscreen: true, clickToExpand: false, zoom: false, pan: false, wrap: false, panelWrap: true, copy: false, annotate: true },
   },
   code: {
     kind: 'code',
+    measure: 'wide',
     capabilities: { fullscreen: true, clickToExpand: false, zoom: false, pan: false, wrap: true, panelWrap: false, copy: true, annotate: true },
   },
   callout: {
     kind: 'callout',
+    measure: 'prose',
     capabilities: { fullscreen: false, clickToExpand: false, zoom: false, pan: false, wrap: false, panelWrap: false, copy: false, annotate: true },
   },
   mermaid: {
     kind: 'mermaid',
+    measure: 'graphic',
     capabilities: { fullscreen: true, clickToExpand: true, zoom: true, pan: true, wrap: false, panelWrap: false, copy: true, annotate: true },
   },
   markmap: {
     kind: 'markmap',
+    measure: 'graphic',
     capabilities: { fullscreen: true, clickToExpand: true, zoom: true, pan: true, wrap: false, panelWrap: false, copy: true, annotate: true },
   },
   math: {
     kind: 'math',
+    measure: 'wide',
     capabilities: { fullscreen: false, clickToExpand: false, zoom: false, pan: false, wrap: false, panelWrap: false, copy: true, annotate: true },
   },
 }
+
+/**
+ * Block types that render through the component shell, and so set their own
+ * width from `measure`; every other block goes in the shared reading column.
+ */
+export const COMPONENT_BLOCKS: ReadonlySet<string> = new Set(['code', 'table', 'mermaid', 'markmap', 'math'])
 
 /** One header button slot, in the order the shell renders them. */
 export type FrameButton = 'fullscreen' | 'wrap' | 'annotate' | 'copy'
@@ -99,6 +133,8 @@ export interface ComponentView {
   lineStart: number
   lineEnd: number
   capabilities: ComponentCapabilities
+  /** The body's width policy; see {@link ComponentMeasure}. */
+  measure: ComponentMeasure
   copyText?: string
 }
 
@@ -292,6 +328,7 @@ export function componentOf(block: Block): ComponentView | null {
         lineStart: block.sourceStartLine,
         lineEnd: block.sourceEndLine,
         capabilities: COMPONENT_REGISTRY.table.capabilities,
+        measure: COMPONENT_REGISTRY.table.measure,
       }
     case 'code':
       return {
@@ -301,6 +338,7 @@ export function componentOf(block: Block): ComponentView | null {
         lineStart: block.sourceStartLine,
         lineEnd: block.sourceEndLine,
         capabilities: COMPONENT_REGISTRY.code.capabilities,
+        measure: COMPONENT_REGISTRY.code.measure,
         copyText: block.content,
       }
     case 'callout': {
@@ -313,6 +351,7 @@ export function componentOf(block: Block): ComponentView | null {
         lineStart: block.sourceStartLine,
         lineEnd: block.sourceEndLine,
         capabilities: COMPONENT_REGISTRY.callout.capabilities,
+        measure: COMPONENT_REGISTRY.callout.measure,
       }
     }
     case 'mermaid':
@@ -323,6 +362,7 @@ export function componentOf(block: Block): ComponentView | null {
         lineStart: block.sourceStartLine,
         lineEnd: block.sourceEndLine,
         capabilities: COMPONENT_REGISTRY.mermaid.capabilities,
+        measure: COMPONENT_REGISTRY.mermaid.measure,
         copyText: block.content,
       }
     case 'markmap':
@@ -333,6 +373,7 @@ export function componentOf(block: Block): ComponentView | null {
         lineStart: block.sourceStartLine,
         lineEnd: block.sourceEndLine,
         capabilities: COMPONENT_REGISTRY.markmap.capabilities,
+        measure: COMPONENT_REGISTRY.markmap.measure,
         copyText: block.content,
       }
     case 'math':
@@ -343,6 +384,7 @@ export function componentOf(block: Block): ComponentView | null {
         lineStart: block.sourceStartLine,
         lineEnd: block.sourceEndLine,
         capabilities: COMPONENT_REGISTRY.math.capabilities,
+        measure: COMPONENT_REGISTRY.math.measure,
         copyText: block.tex,
       }
     default:

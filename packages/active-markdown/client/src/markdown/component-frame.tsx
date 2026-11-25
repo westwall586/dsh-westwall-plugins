@@ -229,7 +229,7 @@ export function ComponentFrame({
   // Only the in-place copy opens the panel; the panel's own copy is already open.
   const clickToExpand = capabilities.clickToExpand && capabilities.fullscreen
   return (
-    <div className="am-component-slot" data-diff={diff}>
+    <div className="am-component-slot" data-diff={diff} data-measure={component.measure}>
       <div
         className="am-component"
         data-component={component.kind}

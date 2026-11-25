@@ -83,11 +83,47 @@
   position: relative;
 }
 
-/* Prose keeps a 44em reading measure; a component may use the whole pane, so a
-   wide table or a long code line needs less horizontal scrolling. */
-.am-doc > :where(.am-heading, .am-paragraph, .am-list, .am-quote, .am-callout, .am-divider) {
-  max-width: 44em;
+/* Reading width. Every block picks one of three measures, and the measure is
+   what sets the width, so nothing here lists block class names: prose blocks
+   sit inside `.am-prose-row`, and a component carries `data-measure` from the
+   component registry. A new block or component only chooses a measure.
+
+   A prose block is wrapped in `.am-prose-row`, which carries the plugin root's
+   font size and so resolves `em` against the host's content size. The cap lives
+   on that row instead of on the block, because `em` on a heading would measure
+   the heading's own scaled size and give every level a different column width.
+   With the cap on the row, a heading's box and the paragraphs' boxes line up,
+   and the measure still follows the content-size setting. Each cap is also
+   capped by the pane, so the measure decides how a wide pane is used, never
+   what fits in a narrow one. */
+[data-active-markdown] {
+  --am-measure-prose: 66em;
+  --am-measure-graphic: 96em;
+}
+
+[data-active-markdown] .am-prose-row {
+  max-width: min(var(--am-measure-prose), 100%);
   margin-inline: auto;
+}
+
+/* The row is a layout owner only: it must not become a box the prose styles see. */
+[data-active-markdown] .am-prose-row > * {
+  max-width: none;
+}
+
+[data-active-markdown] .am-component-slot[data-measure='prose'] {
+  max-width: min(var(--am-measure-prose), 100%);
+  margin-inline: auto;
+}
+
+[data-active-markdown] .am-component-slot[data-measure='graphic'] {
+  max-width: min(var(--am-measure-graphic), 100%);
+  margin-inline: auto;
+}
+
+/* `wide` states its intent rather than omitting a value: the pane is the cap. */
+[data-active-markdown] .am-component-slot[data-measure='wide'] {
+  max-width: none;
 }
 
 .am-heading {
@@ -906,8 +942,8 @@ svg.am-markmap-canvas .markmap-foreign > div {
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
+/* The measure comes from the prose row it sits in; only the bottom gap is its own. */
 .am-frontmatter {
-  max-width: 44em;
   margin: 0 auto 1.4em;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 8px;

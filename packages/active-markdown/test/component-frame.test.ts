@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 import { parseDocument } from '../client/src/markdown/blocks.ts'
-import { COMPONENT_REGISTRY, componentLabel, componentOf, frameButtons } from '../client/src/markdown/model.ts'
+import { COMPONENT_BLOCKS, COMPONENT_REGISTRY, componentLabel, componentOf, frameButtons } from '../client/src/markdown/model.ts'
 import { annotateBlock, blockAnnotationOf, blockAnchor } from '../client/src/annotate/model.ts'
 import { locateBlockAnchor } from '../client/src/annotate/selection.ts'
 
@@ -176,4 +176,37 @@ test('行号移动但内容与类型不变时仍能定位', () => {
   const located = locateBlockAnchor(annotation, shifted.blocks)
   assert.equal(located.status, 'located')
   if (located.status === 'located') assert.equal(located.block.id, TABLE.id)
+})
+
+test('每个组件声明一个宽度档位，注册表里没有遗漏', () => {
+  for (const [kind, definition] of Object.entries(COMPONENT_REGISTRY)) {
+    assert.equal(definition.kind, kind)
+    assert.ok(
+      ['prose', 'wide', 'graphic'].includes(definition.measure),
+      `${kind} must declare a known measure, got ${JSON.stringify(definition.measure)}`,
+    )
+  }
+})
+
+test('宽度档位按下文的读法分配：散文限宽、表格与代码铺满、图单独限宽', () => {
+  assert.equal(COMPONENT_REGISTRY.table.measure, 'wide')
+  assert.equal(COMPONENT_REGISTRY.code.measure, 'wide')
+  assert.equal(COMPONENT_REGISTRY.math.measure, 'wide')
+  assert.equal(COMPONENT_REGISTRY.callout.measure, 'prose')
+  assert.equal(COMPONENT_REGISTRY.mermaid.measure, 'graphic')
+  assert.equal(COMPONENT_REGISTRY.markmap.measure, 'graphic')
+})
+
+test('组件视图把档位带出来，外壳才能只靠一条规则排版', () => {
+  assert.equal(componentOf(TABLE)!.measure, 'wide')
+  assert.equal(componentOf(CODE)!.measure, 'wide')
+  const callout = parseDocument(['> [!NOTE] 提示', '> 正文'].join('\n')).blocks.find(block => block.type === 'callout')!
+  assert.equal(componentOf(callout)!.measure, 'prose')
+})
+
+test('只有组件自己定宽，其余块都进同一个阅读列', () => {
+  const componentTypes = ['code', 'table', 'mermaid', 'markmap', 'math']
+  for (const type of componentTypes) assert.ok(COMPONENT_BLOCKS.has(type), `${type} 走组件路径`)
+  const proseTypes = ['heading', 'paragraph', 'list', 'quote', 'divider', 'callout']
+  for (const type of proseTypes) assert.equal(COMPONENT_BLOCKS.has(type), false, `${type} 进阅读列`)
 })

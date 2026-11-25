@@ -1209,39 +1209,34 @@ svg.am-markmap-canvas .markmap-foreign > div {
   white-space: nowrap;
 }
 
-.am-stale {
-  color: var(--dsw-alias-label-tertiary);
-  font-size: var(--am-toolbar-size);
-  white-space: nowrap;
-}
-
-/* The automatic write's outcome; the failure face is the retry control. */
-.am-save-state {
-  flex: none;
-  color: var(--dsw-alias-label-tertiary);
-  font-size: var(--am-toolbar-size);
-  white-space: nowrap;
-}
-
-.am-save-retry {
+/* A toolbar note: a condition worth naming, not a warning lamp.
+   The icon carries the severity and the text stays in the toolbar's own weight
+   and color, so a note never competes with the action beside it. Only a note
+   that can be acted on (a retry) gets a border and a pointer. */
+.am-toolbar-note {
   flex: none;
   display: inline-flex;
   align-items: center;
   gap: 5px;
   height: 24px;
-  padding: 0 9px;
-  border: 0.5px solid color-mix(in srgb, var(--dsw-alias-state-warn-primary) 40%, transparent);
+  padding: 0 8px;
+  border: 0.5px solid transparent;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 10%, transparent);
-  color: var(--dsw-alias-state-warn-primary);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
   font: inherit;
-  font-size: 0.82em;
+  font-size: var(--am-toolbar-size);
   white-space: nowrap;
+}
+
+.am-toolbar-note--action {
+  border-color: var(--dsw-alias-border-l2);
   cursor: pointer;
 }
 
-.am-save-retry:hover {
-  background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 18%, transparent);
+.am-toolbar-note--action:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
 }
 
 .am-error-chip {

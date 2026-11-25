@@ -2460,26 +2460,26 @@ export function Body({
                         {toolbarError.kind === 'translate' ? t('translate.failedShort') : t('translate.tooLargeShort')}
                       </button>
                     ) : staleTranslation ? (
-                      <span className="am-stale" title={t('translate.stale')}>{t('translate.staleShort')}</span>
+                      <span className="am-toolbar-note" title={t('translate.stale')}>
+                        <AlertIcon />
+                        {t('translate.staleShort')}
+                      </span>
                     ) : null}
-                    {saveFlag === null ? null : saveFlag.kind === 'retry' ? (
+                    {/* Saving is automatic, so a successful one is the expected outcome and
+                        gets no receipt; only a failure still needs the reader, and it is the
+                        one that can be retried. `saveFlagOf` keeps reporting `saved` and
+                        `saving` because the state machine still needs them. */}
+                    {saveFlag !== null && saveFlag.kind === 'retry' ? (
                       <button
                         type="button"
-                        className="am-save-retry"
+                        className="am-toolbar-note am-toolbar-note--action"
                         title={`${saveFlag.message}${'\n'}${t('translate.saveRetry')}`}
                         onClick={retrySave}
                       >
                         <AlertIcon />
                         {t('translate.saveFailedShort')}
                       </button>
-                    ) : (
-                      <span
-                        className="am-save-state"
-                        title={saveFlag.kind === 'saved' ? t('translate.saved', { file: saveFlag.file }) : undefined}
-                      >
-                        {saveFlag.kind === 'saving' ? t('translate.saving') : t('translate.savedShort')}
-                      </span>
-                    )}
+                    ) : null}
                     <button type="button" className="am-toolbar-button" onClick={(event) => openAsk(event.currentTarget)}>
                       {t('translate.retranslate')}
                     </button>

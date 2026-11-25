@@ -3,6 +3,10 @@
 > 状态：方案（2026-11-25）。尚未实施。本方案把批注、翻译、编辑草稿、阅读位置等
 > “切走时必须存活”的状态收归进一个统一 store，替换当前散落的多个状态容器。
 > 宽度与字号、批注归档等后续事项见 [BACKLOG.md](BACKLOG.md)。
+>
+> **结构已由 [STATE-STORE-SYNTHESIS.md](STATE-STORE-SYNTHESIS.md) 取代**：本文保留定位、
+> 三条规则与验收，但第 3 至第 6 节（键、快照、接口、生命周期）按合成设计实现。两份文档
+> 冲突时以合成设计为准。
 
 ## 0. 定位：只读工具的临时状态
 
@@ -128,9 +132,11 @@ export interface DocumentStore {
 store 做完了翻译照样被打断。abort 只由三种情况触发：用户点“返回原文”/“重新翻译”、
 关闭页签、文档外部修改。
 
-**关键点二：区分“切走”与“关闭”的唯一可靠信号是 `tabInfo.tab.signal`。**
-宿主声明它“只在页签记录消失或插件卸载时 abort，不会因为隐藏或会话切换 abort”。
-在 `body.tsx` 的 effect 里监听它 → 调 `store.forget(key)`。卸载不碰它。
+**关键点二：区分“切走”与“关闭”需要一个比 body 活得久的观察者。**
+~~唯一可靠信号是 `tabInfo.tab.signal`，在 body 的 effect 里监听它。~~
+这条已被实测推翻：切走时 body 卸载，监听器随之消失，隐藏状态下关闭页签就没人听见。
+可行的做法是 `apply` 作用域里常驻的观察者订阅宿主的 `openTabs`，细节见
+[STATE-STORE-SYNTHESIS.md](STATE-STORE-SYNTHESIS.md) 第 5 节。
 
 **关键点三：外部修改由文档重新加载路径触发。** `body.tsx` 在 `loadDocument`
 拿到新 `version` 时调 `store.invalidate(key)`：终止翻译、丢弃编辑草稿（改为直接

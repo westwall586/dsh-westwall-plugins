@@ -34,6 +34,12 @@ export interface CrateDeps {
 export interface Crate {
   readonly key: DocumentKey
   /**
+   * 宿主读文件时给出的绝对路径。crate 的键在读到正文之前就定下了，而文档地址里的
+   * 路径是相对工作区的；批注与清理由 Host 按绝对路径存，所以这里记住第一条绝对
+   * 路径，之后的访问都用它。
+   */
+  rememberPath(path: string): void
+  /**
    * 某 composer 维度的批注面。槽归 crate，所以 body 卸载再挂回拿到的是同一个快照；
    * 每次调用累加引用计数，与 releaseCompose 配对。
    */
@@ -71,6 +77,10 @@ export function createCrate(deps: CrateDeps): Crate {
   const entries = new Map<string, ComposeEntry>()
   const readingSlot: ReadingSlot = createReadingSlot()
   const reading = createReading({ slot: readingSlot, ...(deps.readingDelayMs === undefined ? {} : { delayMs: deps.readingDelayMs }) })
+  /** crate 已知的绝对路径；没有时退回键里的那条。 */
+  let resolvedPath: string | undefined
+  const documentPath = (): string | undefined => resolvedPath
+  const storedPath = (): string => resolvedPath ?? deps.key.path
   /** 先前的关闭清理；Host 调用等它。 */
   let gate: Promise<void> = Promise.resolve()
   /** 已经在等门的那一份调用，复用它，免得每次调用多一层出队。 */
@@ -84,7 +94,8 @@ export function createCrate(deps: CrateDeps): Crate {
     if (gated !== undefined && gate === gated) gated = undefined
     return deps.host()
   })
-  const run = createTranslationRun({ key: deps.key, host: hostCall })
+  // 翻译运行按文件键控，涉及文件的 Host 调用同样要走文档的绝对路径。
+  const run = createTranslationRun({ key: deps.key, path: storedPath, host: hostCall })
   const editSlot: EditSlot = createEditSlot()
   const edit = createEdit(editSlot)
   const viewSlot: ViewPreferencesSlot = createPreferencesSlot()
@@ -104,7 +115,7 @@ export function createCrate(deps: CrateDeps): Crate {
       entry.handle.slot.snapshot = EMPTY_SNAPSHOT
       for (const listener of [...entry.handle.slot.listeners]) listener()
     }
-    return clearStored(deps.key, deps.host).catch((error: unknown) => {
+    return clearStored(deps.key, storedPath(), deps.host).catch((error: unknown) => {
       console.warn('[active-markdown] annotation clear failed', error)
     })
   }
@@ -116,7 +127,7 @@ export function createCrate(deps: CrateDeps): Crate {
       existing.refs += 1
       return existing.handle
     }
-    const handle = createNotes({ key: deps.key, compose, host: hostCall }, createNotesSlot(), chains)
+    const handle = createNotes({ key: deps.key, compose, host: hostCall, documentPath }, createNotesSlot(), chains)
     entries.set(compose, { handle, refs: 1 })
     return handle
   }
@@ -147,6 +158,9 @@ export function createCrate(deps: CrateDeps): Crate {
 
   return {
     key: deps.key,
+    rememberPath(path) {
+      if (resolvedPath === undefined) resolvedPath = path
+    },
     awaitCleanup(pending) {
       gate = Promise.all([gate, pending]).then(() => undefined, () => undefined)
       gated = undefined

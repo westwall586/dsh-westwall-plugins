@@ -13,6 +13,11 @@ export interface ReadingSlot {
 }
 
 export interface Reading {
+  /**
+   * 这份端口的身份。同一个路径上的 crate 可以被丢弃再建（关掉页签又重开），
+   * 等价于 `===` 的对象同一性，让订阅者能分辨“同一个 crate”与“同路径的新 crate”。
+   */
+  readonly clock: object
   /** 当前记录的像素位置，只用于落值与判断“是否有值”。 */
   get(view: View): number
   /** 节流写入；切走前必须先 flush，否则最后一段滚动会丢。 */
@@ -67,7 +72,9 @@ export function createReading(deps: ReadingDeps): Reading {
     }, delay)
   }
 
+  const clock: object = {}
   return {
+    clock,
     get(view) {
       if (pending !== null && pending.view === view) return pending.top
       return slot[view]

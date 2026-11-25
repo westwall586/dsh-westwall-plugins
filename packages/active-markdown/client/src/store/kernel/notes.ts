@@ -78,6 +78,11 @@ export interface NotesDeps {
   key: DocumentKey
   compose: string
   host(): Promise<HostBridge>
+  /**
+   * 宿主把文档地址里的路径原样交给 body，而 Host 只接受规范绝对路径。crate 的键
+   * 在知道绝对路径之前就定下了，所以这一层在每次访问时给出已知的那条路径。
+   */
+  documentPath?(): string | undefined
 }
 
 export interface NotesHandle {
@@ -97,10 +102,11 @@ export const EMPTY_SNAPSHOT: AnnotationSnapshot = Object.freeze({
 
 /**
  * 清掉一份文档的磁盘批注与 pending 记录。清理发生在 crate 被丢弃之后，此时没有
- * 任何一个 composer 维度还活着，所以它不属于某个 slot，只借 Host 的入口。
+ * 任何一个 composer 维度还活着，所以它不属于某个 slot，只借 Host 的入口；
+ * `path` 是 crate 已知的那条文档路径，见 `NotesDeps.documentPath`。
  */
-export function clearStored(key: DocumentKey, host: () => Promise<HostBridge>): Promise<void> {
-  return host().then(bridge => bridge.annotationClear({ sessionId: key.session, path: key.path }))
+export function clearStored(key: DocumentKey, path: string, host: () => Promise<HostBridge>): Promise<void> {
+  return host().then(bridge => bridge.annotationClear({ sessionId: key.session, path }))
 }
 
 function messageOf(error: unknown): string {
@@ -123,6 +129,11 @@ export function createWriteChains(): Map<string, Promise<void>> {
 
 export function createNotes(deps: NotesDeps, slot: NotesSlot, chains: Map<string, Promise<void>>): NotesHandle {
   const { key, compose } = deps
+  // 相对路径只用于内存键，宿主的两端（读、清）都按同一份文档的绝对路径找。
+  const storedPath = (): string => {
+    const known = deps.documentPath?.()
+    return known === undefined || !known.startsWith('/') ? key.path : known
+  }
   // 写链跨 handle 共享：同一个 composer 换一个句柄调用，写入仍然排队。
   const id = composeId(key, compose)
 
@@ -155,7 +166,7 @@ export function createNotes(deps: NotesDeps, slot: NotesSlot, chains: Map<string
       const host = await deps.host()
       const result = await host.annotationSave({
         sessionId: key.session,
-        path: key.path,
+        path: storedPath(),
         annotations: [...annotations],
         pending,
       })
@@ -182,7 +193,7 @@ export function createNotes(deps: NotesDeps, slot: NotesSlot, chains: Map<string
       let persistence: AnnotationPersistence = 'durable'
       try {
         const host = await deps.host()
-        draft = await host.annotationLoad({ sessionId: key.session, path: key.path })
+        draft = await host.annotationLoad({ sessionId: key.session, path: storedPath() })
       } catch {
         persistence = 'memory'
       }
@@ -287,7 +298,7 @@ export function createNotes(deps: NotesDeps, slot: NotesSlot, chains: Map<string
       if (current.roundId !== roundId) return refuse('round-mismatch')
       try {
         const host = await deps.host()
-        await host.reviewDetach({ sessionId: key.session, path: key.path, roundId })
+        await host.reviewDetach({ sessionId: key.session, path: storedPath(), roundId })
       } catch (error) {
         return { status: 'failed', message: messageOf(error) }
       }
@@ -307,7 +318,7 @@ export function createNotes(deps: NotesDeps, slot: NotesSlot, chains: Map<string
       let snapshotMissing: boolean
       try {
         const host = await deps.host()
-        const result = await host.reviewCommit({ sessionId: key.session, path: key.path, roundId, sentText })
+        const result = await host.reviewCommit({ sessionId: key.session, path: storedPath(), roundId, sentText })
         if (!result.committed) {
           return { status: 'failed', message: `review commit was not accepted: ${roundId}` }
         }
@@ -334,7 +345,7 @@ export function createNotes(deps: NotesDeps, slot: NotesSlot, chains: Map<string
       return withLock(async () => {
         try {
           const host = await deps.host()
-          await host.annotationClear({ sessionId: key.session, path: key.path })
+          await host.annotationClear({ sessionId: key.session, path: storedPath() })
           setSnapshot({ ...slot.snapshot, persistence: 'durable' })
           return { status: 'saved', durable: true }
         } catch (error) {

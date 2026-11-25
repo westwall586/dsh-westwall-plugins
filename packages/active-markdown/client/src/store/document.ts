@@ -44,6 +44,10 @@ export interface DocumentStore {
   editFor(session: string, path: string): Edit | null
   /** 取该文档的视图偏好；文档不存在时为 null。 */
   viewFor(session: string, path: string): ViewPreferences | null
+  /** crate 记住读到的那条绝对路径；之后的批注与翻译都按它找文件。 */
+  rememberPath(session: string, path: string, absolutePath: string): void
+  /** 地址里的路径是相对的：把绝对路径记到该会话下已有的每一个 crate 上。 */
+  rememberPathFor(session: string, absolutePath: string): void
   /** 登记一次 body 挂载。 */
   mount(ref: DocumentRef): void
   /** 撤销一次挂载；crate 与快照都保留。 */
@@ -127,6 +131,16 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
 
     viewFor(session, path) {
       return entries.get(crateId({ session, path }))?.crate.view ?? null
+    },
+
+    rememberPath(session, path, absolutePath) {
+      entries.get(crateId({ session, path }))?.crate.rememberPath(absolutePath)
+    },
+
+    rememberPathFor(session, absolutePath) {
+      for (const entry of entries.values()) {
+        if (entry.crate.key.session === session) entry.crate.rememberPath(absolutePath)
+      }
     },
 
     mount(ref) {

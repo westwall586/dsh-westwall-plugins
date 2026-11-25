@@ -12,6 +12,7 @@
  * 关闭；尚未确认关闭的 crate 一律按 `unload` 处理（只清内存，不动磁盘）。
  */
 import type { DocumentStore } from './document.ts'
+import { fileAddressOf } from '../source.ts'
 import { crateId, type DocumentRef } from './ref.ts'
 
 export interface DocumentMount {
@@ -94,12 +95,23 @@ export function createCloseObserver(deps: CloseObserverDeps): CloseObserver {
       const gone = new Set<string>()
       for (const [id, entry] of [...held]) {
         if (open.has(entry.address)) continue
+        // 空快照说明页签库还没发布第一次快照（应用启动、窗口重建时都是这样），
+        // 不是“页签都关了”；这时把任何登记当成关闭都会清掉刚恢复的文档。
+        if (open.size === 0) continue
         held.delete(id)
         gone.add(id)
       }
-      // 一个页签都没有时，没有登记的 crate（来自某个已不在快照里的会话）同样就是关闭。
-      // 只在快照为空时扫：快照非空说明它只覆盖一部分会话，扫会把还开着的文档误判成关闭。
-      if (open.size === 0) deps.documents.touch((session, path) => { gone.add(crateId({ session, path })) })
+      // 一次发布是能确定隐藏状态下关闭的唯一时机，但发布也发生在普通重载与挂载晚一步
+      // 的时候，那时页签还开着、只是暂时没有登记。所以一个 crate 没有登记时只有在它
+      // 的地址确实不在快照里才算关闭：按地址判，不能按“还有没有别的登记”判，否则
+      // 还开着的文档会被清掉。
+      deps.documents.touch((session, path) => {
+        const id = crateId({ session, path })
+        if (held.has(id)) return
+        const address = fileAddressOf(session, path)
+        if (address !== undefined && open.has(address)) return
+        gone.add(id)
+      })
       // 磁盘清理在本轮中途就会改 store，先把要关的收齐再动手。
       for (const id of gone) {
         const at = id.indexOf('\u0000')

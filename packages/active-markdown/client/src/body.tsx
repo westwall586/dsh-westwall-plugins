@@ -39,7 +39,7 @@ import {
   type TextLineAtom,
 } from './annotate/selection.ts'
 import { EMPTY_SNAPSHOT, refFrom, useEdit, useNotes, useTranslation, useViewPreferences } from './store/index.ts'
-import type { DocumentRef, DocumentStore, Notes, Registration, TranslationRun, View } from './store/index.ts'
+import type { DocumentRef, DocumentStore, Notes, Reading, Registration, TranslationRun, View } from './store/index.ts'
 import type {
   ContextMenuTarget,
   DescribeView,
@@ -66,6 +66,7 @@ import {
 import { ConflictPanel, EditBanner, EditToolbar, useEditCommand } from './edit/panel.tsx'
 import { scrollportOf } from './scroll.ts'
 import { dirty as draftDirty, sessionOf, type EditEvent } from './edit/state.ts'
+import { decideLoad, type LoadDecision, type PreviousLoad } from './document-load.ts'
 import { createImageResolver, type ImageResolver } from './images.ts'
 import { classifyLink } from './links.ts'
 import { parseDocument, type ParsedDocument } from './markdown/blocks.ts'
@@ -553,7 +554,15 @@ export function Body({
   const viewRef = useRef<View>(view)
   // Reading the view from this ref keeps the scroll listener out of a resubscribe.
   viewRef.current = view
+  // 绑定到最新一次渲染的 reading 端口：crate 换了实例时，滚动回调不能还写进旧的。
+  const readingRef = useRef<Reading | null>(null)
   const restored = useRef(false)
+  /**
+   * The last text this body read successfully, kept apart from `state`: a reload
+   * sets the screen to `loading` first, and the comparison must not lose the
+   * previous text then. A restored tab starts at `loading` with nothing read yet.
+   */
+  const lastLoadRef = useRef<PreviousLoad | null>(null)
   const currentTextRef = useRef('')
   if (state.status === 'ready') currentTextRef.current = state.text
 
@@ -583,10 +592,16 @@ export function Body({
   const { preferences, collapsed, updateCursor } = useViewPreferences(documents, sessionId, path)
   const editRef = useRef(edit)
   editRef.current = edit
-  const reading = useMemo(
-    () => (sessionId === undefined || path === undefined ? null : documents.readingFor(sessionId, path)),
-    [documents, sessionId, path],
-  )
+  /**
+   * The reading port of THIS body's crate. It is read on every render, not memoised
+   * by path: a tab that was closed and reopened reaches a new crate under the same
+   * path, and a memo held from the old one would write into a disposed crate while
+   * the restore below reads the new, empty one.
+   */
+  const reading = sessionId === undefined || path === undefined ? null : documents.readingFor(sessionId, path)
+  /** What the remember/restore effects below re-run on: this crate, or a new one at the same path. */
+  const readingClock = reading === null ? null : reading.clock
+  readingRef.current = reading
   /**
    * The element that owns this document's scrolling. It binds before the content
    * renders, so a restored offset would clamp to 0 there; the restored flag lets
@@ -606,28 +621,29 @@ export function Body({
   useEffect(() => {
     const node = container.current
     if (node === null || reading === null) return
-    const onScroll = (): void => { reading.record(viewRef.current, node.scrollTop) }
+    const onScroll = (): void => { readingRef.current?.record(viewRef.current, node.scrollTop) }
     node.addEventListener('scroll', onScroll, { passive: true })
     return () => {
       node.removeEventListener('scroll', onScroll)
       reading.flush()
     }
-  }, [reading])
+  }, [reading, readingClock])
 
   // Content has its height here, so the remembered offset can land instead of
   // clamping to 0, and the host's late write of a clamped offset is overridden.
+  //
+  // A remembered offset is only ever written by a scroll event, so while `restored`
+  // is false the current `scrollTop` is either 0 or the host's clamped value, never
+  // one this body should keep. Every ready transition (a tab remount, a reload of
+  // the same document) therefore re-applies the target once the content is laid
+  // out; a view switch is the one jump that does not come from this effect.
   useLayoutEffect(() => {
     const node = container.current
     if (node === null || reading === null || state.status !== 'ready') return
-    const target = reading.get(view)
-    if (restored.current) {
-      // The host rewrote the offset when this document's version was reported.
-      if (node.scrollTop !== target) node.scrollTop = target
-      return
-    }
     restored.current = true
-    node.scrollTop = target
-  }, [state.status, state.status === 'ready' ? state.version : undefined, view, reading])
+    const target = reading.get(view)
+    if (node.scrollTop !== target) node.scrollTop = target
+  }, [state.status, state.status === 'ready' ? state.version : undefined, view, reading, readingClock])
 
   // A view switch is a jump within the same scroller, so the incoming view gets its
   // own position and the outgoing one keeps its own.
@@ -720,7 +736,10 @@ export function Body({
     const controller = new AbortController()
     requestToken.current += 1
     const changedDocument = docKeyRef.current !== documentKey
+    const previous = lastLoadRef.current
     if (changedDocument) {
+      // 换文档：上一次读到的正文不再属于这次比较。
+      lastLoadRef.current = null
       docKeyRef.current = documentKey
       setView('source')
       setInstruction('')
@@ -741,11 +760,9 @@ export function Body({
       setExitConfirm(false)
       setEditedSinceOpen(false)
     } else if (stateRef.current.status !== 'ready') {
+      // 刷新恢复的页签、或读完前的又一次重读：屏幕上是空的，但上一次读到的正文
+      // 还在 lastLoadRef 里，所以这里只把屏幕交回 loading，不动翻译运行。
       setState({ status: 'loading' })
-    } else if (stateRef.current.text !== currentTextRef.current) {
-      // 文件被外部改写（宿主刷新）：旧正文的译文、批注与编辑草稿都不再属于它，
-      // 阅读位置按 external-change 的规则保留。
-      run?.abort()
     }
     void loadDocument(readBytes, { sessionId, path }, controller.signal).then((result) => {
       if (controller.signal.aborted) return
@@ -763,17 +780,32 @@ export function Body({
         version: result.version,
         bytes: result.bytes,
       }
-      const current = stateRef.current
-      if (!changedDocument && current.status === 'ready' && current.version === result.version && sameText(current.text, result.text)) {
+      // 上一次成功读到的正文与版本进了 lastLoadRef；之后的判断只看它，不看屏幕上
+      // 是什么状态。同版本重读（宿主刷新、保存后重载）不是外部改写。
+      lastLoadRef.current = { text: result.text, version: result.version }
+      const decision: LoadDecision = decideLoad({
+        changedDocument,
+        previous,
+        version: result.version,
+        text: result.text,
+        sameText,
+      })
+      if (decision === 'same') {
         setState(ready)
         return
       }
+      // 只有外部改写才动翻译运行；普通重读（宿主刷新、保存后重载）不 abort。
+      const rewrite = decision === 'external-change' || decision === 'rewrite'
+      if (rewrite) {
+        // 旧正文的译文、批注与编辑草稿都不再属于它，阅读位置按 external-change
+        // 的规则保留。
+        run?.abort()
+      }
       const phase = editRef.current
       if (phase.status !== 'reading') {
-        // 文件被外部改写：草稿与正在跑的翻译都不再对得上正文，直接退出编辑态并
-        // 告知；让用户在三方内容之间选一版只会更容易留下写错的稿。
+        // 编辑中遇到外部改写：草稿不再对得上正文，直接退出编辑态并告知；让用户
+        // 在三方内容之间选一版只会更容易留下写错的稿。
         setState(ready)
-        run?.abort()
         setInstruction('')
         setEditability({ status: 'ok', absolutePath: result.absolutePath, version: result.version })
         applyEdit({ type: 'exit' })
@@ -783,20 +815,27 @@ export function Body({
         if (!changedDocument) setNotice({ text: t('edit.externalDiscarded'), undo: false })
         return
       }
-      run?.abort()
-      setView('source')
-      setInstruction('')
-      setAsk(null)
-      setStored({ status: 'probing' })
-      setEditor(null)
-      setDrawerOpen(false)
-      setUndo(null)
-      setPinTops({})
-      setPeek(null)
-      setAttachBusy(false)
-      setAttachError(null)
-      setNotice(keepNotice.current)
-      keepNotice.current = null
+      if (decision === 'reload' && !changedDocument) {
+        // 版本变了、正文没变，而且不在编辑态：屏幕上的东西都还能用，只换正文与
+        // 版本。翻译运行不受影响，译文还能继续显示。
+        setState(ready)
+        return
+      }
+      if (rewrite) {
+        setView('source')
+        setInstruction('')
+        setAsk(null)
+        setStored({ status: 'probing' })
+        setEditor(null)
+        setDrawerOpen(false)
+        setUndo(null)
+        setPinTops({})
+        setPeek(null)
+        setAttachBusy(false)
+        setAttachError(null)
+        setNotice(keepNotice.current)
+        keepNotice.current = null
+      }
       setState(ready)
       restoreTranslation(result.text, requestToken.current)
     })
@@ -912,15 +951,30 @@ export function Body({
     [view, translatedParsed],
   )
   const absolutePath = state.status === 'ready' ? state.absolutePath : ''
+  /**
+   * The crate key's path, which is the address's path until the first read reports
+   * the absolute one. A body that remounts for a restored tab starts from
+   * `loading`, and it must reach the very same crate then; keying by the absolute
+   * path instead would move every stored position with it.
+   */
+  const documentPath = useMemo(() => path ?? absolutePath, [path, absolutePath])
   // The annotation draft belongs to the composer's session, never the
   // addressed document's session; the file operations belong to the latter.
   const documentRef = useMemo(
-    () => (sessionId === undefined || !composeSessionId || absolutePath === ''
+    () => (sessionId === undefined || !composeSessionId || documentPath === ''
       ? null
-      : refFrom({ session: sessionId, compose: composeSessionId, path: absolutePath })),
-    [sessionId, composeSessionId, absolutePath],
+      : refFrom({ session: sessionId, compose: composeSessionId, path: documentPath })),
+    [sessionId, composeSessionId, documentPath],
   )
   const { writer, snapshot } = useNotes(documents, documentRef)
+  // 写完编辑草稿后 body 才知道文档的绝对路径；批注、批注清理与翻译的 Host 调用都
+  // 按绝对路径找文件，所以要在 crate 建好之后再让它记住。
+  const knownPath = state.status === 'ready' ? state.absolutePath : undefined
+  useEffect(() => {
+    if (knownPath === undefined || sessionId === undefined || path === undefined) return
+    if (documents.has(sessionId, path)) documents.rememberPath(sessionId, path, knownPath)
+    else documents.rememberPathFor(sessionId, knownPath)
+  }, [documents, sessionId, path, knownPath, readingClock])
   // 登记靠 `tab.signal` 的生命周期，`useTabInfo()` 读到的就是它；登记项随 body 卸载
   // 撤销，页签在隐藏状态被关掉时由 apply 层的观察者接手。
   const tabSignal = typeof useTabInfo === 'function'

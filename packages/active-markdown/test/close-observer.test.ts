@@ -4,10 +4,12 @@ import assert from 'node:assert/strict'
 import type { HostBridge } from '../client/src/context.ts'
 import { createDocumentStore } from '../client/src/store/document.ts'
 import { createCloseObserver, type CloseObserver, type DocumentMount } from '../client/src/store/observer.ts'
+import { fileAddressOf } from '../client/src/source.ts'
 
 const SESSION = 's1'
-const PATH = '/w/a.md'
-const ADDRESS = `dsh-resource://file/session/${SESSION}${PATH}`
+/** 宿主给 body 的地址路径是相对工作区的，crate 的键用的就是它。 */
+const PATH = 'a.md'
+const ADDRESS = fileAddressOf(SESSION, PATH)
 
 interface Harness {
   documents: ReturnType<typeof createDocumentStore>
@@ -16,6 +18,8 @@ interface Harness {
   clears: string[]
   /** Release one pending annotation clear; the disk stays untouched until then. */
   releaseClear(): void
+  /** The host published a new `openTabs` snapshot. */
+  publish(): void
   /** Settle every pending microtask. */
   flush(): Promise<void>
 }
@@ -26,6 +30,8 @@ function flush(): Promise<void> {
 
 function harness(): Harness {
   const open = new Set<string>([ADDRESS])
+  /** 宿主每次发布快照才会调 `check()`；登记与撤销本身不触发检查。 */
+  const publish = (): void => { h.observer.check() }
   const clears: string[] = []
   const pending: Array<() => void> = []
   const bridge = {
@@ -46,15 +52,17 @@ function harness(): Harness {
     host: async () => bridge as unknown as HostBridge,
     readingDelayMs: 0,
   })
+  const h: Harness = {} as Harness
   const observer = createCloseObserver({
     documents,
     openAddresses: () => open,
     dispose: (session, path) => { void documents.dispose(session, path, 'close') },
   })
-  return {
+  Object.assign(h, {
     documents,
     observer,
     open,
+    publish,
     clears,
     releaseClear() {
       const resolve = pending.shift()
@@ -62,10 +70,12 @@ function harness(): Harness {
       resolve()
     },
     flush,
-  }
+  })
+  return h
 }
 
-function mount(h: Harness, signal = new AbortController().signal): DocumentMount {
+function mount(_h: Harness, signal = new AbortController().signal): DocumentMount {
+  // 页签地址就是宿主给 body 的那个：相对工作区的路径，没有前导斜杠。
   return { ref: { session: SESSION, compose: SESSION, path: PATH }, signal, address: ADDRESS }
 }
 
@@ -74,18 +84,20 @@ test('切走再切回（页签还在）不动状态', () => {
   const registration = h.observer.register(mount(h))
   h.documents.editFor(SESSION, PATH)?.reduce({ type: 'enter', text: '原文', version: 'v1', line: 1 })
 
-  // 切走：body 卸载，登记撤销，页签还在。
+  // 切走：body 卸载。页签还在，所以宿主这次不会发布新的快照；观测者自己也不会把
+  // 没有登记的 crate 判成关闭，否则刷新的时刻差就会把还开着的文档清掉。
   registration.release()
-  h.observer.check()
+  h.publish()
   assert.equal(h.clears.length, 0, '页签还开着就不清')
   assert.equal(h.documents.editFor(SESSION, PATH)?.getState().status, 'editing')
 
-  // 切回来：再登记一次，草稿还在。
+  // 切回来：再登记一次，草稿还在。页签一直开着，所以宿主不会为这次挂载发布快照。
   h.observer.register(mount(h))
-  h.observer.check()
-  assert.equal(h.clears.length, 0)
-  assert.equal(h.documents.editFor(SESSION, PATH)?.getState().status, 'editing')
+  const draft = h.documents.editFor(SESSION, PATH)
+  assert.equal(h.clears.length, 0, '没有发布就没有关闭')
+  assert.equal(draft?.getState().status, 'editing')
 })
+
 
 test('隐藏状态下关闭页签：登记已撤销也能从快照里发现', async () => {
   const h = harness()
@@ -94,7 +106,7 @@ test('隐藏状态下关闭页签：登记已撤销也能从快照里发现', as
   // body 卸载了：登记撤销，页签记录随后消失。
   registration.release()
   h.open.delete(ADDRESS)
-  h.observer.check()
+  h.publish()
   await h.flush()
 
   assert.deepEqual(h.clears, [`${SESSION}:${PATH}`], '磁盘批注被清掉')
@@ -106,13 +118,13 @@ test('同一文件两个页签：关掉一个不算关闭', async () => {
   const first = h.observer.register(mount(h))
   const second = h.observer.register(mount(h))
   first.release()
-  h.observer.check()
+  h.publish()
   assert.equal(h.clears.length, 0, '还有一个页签开着')
 
   // 最后一个页签关掉后，两条登记都已撤销，crate 也没有页签了。
   second.release()
   h.open.delete(ADDRESS)
-  h.observer.check()
+  h.publish()
   await h.flush()
   assert.deepEqual(h.clears, [`${SESSION}:${PATH}`])
 })
@@ -125,7 +137,7 @@ test('插件卸载不算关闭：abort 了也不清磁盘', async () => {
   // 宿主先 abort，再让插件的 effect 清理跑（先置 disposed 再让 abort 回调看见它）。
   h.observer.dispose()
   controller.abort()
-  h.observer.check()
+  h.publish()
   await h.flush()
 
   assert.deepEqual(h.clears, [], '磁盘批注不被清空')
@@ -136,7 +148,7 @@ test('关闭后又马上开回同一文件：新 crate 读到的是清空后的�
   const registration = h.observer.register(mount(h))
   registration.release()
   h.open.delete(ADDRESS)
-  h.observer.check()
+  h.publish()
 
   // 清理还没落地，reader 已经点开了同一个文件。
   h.open.add(ADDRESS)
@@ -156,15 +168,40 @@ test('关闭后又马上开回同一文件：新 crate 读到的是清空后的�
   assert.deepEqual(notes.notes.getSnapshot().annotations, [])
 })
 
-test('快照为空时，没有登记的 crate 也算关闭', async () => {
+test('宿主还没发布过快照（空）时不算关闭', async () => {
   const h = harness()
-  // 会话被删掉后它的页签记录已经不在快照里，body 也没机会再挂上来。
+  const registration = h.observer.register(mount(h))
   h.open.clear()
+  // 应用启动、窗口重建时页签库还是空的；这时关掉一个刚恢复的文档是数据丢失。
+  h.publish()
+  assert.equal(h.clears.length, 0)
+  // 刚恢复的文档还没挂上来，内存里也没有它的 crate；这时发布空快照不能清掉任何东西。
+  assert.equal(h.clears.length, 0)
+  registration.release()
+  h.publish()
+  assert.equal(h.clears.length, 0)
+})
+
+test('页签没了、快照非空时才算关闭', async () => {
+  const h = harness()
+  h.observer.register(mount(h))
+  h.open.clear()
+  h.open.add('dsh-resource://file/session/s1/other.md')
+  h.publish()
+  await h.flush()
+  assert.equal(h.clears.length, 1)
+})
+
+test('快照非空时，没有登记的 crate 也算关闭', async () => {
+  const h = harness()
+  // 会话被删掉后它的页签记录已经不在快照里，别的页签还开着，body 也没机会再挂上来。
+  h.open.clear()
+  h.open.add('dsh-resource://file/session/s1/other.md')
   // 会话没了：body 不会再挂上来，但 crate 还在。
   h.documents.mount({ session: SESSION, compose: SESSION, path: PATH })
   h.documents.editFor(SESSION, PATH)?.reduce({ type: 'enter', text: '原文', version: 'v1', line: 1 })
 
-  h.observer.check()
+  h.publish()
   await h.flush()
   // 清理发出后 crate 才被丢掉；落盘那一步由挂起的 annotationClear 收尾。
   assert.equal(h.clears.length, 1)

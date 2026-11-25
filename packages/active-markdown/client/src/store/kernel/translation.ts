@@ -28,6 +28,11 @@ export interface RunSource {
 export interface TranslationRunDeps {
   readonly key: RunKey
   host(): Promise<HostBridge>
+  /**
+   * 文档的绝对路径。运行在 crate 读到正文之前就可能被创建，那时键里还是地址给出的
+   * 相对路径；Host 的翻译与落盘都按绝对路径找文件。
+   */
+  path?(): string
 }
 
 export interface TranslationRun {
@@ -86,6 +91,7 @@ function storedRun(meta: TranslationMeta, described: DescribeView, extraInstruct
 }
 
 export function createTranslationRun(deps: TranslationRunDeps): TranslationRun {
+  const documentPath = (): string => deps.path?.() ?? deps.key.path
   let state: TranslationState = { status: 'idle' }
   /** 世代令牌：start、abort、dispose 都递增，晚到的异步结果据此作废。 */
   let generation = 0
@@ -108,7 +114,7 @@ export function createTranslationRun(deps: TranslationRunDeps): TranslationRun {
         const bridge = await deps.host()
         const saved = await bridge.save({
           sessionId: deps.key.session,
-          path: deps.key.path,
+          path: documentPath(),
           text: ready.source,
           translated: ready.text,
           lang: ready.run.lang,
@@ -214,7 +220,7 @@ export function createTranslationRun(deps: TranslationRunDeps): TranslationRun {
             set({ status: 'running', chunk: index + 1, chunks, ...(partial === undefined ? {} : { partial }) })
             replies.push(await bridge.translate({
               sessionId: deps.key.session,
-              path: deps.key.path,
+              path: documentPath(),
               text: sourceLines.slice(range.start, range.end).join('\n'),
               lang: settings.lang,
               ...(model === null ? {} : { provider: model.provider, model: model.model }),

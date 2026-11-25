@@ -63,8 +63,9 @@ test('只有真的变了才通知订阅者，且通知时已能读到新状态',
   assert.deepEqual(seen, ['editing', 'saving', 'reading'], '重复的 save 不通知')
 })
 
-test('没被打开过的文档没有编辑草稿', () => {
+test('文档消失后取不到编辑草稿与视图偏好', () => {
   const documents = store()
   documents.mount(REF)
   assert.equal(documents.editFor(SESSION, '/w/missing.md'), null)
+  assert.equal(documents.viewFor(SESSION, '/w/missing.md'), null)
 })

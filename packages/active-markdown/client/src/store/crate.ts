@@ -5,6 +5,7 @@
 import type { HostBridge } from '../context.ts'
 import { createEdit, createEditSlot, type Edit, type EditSlot } from './kernel/edit.ts'
 import { createNotes, createWriteChains, createNotesSlot, type NotesHandle } from './kernel/notes.ts'
+import { createPreferences, createPreferencesSlot, type ViewPreferences, type ViewPreferencesSlot } from './kernel/preferences.ts'
 import { createReading, createReadingSlot, type Reading, type ReadingSlot } from './kernel/reading.ts'
 import { createTranslationRun, type TranslationRun } from './kernel/translation.ts'
 import type { DocumentKey } from './ref.ts'
@@ -38,6 +39,8 @@ export interface Crate {
   readonly run: TranslationRun
   /** 编辑草稿：切走再切回要完整保留，关闭页签或文件被外部改写时丢弃。 */
   readonly edit: Edit
+  /** 视图偏好：目录折叠与更新游标。 */
+  readonly view: ViewPreferences
   /** 没有任何 composer 维度被持有。 */
   readonly empty: boolean
   dispose(reason: Disposal): void
@@ -58,6 +61,8 @@ export function createCrate(deps: CrateDeps): Crate {
   const run = createTranslationRun({ key: deps.key, host: deps.host })
   const editSlot: EditSlot = createEditSlot()
   const edit = createEdit(editSlot)
+  const viewSlot: ViewPreferencesSlot = createPreferencesSlot()
+  const view = createPreferences(viewSlot)
 
   const notesFor = (compose: string): NotesHandle => {
     if (disposed) throw new Error('crate is disposed')
@@ -102,6 +107,7 @@ export function createCrate(deps: CrateDeps): Crate {
     reading,
     run,
     edit,
+    view,
     get empty() {
       return entries.size === 0
     },

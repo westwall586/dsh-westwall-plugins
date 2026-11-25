@@ -1,10 +1,11 @@
 /**
  * React 绑定。body 用 useNotes 读一个 composer 的批注快照；文档级槽位（阅读位置、
- * 翻译运行、编辑草稿）归 crate，各自有一个读取点。
+ * 翻译运行、编辑草稿、视图偏好）归 crate，各自有一个读取点。
  */
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
 import { EMPTY_SNAPSHOT, type AnnotationSnapshot } from './kernel/notes.ts'
 import type { Edit } from './kernel/edit.ts'
+import { EMPTY_COLLAPSED, type ViewPreferences } from './kernel/preferences.ts'
 import type { TranslationRun } from './kernel/translation.ts'
 import type { TranslationState } from '../translate/state.ts'
 import type { EditState } from '../edit/state.ts'
@@ -88,3 +89,35 @@ export function useEdit(
   const getSnapshot = useCallback(() => (edit === null ? NO_EDIT : edit.getState()), [edit])
   return { edit, state: useSyncExternalStore(subscribe, getSnapshot, getSnapshot) }
 }
+
+/** Subscribe the body to its file's view preferences, for the folder folds and the update cursor. */
+export function useViewPreferences(
+  store: DocumentStore,
+  session: string | undefined,
+  path: string | undefined,
+): {
+  preferences: ViewPreferences | null
+  collapsed: ReadonlySet<string>
+  updateCursor: number
+} {
+  const preferences = useMemo(
+    () => (session === undefined || path === undefined ? null : store.viewFor(session, path)),
+    [store, session, path],
+  )
+  const subscribe = useCallback(
+    (listener: () => void) => (preferences === null ? NO_SUBSCRIBE : preferences.subscribe(listener)),
+    [preferences],
+  )
+  const getCollapsed = useCallback(
+    () => (preferences === null ? EMPTY_COLLAPSED : preferences.getCollapsed()),
+    [preferences],
+  )
+  const getCursor = useCallback(
+    () => (preferences === null ? 0 : preferences.getUpdateCursor()),
+    [preferences],
+  )
+  const collapsed = useSyncExternalStore(subscribe, getCollapsed, getCollapsed)
+  const updateCursor = useSyncExternalStore(subscribe, getCursor, getCursor)
+  return { preferences, collapsed, updateCursor }
+}
+

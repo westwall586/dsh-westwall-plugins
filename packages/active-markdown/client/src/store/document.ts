@@ -9,6 +9,7 @@
 import type { HostBridge } from '../context.ts'
 import type { Edit } from './kernel/edit.ts'
 import type { Notes } from './kernel/notes.ts'
+import type { ViewPreferences } from './kernel/preferences.ts'
 import type { Reading } from './kernel/reading.ts'
 import type { TranslationRun } from './kernel/translation.ts'
 import { createCrate, type Crate, type Disposal } from './crate.ts'
@@ -41,12 +42,21 @@ export interface DocumentStore {
   readingFor(session: string, path: string): Reading | null
   /** 取该文档的编辑草稿；文档不存在时为 null。 */
   editFor(session: string, path: string): Edit | null
+  /** 取该文档的视图偏好；文档不存在时为 null。 */
+  viewFor(session: string, path: string): ViewPreferences | null
   /** 登记一次 body 挂载。 */
   mount(ref: DocumentRef): void
   /** 撤销一次挂载；crate 与快照都保留。 */
   unmount(ref: DocumentRef): void
   /** 常驻观察者用它判断某文档是否还有存活状态。 */
   has(session: string, path: string): boolean
+  /**
+   * 为当前存活的 crate 各发一次信号。观察者拿它判断某个已不在任何登记里的 crate
+   * 有没有人还开着（比如来自已不存在的会话）；标记为 closed 的 crate 被跳过。
+   */
+  touch(live: (session: string, path: string) => void): void
+  /** 标记已发现页签消失；之后 `touch` 不再把它交给观察者。 */
+  closed(session: string, path: string): void
   dispose(session: string, path: string, reason: Disposal): void
   disposeAll(reason: Disposal): void
 }
@@ -54,6 +64,8 @@ export interface DocumentStore {
 interface Entry {
   readonly crate: Crate
   mounts: number
+  /** 观察者已确认页签消失；它之后可能还在等 `dispose` 完成落盘。 */
+  closed: boolean
 }
 
 export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
@@ -70,6 +82,7 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
           ...(deps.readingDelayMs === undefined ? {} : { readingDelayMs: deps.readingDelayMs }),
         }),
         mounts: 0,
+        closed: false,
       }
       entries.set(id, entry)
     }
@@ -105,6 +118,10 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
       return entries.get(crateId({ session, path }))?.crate.edit ?? null
     },
 
+    viewFor(session, path) {
+      return entries.get(crateId({ session, path }))?.crate.view ?? null
+    },
+
     mount(ref) {
       find(ref.path, ref.session).mounts += 1
     },
@@ -118,6 +135,18 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
 
     has(session, path) {
       return entries.has(crateId({ session, path }))
+    },
+
+    touch(live) {
+      for (const entry of entries.values()) {
+        if (entry.closed) continue
+        live(entry.crate.key.session, entry.crate.key.path)
+      }
+    },
+
+    closed(session, path) {
+      const entry = entries.get(crateId({ session, path }))
+      if (entry !== undefined) entry.closed = true
     },
 
     dispose(session, path, reason) {

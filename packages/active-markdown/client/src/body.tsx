@@ -38,7 +38,7 @@ import {
   type JoinedLines,
   type TextLineAtom,
 } from './annotate/selection.ts'
-import { EMPTY_SNAPSHOT, refFrom, useEdit, useNotes, useTranslation } from './store/index.ts'
+import { EMPTY_SNAPSHOT, refFrom, useEdit, useNotes, useTranslation, useViewPreferences } from './store/index.ts'
 import type { DocumentRef, DocumentStore, Notes, TranslationRun, View } from './store/index.ts'
 import type {
   ContextMenuTarget,
@@ -503,10 +503,8 @@ export function Body({
   /** A save-as keeps its path on screen through the reload it starts. */
   const keepNotice = useRef<Notice | null>(null)
   const [latest, setLatest] = useState<ReviewLatestView | null>(null)
-  const [updateCursor, setUpdateCursor] = useState(0)
   const [tocOpen, setTocOpen] = useState(false)
   const [tocPlacement, setTocPlacement] = useState<PanelPlacement | null>(null)
-  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(EMPTY_ANCHORS)
   const [activeToc, setActiveToc] = useState<string | undefined>(undefined)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editor, setEditor] = useState<Editor | null>(null)
@@ -570,6 +568,9 @@ export function Body({
   // The draft belongs to the file, not to this body: a tab switch keeps it, only a
   // close or an external rewrite drops it (the crate decides that).
   const { edit: draft, state: edit } = useEdit(documents, sessionId, path)
+  // Folder folds and the update cursor are document preferences: they survive a
+  // tab switch and reset when another document takes the pane.
+  const { preferences, collapsed, updateCursor } = useViewPreferences(documents, sessionId, path)
   const editRef = useRef(edit)
   editRef.current = edit
   const reading = useMemo(
@@ -967,12 +968,8 @@ export function Body({
   const toc = useMemo(() => tocEntries(displayed.blocks), [displayed])
 
   const toggleFold = useCallback((anchor: string): void => {
-    setCollapsed((current) => {
-      const next = new Set(current)
-      if (!next.delete(anchor)) next.add(anchor)
-      return next
-    })
-  }, [])
+    preferences?.toggleCollapsed(anchor)
+  }, [preferences])
   const rows = useMemo(() => tocRows(toc, collapsed, activeToc), [toc, collapsed, activeToc])
 
   const jumpToSection = useCallback((anchor: string): void => {
@@ -997,9 +994,11 @@ export function Body({
   const langCode = translation.status === 'ready' ? translation.run.lang : described?.settings.lang
   const langLabel = described?.languages.find(option => option.code === langCode)?.label ?? t('view.translated')
 
+  // 换文档（或同一份文档换了内容）时游标要归零；挂在 crate 上，所以切页签、
+  // 换视图都不清。
   useEffect(() => {
-    setUpdateCursor(0)
-  }, [diff, view])
+    preferences?.setUpdateCursor(0)
+  }, [preferences, diff, view])
 
   useEffect(() => {
     let live = true
@@ -1028,13 +1027,13 @@ export function Body({
     void target.offsetWidth
     target.classList.add('am-diff-flash')
     window.setTimeout(() => target.classList.remove('am-diff-flash'), 1200)
-    setUpdateCursor(next)
-  }, [updateCursor])
+    preferences?.setUpdateCursor(next)
+  }, [preferences, updateCursor])
 
   useEffect(() => {
-    setCollapsed(EMPTY_ANCHORS)
+    preferences?.setCollapsed(EMPTY_ANCHORS)
     setActiveToc(undefined)
-  }, [path, view])
+  }, [preferences, path, view])
 
   useLayoutEffect(() => {
     if (!tocOpen) {
